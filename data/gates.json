@@ -1,0 +1,57 @@
+{
+  "types": {
+    "atk_mul2": {
+      "label": "攻擊 ×2",
+      "effects": [{ "stat": "attack", "op": "mul", "value": 2 }]
+    },
+    "atk_mul3_gel_cost": {
+      "label": "攻擊 ×3\n凝膠 -30",
+      "effects": [
+        { "stat": "attack", "op": "mul", "value": 3 },
+        { "stat": "gel", "op": "add", "value": -30 }
+      ]
+    },
+    "atk_add35_shield_cost": {
+      "label": "攻擊 +35\n護盾 -1",
+      "effects": [
+        { "stat": "attack", "op": "add", "value": 35 },
+        { "stat": "shield", "op": "add", "value": -1 }
+      ]
+    },
+    "gel_add40": {
+      "label": "凝膠 +40",
+      "effects": [{ "stat": "gel", "op": "add", "value": 40 }]
+    },
+    "gel_add60_atk_cost": {
+      "label": "凝膠 +60\n攻擊 ÷2",
+      "effects": [
+        { "stat": "gel", "op": "add", "value": 60 },
+        { "stat": "attack", "op": "mul", "value": 0.5 }
+      ]
+    },
+    "shield_add1": {
+      "label": "護盾 +1",
+      "effects": [{ "stat": "shield", "op": "add", "value": 1 }]
+    },
+    "shield_add2_gel_cost": {
+      "label": "護盾 +2\n凝膠 -40",
+      "effects": [
+        { "stat": "shield", "op": "add", "value": 2 },
+        { "stat": "gel", "op": "add", "value": -40 }
+      ]
+    },
+    "atk_add20": {
+      "label": "攻擊 +20",
+      "effects": [{ "stat": "attack", "op": "add", "value": 20 }]
+    }
+  },
+
+  "pairs": [
+    { "left": "atk_mul2", "right": "gel_add40" },
+    { "left": "atk_mul3_gel_cost", "right": "shield_add1" },
+    { "left": "gel_add60_atk_cost", "right": "atk_add20" },
+    { "left": "shield_add2_gel_cost", "right": "atk_mul2" },
+    { "left": "atk_add35_shield_cost", "right": "gel_add40" },
+    { "left": "atk_add20", "right": "shield_add1" }
+  ]
+}

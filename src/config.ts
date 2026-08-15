@@ -21,3 +21,32 @@ export const MIN_SUPPORTED_HEIGHT = 640;
 export function aspectRatio(width: number, height: number): number {
   return width / height;
 }
+
+/**
+ * 配色。
+ *
+ * 刻意不放進 `data/balance.json`：TECH_SPEC 第 3 節要求資料驅動的對象是
+ * 「遊戲數值」（敵人屬性、閘門數值、經驗曲線等），配色屬美術風格，
+ * 調整時機與調數值完全不同，混在一起只會讓 balance.json 變成雜物櫃。
+ */
+export const PALETTE = {
+  skyTop: 0x1a1033,
+  skyBottom: 0x4a2a5e,
+  ground: 0x241a33,
+  road: 0x3a2b4d,
+  roadStripe: 0x463455,
+  roadEdge: 0xffc46b,
+  centerLine: 0x6b5a80,
+  deadZone: 0x7a3b52,
+  gateGood: 0x4fd1a5,
+  gateBad: 0xe86a8a,
+  slime: 0x4fd1a5,
+  slimeEye: 0x0d1b1e,
+  text: 0xe8f5f0,
+  textDim: 0x9aa8b5,
+} as const;
+
+/** 供 Phaser Text 使用的十六進位字串。 */
+export function hex(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
+}

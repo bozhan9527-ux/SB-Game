@@ -11,7 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "phaser": "3.90.0"
+    "phaser": "3.90.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "typescript": "7.0.2",

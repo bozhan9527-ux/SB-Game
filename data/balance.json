@@ -1,0 +1,50 @@
+{
+  "projection": {
+    "horizonY": 300,
+    "focalLength": 260,
+    "cameraHeight": 2.4,
+    "roadHalfWidth": 1.0,
+    "nearZ": 0.5,
+    "farZ": 14
+  },
+  "gateRun": {
+    "speedZPerSecond": 3.2,
+    "gateSpacingZ": 4.5,
+    "firstGateZ": 9,
+    "deadZoneX": 0.12,
+    "playerMaxX": 0.65,
+    "wallHitGelPenalty": 20
+  },
+  "drag": {
+    "pixelsPerUnitX": 110,
+    "recenterOnRelease": false
+  },
+  "battleStart": {
+    "gel": 100,
+    "gelMax": 100,
+    "shield": 0,
+    "baseAttack": 10
+  },
+  "render": {
+    "gateHeightWorld": 0.85,
+    "stripeLengthZ": 1.6,
+    "playerZ": 1.2,
+    "playerRadiusWorld": 0.26,
+    "roadSampleCount": 28,
+    "labelMinScale": 40
+  },
+  "encounters": {
+    "minion": {
+      "minGates": 3,
+      "maxGates": 5
+    },
+    "hero": {
+      "minGates": 5,
+      "maxGates": 8
+    },
+    "boss": {
+      "minGates": 10,
+      "maxGates": 10
+    }
+  }
+}
