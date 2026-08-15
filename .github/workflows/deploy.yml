@@ -39,10 +39,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 註：不使用 enablement: true 自動啟用 Pages。實測 GITHUB_TOKEN 無此權限
+      # （Create Pages site failed: Resource not accessible by integration），
+      # Pages 的 Source 必須先在 repo 設定頁手動切為 GitHub Actions。
       - uses: actions/configure-pages@v5
-        with:
-          # 若 repo 尚未啟用 Pages，嘗試由 workflow 自動啟用（已啟用則為 no-op）
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
