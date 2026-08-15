@@ -28,12 +28,17 @@
 
 ## 二、當前待辦
 
-### 需製作人操作（Claude 無權限，阻塞首次部署）
+### 部署現況（重要，動 CI 前先讀）
 
-- [ ] GitHub → Settings → Pages → Build and deployment 的 **Source 選 GitHub Actions**
-- [ ] 建立／確認 `main` 為預設分支，並把 `claude/game-design-beg7xo` 併入
-      （`deploy.yml` 依 TECH_SPEC 第 5 節只在 push 到 `main` 時觸發；未併入前可在 Actions 頁面用 `workflow_dispatch` 手動跑一次）
-- [ ] 手機開 `https://bozhan9527-ux.github.io/SB-Game/` 確認畫面
+首次部署已成功：<https://bozhan9527-ux.github.io/SB-Game/>
+
+**但目前 push 到 `main` 不會部署成功。** 原因見下方 L-01。
+現行可用的部署方式：**在 Actions 頁面對 `deploy.yml` 用 `workflow_dispatch` 手動觸發，且 ref 必須選 `claude/game-design-beg7xo`。**
+
+- [ ] **待辦：把預設分支改為 `main`**（Settings → General → Default branch）。
+      2026-08-15 首次嘗試時 GitHub 網頁版回報 `Could not change default branch`，
+      兩個分支都存在且無保護規則，疑為手機版網頁的暫時性問題，改用桌機再試。
+      改完之後 push 到 `main` 即可自動部署，屆時本節可刪除。
 
 ### 階段 1a — ExploreScene（下一步）
 
@@ -76,7 +81,23 @@ D-11 只在做變現版時才需要，目前不阻塞。
 
 > 同一個錯誤出現第二次即代表缺機制。記錄於此，並轉為規則或自動檢查。
 
-（目前無）
+### L-01 [2026-08-15] GitHub Pages 只允許從預設分支部署
+
+**現象**：`deploy` job 在 2 秒內失敗，零個步驟被執行，且無任何 log 可下載。
+`build` job（型別檢查、測試、建置、上傳 artifact）全部成功。
+
+**原因**：啟用 Pages 時 GitHub 會自動建立 `github-pages` 環境，其部署分支政策
+**預設只允許 repo 的預設分支**。本 repo 建立時是空的，GitHub 把第一個被推上去的
+分支 `claude/game-design-beg7xo` 設為預設，因此從 `main` 觸發的部署在 job 啟動前
+就被環境保護規則拒絕——這也是為何完全沒有 log。
+
+**機制化措施**：
+1. 本檔「部署現況」一節記錄現行唯一可用的部署方式（dispatch + 指定 ref）。
+2. `deploy.yml` 保留 `workflow_dispatch`，這是目前唯一能部署的途徑，**不得移除**。
+3. 根治方式是把預設分支改為 `main`；未完成前不要以為 push 到 `main` 就會上線。
+
+**判讀原則**：往後若見到某個 job「零步驟、秒失敗、無 log」，優先懷疑環境保護規則
+或權限，不要往程式碼方向查。
 
 格式範例：
 ```
@@ -108,6 +129,11 @@ D-11 只在做變現版時才需要，目前不阻塞。
 | `npm test` | 4 項通過 |
 | 瀏覽器實際畫面 | 以 Chromium 於 360×640 與 393×852 實測，畫布正確置中縮放、無 JS 錯誤 |
 
-**與規格的差異（需製作人追認）**：`deploy.yml` 除 TECH_SPEC 第 5 節指定的 `push: main` 外，另加了 `workflow_dispatch` 手動觸發。原因是開發分支尚未併入 `main` 前無法產生可供手機實測的部署，與第 5 節的擋關規範不衝突（手動觸發同樣要跑完型別檢查與測試）。若不接受請告知，會移除。
+CI 上同樣三道閘門全過（run 31858703956），`deploy` job 成功，GitHub 回報部署狀態
+`success`，environment_url 為 <https://bozhan9527-ux.github.io/SB-Game/>。
 
-**尚未驗證**：GitHub Pages 線上實機。Pages 的 Source 設定需製作人在 repo 設定頁操作，Claude 無此權限——這一項目前是「本機建置與瀏覽器渲染已驗證，線上部署未驗證」，不算完整完成。
+**與規格的差異（需製作人追認）**：`deploy.yml` 除 TECH_SPEC 第 5 節指定的 `push: main` 外，另加了 `workflow_dispatch` 手動觸發。事後證明這是目前唯一能成功部署的途徑（見 L-01），建議保留。
+
+**尚未驗證**：線上頁面的實際畫面。Claude 所在容器的網路政策封鎖 `*.github.io`
+（CONNECT 403），無法自行開啟該網址確認渲染結果——這是環境限制，非程式問題。
+本機 Chromium 的渲染已驗證，線上渲染需製作人以手機確認。
