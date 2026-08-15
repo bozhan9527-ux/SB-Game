@@ -40,6 +40,9 @@ jobs:
         run: npm run build
 
       - uses: actions/configure-pages@v5
+        with:
+          # 若 repo 尚未啟用 Pages，嘗試由 workflow 自動啟用（已啟用則為 no-op）
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
