@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 46" width="34" height="46">
+  <!-- 敵陣兵卒。純白繪製，由 Phaser setTint 上色。比門人更寬、更低伏，帶角與兵刃。 -->
+  <path d="M17 16c-7 0-11 9-12 29h24c-1-20-5-29-12-29z" fill="#ffffff"/>
+  <path d="M5 25L1 18l6-3 3 6z" fill="#ffffff"/>
+  <path d="M29 25l4-7-6-3-3 6z" fill="#ffffff"/>
+  <path d="M17 3c4 0 7 3 7 7s-3 7-7 7-7-3-7-7 3-7 7-7z" fill="#ffffff"/>
+  <path d="M11 5L4 0l4 8z" fill="#ffffff"/>
+  <path d="M23 5l7-5-4 8z" fill="#ffffff"/>
+  <g fill="#000000" opacity="0.75">
+    <path d="M12 9l5 2-5 1z"/>
+    <path d="M22 9l-5 2 5 1z"/>
+  </g>
+  <path d="M5 30h24l.6 4H4.4z" fill="#000000" opacity="0.3"/>
+</svg>

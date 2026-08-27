@@ -1,8 +1,8 @@
 {
-  "swipe": {
-    "minDistancePx": 40,
-    "maxDurationMs": 300,
-    "axisRatio": 1.5
+  "input": {
+    "followSpeed": 15,
+    "trackMarginPx": 95,
+    "momentumPerPixel": 0.004
   },
   "run": {
     "gateSpeedBase": 165,
@@ -42,7 +42,6 @@
     "timeLimitMs": 40000,
     "dpsFactor": 0.6,
     "tickMs": 100,
-    "momentumPerSwipe": 0.12,
     "momentumMax": 0.6,
     "momentumDecayPerSec": 0.25
   },

@@ -9,15 +9,17 @@ import type { BossArt } from './data/types';
 
 export const ART = {
   disciple: 'disciple',
+  enemy: 'enemy',
   gateArch: 'gate-arch',
-  mobLine: 'mob-line',
   cloud: 'cloud',
   slash: 'slash',
 } as const;
 
 /** 門人圖以兩倍尺寸點陣化再縮小，避免在高解析度手機上糊掉。 */
 export const DISCIPLE_SOURCE_HEIGHT = 80;
-export const DISCIPLE_DISPLAY_HEIGHT = 30;
+export const DISCIPLE_DISPLAY_HEIGHT = 44;
+export const ENEMY_SOURCE_HEIGHT = 92;
+export const ENEMY_DISPLAY_HEIGHT = 58;
 
 export function bossTexture(art: BossArt): string {
   return `boss-${art}`;
@@ -32,8 +34,8 @@ interface SvgSpec {
 
 const SVGS: readonly SvgSpec[] = [
   { key: ART.disciple, file: 'disciple.svg', width: 56, height: DISCIPLE_SOURCE_HEIGHT },
+  { key: ART.enemy, file: 'enemy.svg', width: 68, height: ENEMY_SOURCE_HEIGHT },
   { key: ART.gateArch, file: 'gate-arch.svg', width: 448, height: 232 },
-  { key: ART.mobLine, file: 'mob-line.svg', width: 448, height: 92 },
   { key: ART.cloud, file: 'cloud.svg', width: 240, height: 76 },
   { key: ART.slash, file: 'slash.svg', width: 240, height: 240 },
   { key: bossTexture('beast'), file: 'boss-beast.svg', width: 320, height: 320 },

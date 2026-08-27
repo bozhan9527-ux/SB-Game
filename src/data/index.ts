@@ -31,7 +31,7 @@ const GATE_OPS: readonly GateOp[] = ['add', 'mul'];
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
-  const swipe = obj(raw, 'swipe', path);
+  const input = obj(raw, 'input', path);
   const run = obj(raw, 'run', path);
   const power = obj(raw, 'power', path);
   const mob = obj(raw, 'mob', path);
@@ -40,10 +40,10 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const p = (o: unknown, k: string, sub: string): number => num(o, k, `${path}.${sub}`);
 
   return {
-    swipe: {
-      minDistancePx: p(swipe, 'minDistancePx', 'swipe'),
-      maxDurationMs: p(swipe, 'maxDurationMs', 'swipe'),
-      axisRatio: p(swipe, 'axisRatio', 'swipe'),
+    input: {
+      followSpeed: p(input, 'followSpeed', 'input'),
+      trackMarginPx: p(input, 'trackMarginPx', 'input'),
+      momentumPerPixel: p(input, 'momentumPerPixel', 'input'),
     },
     run: {
       gateSpeedBase: p(run, 'gateSpeedBase', 'run'),
@@ -83,7 +83,6 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       timeLimitMs: p(boss, 'timeLimitMs', 'boss'),
       dpsFactor: p(boss, 'dpsFactor', 'boss'),
       tickMs: p(boss, 'tickMs', 'boss'),
-      momentumPerSwipe: p(boss, 'momentumPerSwipe', 'boss'),
       momentumMax: p(boss, 'momentumMax', 'boss'),
       momentumDecayPerSec: p(boss, 'momentumDecayPerSec', 'boss'),
     },

@@ -5,14 +5,14 @@
  * 格式錯誤必須在載入階段就報錯。
  */
 
-/** 滑動手勢判定門檻（TECH_SPEC 第 4.5 節）。 */
-export interface SwipeThresholds {
-  /** 位移下限，單位 px。 */
-  minDistancePx: number;
-  /** 時間上限，單位 ms。 */
-  maxDurationMs: number;
-  /** 主軸判定倍率：水平位移須大於垂直位移 ×axisRatio 才算左右滑。 */
-  axisRatio: number;
+/** 觸控跟隨的手感參數（TECH_SPEC 第 4.5 節）。 */
+export interface InputBalance {
+  /** 隊伍逼近手指的速度，越大越跟手、越小越滑順。單位為每秒的逼近率。 */
+  followSpeed: number;
+  /** 隊伍中心與路面邊緣的最小距離，避免整團跑出賽道。 */
+  trackMarginPx: number;
+  /** 首領戰中，每移動一像素累積的氣勢。 */
+  momentumPerPixel: number;
 }
 
 /** 關卡推進（閘門捲動）相關常數。 */
@@ -79,8 +79,7 @@ export interface BossBalance {
   /** 隊伍戰力換算為每秒傷害的係數。 */
   dpsFactor: number;
   tickMs: number;
-  /** 首領戰中每次滑動累積的氣勢（傷害加成）。 */
-  momentumPerSwipe: number;
+  /** 氣勢（傷害加成）的上限。 */
   momentumMax: number;
   momentumDecayPerSec: number;
 }
@@ -96,7 +95,7 @@ export interface GoldBalance {
 }
 
 export interface Balance {
-  swipe: SwipeThresholds;
+  input: InputBalance;
   run: RunBalance;
   power: PowerBalance;
   mob: MobBalance;
