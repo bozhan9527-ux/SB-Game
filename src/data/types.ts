@@ -82,6 +82,15 @@ export interface BossBalance {
   /** 氣勢（傷害加成）的上限。 */
   momentumMax: number;
   momentumDecayPerSec: number;
+  /**
+   * 守勢：手指停住不動超過這個時間就進入守勢。
+   * 首領戰因此有了真正的取捨——猛攻輸出高但挨打重，守勢挨打輕但打不動。
+   */
+  guardIdleMs: number;
+  /** 守勢時的輸出倍率。 */
+  guardDpsMultiplier: number;
+  /** 守勢時承受傷害的倍率。 */
+  guardDamageMultiplier: number;
 }
 
 /**
@@ -108,6 +117,9 @@ export interface Balance {
   gold: GoldBalance;
 }
 
+/** 背景地貌。十個境界不只換色，連遠景的形狀都不同。 */
+export type Scenery = 'peaks' | 'forest' | 'sea' | 'volcano' | 'voidrock' | 'storm' | 'palace' | 'celestial';
+
 /** 境界。關卡編號落在 [stageFrom, stageTo] 之間即為該境界。 */
 export interface Realm {
   id: string;
@@ -119,6 +131,8 @@ export interface Realm {
   color: string;
   /** 境界壓制：對隊伍戰力的加成比例。 */
   powerBonus: number;
+  /** 遠景地貌。 */
+  scenery: Scenery;
 }
 
 /** 門派造型，對應 public/art/disciple-*.svg。 */
@@ -144,6 +158,20 @@ export interface Sect {
   goldMultiplier: number;
   /** 敵陣傷亡倍率，越低越耐打。 */
   mobLossMultiplier: number;
+
+  // 以下是「會改變玩法決策」的被動，不只是數值差異。
+  /** 被動的一句話說明。 */
+  passive: string;
+  /** 每關前幾次敵陣完全免傷（體修）。 */
+  mobImmunityCount: number;
+  /** 陷阱閘門是否完全無效（符修）。 */
+  trapImmune: boolean;
+  /** 每通過一道金幣閘門回復的人數比例（丹修）。 */
+  goldGateHealRatio: number;
+  /** 首領戰的起始氣勢，1 為滿（劍修）。 */
+  bossStartMomentum: number;
+  /** 氣勢衰退倍率（劍修為 2，衰退加倍）。 */
+  momentumDecayMultiplier: number;
 }
 
 export type GateTarget = 'disciples' | 'arms' | 'gold';
@@ -205,6 +233,20 @@ export interface BossDef {
   name: string;
   taunt: string;
   art: BossArt;
+}
+
+/** 成就的達成條件種類。 */
+export type AchievementKind = 'stage' | 'crowd' | 'arms' | 'fastBoss' | 'clears' | 'gold' | 'sects';
+
+export interface Achievement {
+  id: string;
+  name: string;
+  desc: string;
+  kind: AchievementKind;
+  /** 門檻。fastBoss 為毫秒上限，其餘為下限。 */
+  value: number;
+  /** 達成時發放的金幣。 */
+  reward: number;
 }
 
 export interface EnemyBook {

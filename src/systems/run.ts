@@ -47,6 +47,8 @@ export interface RunState {
   encounters: Encounter[];
   /** 下一個待結算的遭遇索引。 */
   cursor: number;
+  /** 已用掉幾次敵陣免傷（體修被動）。 */
+  mobImmunityUsed: number;
 }
 
 export interface GateResult {
@@ -54,6 +56,8 @@ export interface GateResult {
   discipleDelta: number;
   armsDelta: number;
   goldDelta: number;
+  /** 被動生效時的提示文字，沒有就是 null。 */
+  passiveNote: string | null;
 }
 
 export interface BossState {
@@ -198,6 +202,7 @@ export function createRunState(loadout: Loadout, seed: number): RunState {
     goldCollected: 0,
     encounters: buildEncounters(loadout.stage, rng),
     cursor: 0,
+    mobImmunityUsed: 0,
   };
 }
 
@@ -210,6 +215,13 @@ export function createRunState(loadout: Loadout, seed: number): RunState {
 export function applyGate(state: RunState, choice: GateChoice): GateResult {
   const before = { disciples: state.disciples, arms: state.arms };
   const armsMul = state.loadout.armsMultiplier;
+  const sect = state.loadout.sect;
+  let passiveNote: string | null = null;
+
+  // 符修：陷阱完全無效。玩家因此可以無視陷阱側，選擇邏輯與其他門派不同。
+  if (choice.trap && sect.trapImmune) {
+    return { choice, discipleDelta: 0, armsDelta: 0, goldDelta: 0, passiveNote: '符籙鎮邪' };
+  }
 
   if (choice.target === 'disciples') {
     // 聚眾成軍是乘算：加算閘門的收益也一起放大，這條線才不會在後期被稀釋。
@@ -234,11 +246,19 @@ export function applyGate(state: RunState, choice: GateChoice): GateResult {
     choice.target === 'gold' ? Math.round(choice.value * state.loadout.goldMultiplier) : 0;
   state.goldCollected += goldDelta;
 
+  // 丹修：金幣閘門兼具補血，讓「拿錢」與「保人」不再是互斥選擇。
+  if (choice.target === 'gold' && sect.goldGateHealRatio > 0) {
+    const healed = Math.max(1, Math.round(state.disciples * sect.goldGateHealRatio));
+    state.disciples = Math.min(BALANCE.power.maxDisciples, state.disciples + healed);
+    passiveNote = `丹藥回春 +${healed}`;
+  }
+
   return {
     choice,
     discipleDelta: state.disciples - before.disciples,
     armsDelta: state.arms - before.arms,
     goldDelta,
+    passiveNote,
   };
 }
 
@@ -282,8 +302,17 @@ export function mobLoss(state: RunState, encounter: MobEncounter): number {
   );
 }
 
-/** 結算敵陣，回傳實際損失人數。 */
+/**
+ * 結算敵陣，回傳實際損失人數。
+ *
+ * 體修的前幾次敵陣完全免傷（被動），因此體修可以先放心堆人數，
+ * 不必像其他門派那樣一開場就得顧武裝——這是玩法上的差異，不只是數值。
+ */
 export function resolveMob(state: RunState, encounter: MobEncounter): number {
+  if (state.mobImmunityUsed < state.loadout.sect.mobImmunityCount) {
+    state.mobImmunityUsed += 1;
+    return 0;
+  }
   const loss = Math.min(state.disciples, mobLoss(state, encounter));
   state.disciples -= loss;
   return loss;

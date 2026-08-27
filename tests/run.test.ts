@@ -66,10 +66,42 @@ describe('閘門結算', () => {
     expect(talisman.arms).toBe(15); // 10 × 1.5
     expect(body.arms).toBe(10);
 
-    const talisman2 = stateFor('talisman');
-    talisman2.arms = 20;
-    applyGate(talisman2, { templateId: 't', target: 'arms', op: 'add', value: -10, trap: true, label: '' });
-    expect(talisman2.arms).toBe(10); // 陷阱不因門派而加倍
+    // 陷阱不因武裝加成而放大。符修現在對陷阱免疫，改用體修驗證這條規則。
+    const body2 = stateFor('body');
+    body2.arms = 20;
+    applyGate(body2, { templateId: 't', target: 'arms', op: 'add', value: -10, trap: true, label: '' });
+    expect(body2.arms).toBe(10);
+  });
+
+  it('符修對陷阱免疫，踩到完全無效（門派被動）', () => {
+    const talisman = stateFor('talisman');
+    talisman.arms = 20;
+    const before = talisman.disciples;
+    const result = applyGate(talisman, {
+      templateId: 't', target: 'disciples', op: 'mul', value: 0.5, trap: true, label: '',
+    });
+    expect(talisman.disciples).toBe(before);
+    expect(talisman.arms).toBe(20);
+    expect(result.passiveNote).toBe('符籙鎮邪');
+  });
+
+  it('體修的前兩次敵陣完全免傷（門派被動）', () => {
+    const body = stateFor('body');
+    body.disciples = 50;
+    const wave = { kind: 'mob', name: '測試', art: 'bandit', power: 9999 } as const;
+    expect(resolveMob(body, wave)).toBe(0);
+    expect(resolveMob(body, wave)).toBe(0);
+    expect(resolveMob(body, wave)).toBeGreaterThan(0);
+  });
+
+  it('丹修通過金幣閘門時回復門人（門派被動）', () => {
+    const alchemy = stateFor('alchemy');
+    alchemy.disciples = 100;
+    const result = applyGate(alchemy, {
+      templateId: 'g', target: 'gold', op: 'add', value: 50, trap: false, label: '',
+    });
+    expect(alchemy.disciples).toBeGreaterThan(100);
+    expect(result.passiveNote).toContain('丹藥回春');
   });
 
   it('金幣閘門依門派與升級倍率折算', () => {

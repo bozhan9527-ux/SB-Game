@@ -19,7 +19,7 @@ export class TitleScene extends Phaser.Scene {
     const realm = realmForStage(save.world.stage);
     const sect = sectById(save.player.sectId);
     audio.playMusic(realmIndexForStage(save.world.stage));
-    drawBackdrop(this, realm.color);
+    drawBackdrop(this, realm.color, realm.scenery);
 
     const cx = GAME_WIDTH / 2;
 
@@ -78,9 +78,16 @@ export class TitleScene extends Phaser.Scene {
       onClick: () => this.scene.start('Upgrade'),
     });
 
-    createButton(this, cx, 820, {
-      width: 340,
-      height: 60,
+    createButton(this, cx - 88, 812, {
+      width: 164,
+      height: 58,
+      label: '仙途錄',
+      fontSize: 22,
+      onClick: () => this.scene.start('Achievements'),
+    });
+    createButton(this, cx + 88, 812, {
+      width: 164,
+      height: 58,
       label: hasSect ? '更換門派' : '門派介紹',
       fontSize: 22,
       onClick: () => this.scene.start('Sect'),

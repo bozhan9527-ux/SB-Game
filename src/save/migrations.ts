@@ -12,8 +12,21 @@ const addSettings: Migration = (data) => ({
   settings: { sound: true },
 });
 
+/** v2 → v3：加入成就與長期統計。舊存檔沒有這些欄位，一律從零開始累計。 */
+const addAchievements: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return {
+    ...data,
+    player: {
+      ...player,
+      achievements: [],
+      stats: { maxCrowd: 0, maxArms: 0, fastestBossMs: 0, totalGoldEarned: 0, clearedSects: [] },
+    },
+  };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
-export const MIGRATIONS: readonly Migration[] = [addSettings];
+export const MIGRATIONS: readonly Migration[] = [addSettings, addAchievements];
 
 /**
  * 把任意版本的存檔套用至最新版。

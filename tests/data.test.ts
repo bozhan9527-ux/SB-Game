@@ -68,8 +68,8 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
     expect(() => parseRealms([{ id: 'a' }])).toThrow(DataError);
     expect(() =>
       parseRealms([
-        { id: 'a', name: 'A', subtitle: 's', stageFrom: 1, stageTo: 3, color: '#fff', powerBonus: 0 },
-        { id: 'b', name: 'B', subtitle: 's', stageFrom: 9, stageTo: 12, color: '#fff', powerBonus: 0 },
+        { id: 'a', name: 'A', subtitle: 's', stageFrom: 1, stageTo: 3, color: '#fff', powerBonus: 0, scenery: 'peaks' },
+        { id: 'b', name: 'B', subtitle: 's', stageFrom: 9, stageTo: 12, color: '#fff', powerBonus: 0, scenery: 'peaks' },
       ]),
     ).toThrow(/連續/);
     expect(() =>

@@ -43,7 +43,10 @@
     "dpsFactor": 0.6,
     "tickMs": 100,
     "momentumMax": 0.6,
-    "momentumDecayPerSec": 0.25
+    "momentumDecayPerSec": 0.25,
+    "guardIdleMs": 420,
+    "guardDpsMultiplier": 0.45,
+    "guardDamageMultiplier": 0.45
   },
   "gold": {
     "clearBase": 30,

@@ -10,8 +10,12 @@ import sectsJson from '../../data/sects.json';
 import gatesJson from '../../data/gates.json';
 import upgradesJson from '../../data/upgrades.json';
 import enemiesJson from '../../data/enemies.json';
+import achievementsJson from '../../data/achievements.json';
 
 import type {
+  Achievement,
+  Scenery,
+  AchievementKind,
   Balance,
   BossArt,
   BossDef,
@@ -31,7 +35,13 @@ import { assertUniqueIds, bool, field, list, num, obj, oneOf, str, DataError } f
 const GATE_TARGETS: readonly GateTarget[] = ['disciples', 'arms', 'gold'];
 const GATE_OPS: readonly GateOp[] = ['add', 'mul'];
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
+const SCENERIES: readonly Scenery[] = [
+  'peaks', 'forest', 'sea', 'volcano', 'voidrock', 'storm', 'palace', 'celestial',
+];
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
+const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
+  'stage', 'crowd', 'arms', 'fastBoss', 'clears', 'gold', 'sects',
+];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial',
@@ -92,6 +102,9 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       tickMs: p(boss, 'tickMs', 'boss'),
       momentumMax: p(boss, 'momentumMax', 'boss'),
       momentumDecayPerSec: p(boss, 'momentumDecayPerSec', 'boss'),
+      guardIdleMs: p(boss, 'guardIdleMs', 'boss'),
+      guardDpsMultiplier: p(boss, 'guardDpsMultiplier', 'boss'),
+      guardDamageMultiplier: p(boss, 'guardDamageMultiplier', 'boss'),
     },
     gold: {
       clearBase: p(gold, 'clearBase', 'gold'),
@@ -112,6 +125,7 @@ export function parseRealms(raw: unknown, path = 'realms.json'): Realm[] {
     stageTo: num(item, 'stageTo', p),
     color: str(item, 'color', p),
     powerBonus: num(item, 'powerBonus', p),
+    scenery: oneOf(item, 'scenery', p, SCENERIES),
   }));
   assertUniqueIds(realms, path);
 
@@ -147,6 +161,12 @@ export function parseSects(raw: unknown, path = 'sects.json'): Sect[] {
     bossDamageMultiplier: num(item, 'bossDamageMultiplier', p),
     goldMultiplier: num(item, 'goldMultiplier', p),
     mobLossMultiplier: num(item, 'mobLossMultiplier', p),
+    passive: str(item, 'passive', p),
+    mobImmunityCount: num(item, 'mobImmunityCount', p),
+    trapImmune: bool(item, 'trapImmune', p),
+    goldGateHealRatio: num(item, 'goldGateHealRatio', p),
+    bossStartMomentum: num(item, 'bossStartMomentum', p),
+    momentumDecayMultiplier: num(item, 'momentumDecayMultiplier', p),
   }));
   assertUniqueIds(sects, path);
   return sects;
@@ -190,6 +210,19 @@ export function parseUpgrades(raw: unknown, path = 'upgrades.json'): UpgradeTrac
   return tracks;
 }
 
+export function parseAchievements(raw: unknown, path = 'achievements.json'): Achievement[] {
+  const items = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    name: str(item, 'name', p),
+    desc: str(item, 'desc', p),
+    kind: oneOf(item, 'kind', p, ACHIEVEMENT_KINDS),
+    value: num(item, 'value', p),
+    reward: num(item, 'reward', p),
+  }));
+  assertUniqueIds(items, path);
+  return items;
+}
+
 export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
   const mobs: MobDef[] = list(field(raw, 'mobs', path), `${path}.mobs`, (item, p) => ({
     id: str(item, 'id', p),
@@ -215,6 +248,7 @@ export const SECTS: readonly Sect[] = parseSects(sectsJson);
 export const GATES: readonly GateTemplate[] = parseGates(gatesJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);
 export const ENEMIES: EnemyBook = parseEnemies(enemiesJson);
+export const ACHIEVEMENTS: readonly Achievement[] = parseAchievements(achievementsJson);
 
 /** 每個境界都必須有敵陣與首領可抽，否則該境界的關卡生不出遭遇。 */
 for (const realm of REALMS) {

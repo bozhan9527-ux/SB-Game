@@ -133,6 +133,13 @@ export class RunScene extends Phaser.Scene {
   private bossTimerBar: Phaser.GameObjects.Rectangle | null = null;
   private bossAttackAccum = 0;
   private slashAccum = 0;
+  /** 手指靜止多久了。超過門檻就進入守勢。 */
+  private idleMs = 0;
+  /** 本場最高人數與首領戰耗時，供成就統計使用。 */
+  private peakDisciples = 0;
+  private bossElapsed = 0;
+  private guarding = false;
+  private stanceText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super('Run');
@@ -162,6 +169,11 @@ export class RunScene extends Phaser.Scene {
     this.momentum = 0;
     this.bossAttackAccum = 0;
     this.slashAccum = 0;
+    this.idleMs = 0;
+    this.peakDisciples = 0;
+    this.bossElapsed = 0;
+    this.guarding = false;
+    this.stanceText = null;
     this.bobTime = 0;
     this.targetX = GAME_WIDTH / 2;
     this.lastCrowdX = this.targetX;
@@ -170,7 +182,7 @@ export class RunScene extends Phaser.Scene {
     createWalkAnimations(this);
     this.ensureSparkTexture();
     audio.playMusic(realmIndexForStage(stage));
-    drawBackdrop(this, realm.color);
+    drawBackdrop(this, realm.color, realm.scenery);
     this.drawRoad(realm.color);
     this.buildHud(realm.color);
     this.buildCrowd();
@@ -552,6 +564,7 @@ export class RunScene extends Phaser.Scene {
       if (result.discipleDelta !== 0) parts.push(`${result.discipleDelta > 0 ? '+' : ''}${result.discipleDelta} 人`);
       if (result.armsDelta !== 0) parts.push(`${result.armsDelta > 0 ? '+' : ''}${result.armsDelta} 武裝`);
       if (result.goldDelta !== 0) parts.push(`+${result.goldDelta} 金幣`);
+      if (result.passiveNote !== null) parts.push(result.passiveNote);
       const positive = result.discipleDelta + result.armsDelta + result.goldDelta >= 0;
       this.popup(parts.join('　'), positive ? JADE : DANGER);
       audio.play(choice.target === 'gold' ? 'gold' : positive ? 'gateGood' : 'gateTrap');
@@ -559,7 +572,7 @@ export class RunScene extends Phaser.Scene {
       this.tweens.add({ targets: view.container, alpha: 0, duration: 260 });
     } else {
       const loss = resolveMob(this.run, view.encounter);
-      this.popup(`-${loss} 人`, DANGER);
+      this.popup(loss === 0 ? '銅皮鐵骨　免傷' : `-${loss} 人`, loss === 0 ? JADE : DANGER);
       this.cameras.main.shake(160, 0.006);
       audio.play('mob');
       this.burst(this.crowd.x, CROWD_Y - 40, DANGER, 20);
@@ -608,6 +621,7 @@ export class RunScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
+    this.peakDisciples = Math.max(this.peakDisciples, this.run.disciples);
     this.hudPower.setText(`戰力 ${formatNumber(teamPower(this.run))}`);
     this.hudDisciples.setText(`弟子 ${formatNumber(this.run.disciples)}`);
     this.hudArms.setText(`武裝 ${formatNumber(this.run.arms)}`);
@@ -629,6 +643,8 @@ export class RunScene extends Phaser.Scene {
     this.boss = createBoss(this.run.stage, rng);
     this.bossTimeLeft = BALANCE.boss.timeLimitMs;
     this.bossAttackAccum = 0;
+    // 劍修：開場氣勢全滿，換來的是衰退加倍——前段爆發型的打法。
+    this.momentum = BALANCE.boss.momentumMax * this.run.loadout.sect.bossStartMomentum;
     this.updateHud();
 
     this.targetX = GAME_WIDTH / 2;
@@ -684,6 +700,9 @@ export class RunScene extends Phaser.Scene {
     const momentumLabel = this.add
       .text(cx, 498, '氣勢　左右晃動可提升傷害', textStyle({ size: 18, color: GOLD }))
       .setOrigin(0.5);
+    this.stanceText = this.add
+      .text(cx, 572, '', textStyle({ size: 20, color: INK, bold: true }))
+      .setOrigin(0.5);
 
     container.add([
       figure,
@@ -697,6 +716,7 @@ export class RunScene extends Phaser.Scene {
       momentumBg,
       this.momentumBar,
       momentumLabel,
+      this.stanceText,
     ]);
     this.bossGroup = container;
     this.refreshBossBars();
@@ -742,12 +762,23 @@ export class RunScene extends Phaser.Scene {
     const cfg = BALANCE.boss;
     const seconds = delta / 1000;
 
-    // 氣勢：隊伍橫向移動的距離累積，不動就自然衰退。
+    // 氣勢：隊伍橫向移動的距離累積，不動就自然衰退（劍修衰退加倍）。
     this.momentum = addMomentum(this.momentum, movedPx, BALANCE.input.momentumPerPixel, cfg.momentumMax);
-    this.momentum = Math.max(0, this.momentum - cfg.momentumDecayPerSec * seconds);
+    this.momentum = Math.max(
+      0,
+      this.momentum - cfg.momentumDecayPerSec * this.run.loadout.sect.momentumDecayMultiplier * seconds,
+    );
+
+    // 守勢：手指停住不動就轉為防禦——輸出砍半，但挨打也砍半。
+    // 隊伍快被磨光時停手保命，血量健康時猛攻速殺，首領戰因此有了取捨。
+    this.idleMs = Math.abs(movedPx) < 0.6 ? this.idleMs + delta : 0;
+    this.guarding = this.idleMs >= cfg.guardIdleMs;
+    this.stanceText?.setText(this.guarding ? '守勢　減傷但輸出減半' : '猛攻');
+    this.stanceText?.setColor(this.guarding ? '#7fd8ff' : DANGER);
+    const dpsScale = this.guarding ? cfg.guardDpsMultiplier : 1;
 
     // 我方輸出的視覺回饋：氣勢越高，劍氣越密。
-    this.slashAccum += delta * (1 + this.momentum);
+    this.slashAccum += delta * (1 + this.momentum) * dpsScale;
     if (this.slashAccum >= 420) {
       this.slashAccum = 0;
       this.spawnSlash();
@@ -755,7 +786,7 @@ export class RunScene extends Phaser.Scene {
       audio.play('bossHit');
     }
 
-    boss.hp -= bossDps(this.run, this.momentum) * seconds;
+    boss.hp -= bossDps(this.run, this.momentum) * dpsScale * seconds;
     if (boss.hp <= 0) {
       boss.hp = 0;
       this.refreshBossBars();
@@ -767,7 +798,11 @@ export class RunScene extends Phaser.Scene {
     this.bossAttackAccum += delta;
     while (this.bossAttackAccum >= cfg.attackIntervalMs) {
       this.bossAttackAccum -= cfg.attackIntervalMs;
-      const loss = Math.min(this.run.disciples, bossHitLoss(this.run, boss));
+      const raw = bossHitLoss(this.run, boss);
+      const loss = Math.min(
+        this.run.disciples,
+        Math.max(1, Math.round(raw * (this.guarding ? cfg.guardDamageMultiplier : 1))),
+      );
       this.run.disciples -= loss;
       this.popup(`-${loss} 人`, DANGER);
       this.cameras.main.shake(180, 0.008);
@@ -781,6 +816,7 @@ export class RunScene extends Phaser.Scene {
       }
     }
 
+    this.bossElapsed += delta;
     this.bossTimeLeft -= delta;
     if (this.bossTimeLeft <= 0) {
       this.finish(false, 'timeout');
@@ -866,7 +902,9 @@ export class RunScene extends Phaser.Scene {
       stage: this.run.stage,
       bossName: this.boss?.def.name ?? '首領',
       survivors: Math.max(0, this.run.disciples),
+      peakDisciples: Math.max(this.peakDisciples, this.run.disciples),
       arms: this.run.arms,
+      bossMs: Math.round(this.bossElapsed),
       goldCollected: this.run.goldCollected,
       goldReward: victory ? clearReward(this.run) : defeatReward(this.run),
       defeatReason: reason,

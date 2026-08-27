@@ -5,7 +5,11 @@ export interface RunResultData {
   bossName: string;
   /** 結束時剩餘門人數。 */
   survivors: number;
+  /** 本場最高門人數，用於成就統計。 */
+  peakDisciples: number;
   arms: number;
+  /** 首領戰耗時（ms），沒打到首領為 0。 */
+  bossMs: number;
   /** 關卡途中拾取的金幣。 */
   goldCollected: number;
   /** 通關／失敗獎勵金幣。 */

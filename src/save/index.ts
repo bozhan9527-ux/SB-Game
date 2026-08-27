@@ -16,7 +16,13 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
   return {
     version: SAVE_VERSION,
     savedAt: now,
-    player: { sectId: null, wallet: { gold: 0 }, upgrades },
+    player: {
+      sectId: null,
+      wallet: { gold: 0 },
+      upgrades,
+      achievements: [],
+      stats: { maxCrowd: 0, maxArms: 0, fastestBossMs: 0, totalGoldEarned: 0, clearedSects: [] },
+    },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
     settings: { sound: true },
   };
@@ -34,6 +40,13 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const wallet = (player['wallet'] ?? {}) as Record<string, unknown>;
   const upgrades = (player['upgrades'] ?? {}) as Record<string, unknown>;
   const settings = (raw['settings'] ?? {}) as Record<string, unknown>;
+  const stats = (player['stats'] ?? {}) as Record<string, unknown>;
+  const achievements = Array.isArray(player['achievements'])
+    ? (player['achievements'] as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
+  const clearedSects = Array.isArray(stats['clearedSects'])
+    ? (stats['clearedSects'] as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
 
   const merged: Record<string, number> = { ...base.player.upgrades };
   for (const track of UPGRADES) {
@@ -49,6 +62,14 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       sectId: typeof player['sectId'] === 'string' ? player['sectId'] : null,
       wallet: { gold: Math.max(0, Math.floor(asNumber(wallet['gold'], 0))) },
       upgrades: merged,
+      achievements,
+      stats: {
+        maxCrowd: Math.max(0, Math.floor(asNumber(stats['maxCrowd'], 0))),
+        maxArms: Math.max(0, Math.floor(asNumber(stats['maxArms'], 0))),
+        fastestBossMs: Math.max(0, Math.floor(asNumber(stats['fastestBossMs'], 0))),
+        totalGoldEarned: Math.max(0, Math.floor(asNumber(stats['totalGoldEarned'], 0))),
+        clearedSects,
+      },
     },
     world: {
       stage,
@@ -94,7 +115,9 @@ export function resetSave(storage: Storage = defaultStorage()): SaveData {
 // ---------------------------------------------------------------- 變更操作
 
 export function addGold(data: SaveData, amount: number): void {
-  data.player.wallet.gold = Math.max(0, data.player.wallet.gold + Math.round(amount));
+  const rounded = Math.round(amount);
+  data.player.wallet.gold = Math.max(0, data.player.wallet.gold + rounded);
+  if (rounded > 0) data.player.stats.totalGoldEarned += rounded;
 }
 
 export interface PurchaseResult {
@@ -118,9 +141,13 @@ export function buyUpgrade(data: SaveData, trackId: string): PurchaseResult {
   return { ok: true, reason: null, cost };
 }
 
-/** 通關：關卡前進一關，並記錄最高境界。 */
+/** 通關：關卡前進一關，並記錄最高境界與門派通關紀錄。 */
 export function recordClear(data: SaveData, gold: number): void {
   addGold(data, gold);
+  const sectId = data.player.sectId;
+  if (sectId !== null && !data.player.stats.clearedSects.includes(sectId)) {
+    data.player.stats.clearedSects.push(sectId);
+  }
   data.world.stage += 1;
   data.world.highestStage = Math.max(data.world.highestStage, data.world.stage);
   data.world.runs += 1;

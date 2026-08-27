@@ -24,7 +24,8 @@ export class SectScene extends Phaser.Scene {
 
   create(): void {
     const save = state();
-    drawBackdrop(this, realmForStage(save.world.stage).color);
+    const realm = realmForStage(save.world.stage);
+    drawBackdrop(this, realm.color, realm.scenery);
     this.cards = [];
     this.selected = SECTS.find((sect) => sect.id === save.player.sectId) ?? null;
 
@@ -34,9 +35,9 @@ export class SectScene extends Phaser.Scene {
       .text(cx, 118, '門派決定你的起手牌，隨時可回來更換', textStyle({ size: 19, color: INK_DIM }))
       .setOrigin(0.5);
 
-    const cardHeight = 162;
-    const gap = 10;
-    const top = 156;
+    const cardHeight = 178;
+    const gap = 6;
+    const top = 146;
 
     SECTS.forEach((sect, index) => {
       const y = top + index * (cardHeight + gap) + cardHeight / 2;
@@ -96,7 +97,10 @@ export class SectScene extends Phaser.Scene {
       .text(left, top + 52, wrapText(sect.desc, textWidth, 18), textStyle({ size: 18, color: INK }))
       .setLineSpacing(4);
     this.add
-      .text(left, top + 104, wrapText(this.statLine(sect), textWidth, 16), textStyle({ size: 16, color: INK_DIM }))
+      .text(left, top + 96, wrapText(`【被動】${sect.passive}`, textWidth, 16), textStyle({ size: 16, color: '#e8c46a' }))
+      .setLineSpacing(4);
+    this.add
+      .text(left, top + 128, wrapText(this.statLine(sect), textWidth, 15), textStyle({ size: 15, color: INK_DIM }))
       .setLineSpacing(4);
 
     // 左側色條，讓門派在視覺上一眼可辨。

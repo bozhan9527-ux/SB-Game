@@ -13,7 +13,13 @@
     "bossDamageMultiplier": 1,
     "goldMultiplier": 1,
     "mobLossMultiplier": 0.7,
-    "art": "body"
+    "art": "body",
+    "passive": "銅皮鐵骨：每關前兩次敵陣完全免傷",
+    "mobImmunityCount": 2,
+    "trapImmune": false,
+    "goldGateHealRatio": 0,
+    "bossStartMomentum": 0,
+    "momentumDecayMultiplier": 1
   },
   {
     "id": "sword",
@@ -29,7 +35,13 @@
     "bossDamageMultiplier": 1.35,
     "goldMultiplier": 1,
     "mobLossMultiplier": 1.15,
-    "art": "sword"
+    "art": "sword",
+    "passive": "一劍破萬法：首領戰開場氣勢全滿，但氣勢衰退加倍",
+    "mobImmunityCount": 0,
+    "trapImmune": false,
+    "goldGateHealRatio": 0,
+    "bossStartMomentum": 1,
+    "momentumDecayMultiplier": 2
   },
   {
     "id": "talisman",
@@ -45,7 +57,13 @@
     "bossDamageMultiplier": 1,
     "goldMultiplier": 1,
     "mobLossMultiplier": 1,
-    "art": "talisman"
+    "art": "talisman",
+    "passive": "符籙鎮邪：踩到陷阱閘門完全無效",
+    "mobImmunityCount": 0,
+    "trapImmune": true,
+    "goldGateHealRatio": 0,
+    "bossStartMomentum": 0,
+    "momentumDecayMultiplier": 1
   },
   {
     "id": "alchemy",
@@ -61,6 +79,12 @@
     "bossDamageMultiplier": 0.95,
     "goldMultiplier": 1.5,
     "mobLossMultiplier": 0.85,
-    "art": "alchemy"
+    "art": "alchemy",
+    "passive": "丹藥回春：每通過一道金幣閘門，回復一成門人",
+    "mobImmunityCount": 0,
+    "trapImmune": false,
+    "goldGateHealRatio": 0.1,
+    "bossStartMomentum": 0,
+    "momentumDecayMultiplier": 1
   }
 ]

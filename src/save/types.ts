@@ -8,12 +8,26 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
   /** 權威數值集中於 wallet 之下（TECH_SPEC 第 9.3 節）。 */
   gold: number;
+}
+
+/** 成就判定用的長期統計。只存原始事實，不存衍生值。 */
+export interface StatsState {
+  /** 單場最高門人數。 */
+  maxCrowd: number;
+  /** 單場最高武裝值。 */
+  maxArms: number;
+  /** 最快的首領戰耗時（ms），尚未通關過為 0。 */
+  fastestBossMs: number;
+  /** 累計獲得的金幣。 */
+  totalGoldEarned: number;
+  /** 曾用來通關的門派 id。 */
+  clearedSects: string[];
 }
 
 export interface PlayerState {
@@ -22,6 +36,9 @@ export interface PlayerState {
   wallet: WalletState;
   /** 升級線 id → 等級。未出現的項目視為 0 級。 */
   upgrades: Record<string, number>;
+  /** 已達成的成就 id。 */
+  achievements: string[];
+  stats: StatsState;
 }
 
 export interface WorldState {

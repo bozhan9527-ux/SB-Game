@@ -1,0 +1,18 @@
+[
+  { "id": "first_clear",  "name": "初入仙門", "desc": "通過第 1 關",              "kind": "stage",    "value": 2,       "reward": 60 },
+  { "id": "realm_2",      "name": "築基有成", "desc": "抵達築基期",              "kind": "stage",    "value": 10,      "reward": 200 },
+  { "id": "realm_3",      "name": "金丹大道", "desc": "抵達金丹期",              "kind": "stage",    "value": 19,      "reward": 800 },
+  { "id": "realm_4",      "name": "元嬰出竅", "desc": "抵達元嬰期",              "kind": "stage",    "value": 28,      "reward": 3000 },
+  { "id": "realm_5",      "name": "神念化形", "desc": "抵達化神期",              "kind": "stage",    "value": 37,      "reward": 12000 },
+  { "id": "realm_7",      "name": "天人交感", "desc": "抵達合體期",              "kind": "stage",    "value": 55,      "reward": 160000 },
+  { "id": "realm_9",      "name": "雷劫加身", "desc": "抵達渡劫期",              "kind": "stage",    "value": 73,      "reward": 4000000 },
+  { "id": "ascend",       "name": "破碎虛空", "desc": "抵達飛升境",              "kind": "stage",    "value": 82,      "reward": 40000000 },
+  { "id": "crowd_200",    "name": "百人成陣", "desc": "單場門人數達 200",        "kind": "crowd",    "value": 200,     "reward": 500 },
+  { "id": "crowd_1000",   "name": "千軍萬馬", "desc": "單場門人數達 1000",       "kind": "crowd",    "value": 1000,    "reward": 6000 },
+  { "id": "arms_500",     "name": "靈兵滿營", "desc": "單場武裝值達 500",        "kind": "arms",     "value": 500,     "reward": 3000 },
+  { "id": "fast_boss",    "name": "一劍破敵", "desc": "3 秒內斬殺首領",          "kind": "fastBoss", "value": 3000,    "reward": 1500 },
+  { "id": "clears_25",    "name": "身經百戰", "desc": "累計通關 25 次",          "kind": "clears",   "value": 25,      "reward": 2000 },
+  { "id": "clears_100",   "name": "百戰不殆", "desc": "累計通關 100 次",         "kind": "clears",   "value": 100,     "reward": 30000 },
+  { "id": "gold_million", "name": "富甲一方", "desc": "累計獲得 100 萬金幣",     "kind": "gold",     "value": 1000000, "reward": 50000 },
+  { "id": "all_sects",    "name": "四道皆通", "desc": "以四個門派各通關至少一次", "kind": "sects",    "value": 4,       "reward": 20000 }
+]

@@ -6,7 +6,8 @@
     "stageFrom": 1,
     "stageTo": 9,
     "color": "#7fdba0",
-    "powerBonus": 0
+    "powerBonus": 0,
+    "scenery": "peaks"
   },
   {
     "id": "foundation",
@@ -15,7 +16,8 @@
     "stageFrom": 10,
     "stageTo": 18,
     "color": "#6fc7d8",
-    "powerBonus": 0.05
+    "powerBonus": 0.05,
+    "scenery": "forest"
   },
   {
     "id": "golden",
@@ -24,7 +26,8 @@
     "stageFrom": 19,
     "stageTo": 27,
     "color": "#e8c46a",
-    "powerBonus": 0.1
+    "powerBonus": 0.1,
+    "scenery": "sea"
   },
   {
     "id": "nascent",
@@ -33,7 +36,8 @@
     "stageFrom": 28,
     "stageTo": 36,
     "color": "#c79cf0",
-    "powerBonus": 0.16
+    "powerBonus": 0.16,
+    "scenery": "volcano"
   },
   {
     "id": "spirit",
@@ -42,7 +46,8 @@
     "stageFrom": 37,
     "stageTo": 45,
     "color": "#8fa8ff",
-    "powerBonus": 0.22
+    "powerBonus": 0.22,
+    "scenery": "palace"
   },
   {
     "id": "void",
@@ -51,7 +56,8 @@
     "stageFrom": 46,
     "stageTo": 54,
     "color": "#79e0d8",
-    "powerBonus": 0.3
+    "powerBonus": 0.3,
+    "scenery": "voidrock"
   },
   {
     "id": "unity",
@@ -60,7 +66,8 @@
     "stageFrom": 55,
     "stageTo": 63,
     "color": "#f09a76",
-    "powerBonus": 0.4
+    "powerBonus": 0.4,
+    "scenery": "storm"
   },
   {
     "id": "mahayana",
@@ -69,7 +76,8 @@
     "stageFrom": 64,
     "stageTo": 72,
     "color": "#f07a9a",
-    "powerBonus": 0.52
+    "powerBonus": 0.52,
+    "scenery": "palace"
   },
   {
     "id": "tribulation",
@@ -78,7 +86,8 @@
     "stageFrom": 73,
     "stageTo": 81,
     "color": "#ffd35e",
-    "powerBonus": 0.68
+    "powerBonus": 0.68,
+    "scenery": "storm"
   },
   {
     "id": "ascension",
@@ -86,7 +95,8 @@
     "subtitle": "破碎虛空，位列仙班",
     "stageFrom": 82,
     "stageTo": 9999,
-    "color": "#ffffff",
-    "powerBonus": 0.9
+    "color": "#cfe6ff",
+    "powerBonus": 0.9,
+    "scenery": "celestial"
   }
 ]

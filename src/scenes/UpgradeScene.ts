@@ -32,7 +32,8 @@ export class UpgradeScene extends Phaser.Scene {
   create(): void {
     const save = state();
     this.rows = [];
-    drawBackdrop(this, realmForStage(save.world.stage).color);
+    const realm = realmForStage(save.world.stage);
+    drawBackdrop(this, realm.color, realm.scenery);
 
     const cx = GAME_WIDTH / 2;
     this.add.text(cx, 56, '洞府', textStyle({ size: 42, color: INK, bold: true })).setOrigin(0.5);
