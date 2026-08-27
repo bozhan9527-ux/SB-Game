@@ -3,7 +3,7 @@ import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { sectById } from '../systems/loadout';
-import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
+import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { GOLD, INK, INK_DIM, formatNumber, textStyle } from '../ui/theme';
@@ -35,18 +35,28 @@ export class TitleScene extends Phaser.Scene {
       .text(cx, 372, realmTitle(save.world.stage), textStyle({ size: 40, color: realm.color, bold: true }))
       .setOrigin(0.5);
     this.add
-      .text(cx, 418, `第 ${save.world.stage} 關 · ${realm.subtitle}`, textStyle({ size: 20, color: INK_DIM }))
+      .text(cx, 414, `第 ${save.world.stage} 關 · ${realm.subtitle}`, textStyle({ size: 20, color: INK_DIM }))
+      .setOrigin(0.5);
+    // 距離突破還有幾關，是修仙題材最直接的推進動機。
+    const toBreak = realm.stageTo - save.world.stage + 1;
+    this.add
+      .text(
+        cx,
+        444,
+        toBreak > 900 ? '已至無盡飛升境' : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
+        textStyle({ size: 19, color: GOLD }),
+      )
       .setOrigin(0.5);
     this.add
       .text(
         cx,
-        462,
+        486,
         sect === null ? '尚未拜入門派' : `${sect.name} · ${sect.path}`,
         textStyle({ size: 22, color: sect === null ? INK_DIM : sect.color }),
       )
       .setOrigin(0.5);
     this.add
-      .text(cx, 508, `金幣 ${formatNumber(save.player.wallet.gold)}`, textStyle({ size: 24, color: GOLD }))
+      .text(cx, 526, `金幣 ${formatNumber(save.player.wallet.gold)}`, textStyle({ size: 24, color: GOLD }))
       .setOrigin(0.5);
 
     // 按鈕

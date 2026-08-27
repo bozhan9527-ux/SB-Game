@@ -33,8 +33,10 @@ import {
   gateSpeedForStage,
   mobLossRatio,
   resolveMob,
+  teamPower,
 } from '../systems/run';
 import { drawBackdrop } from '../ui/backdrop';
+import { createButton } from '../ui/button';
 import {
   BG_PANEL,
   DANGER,
@@ -99,10 +101,11 @@ export class RunScene extends Phaser.Scene {
   private views: EncounterView[] = [];
   private spawnIndex = 0;
 
+  /** 路面往下捲的紋路。隊伍在跑但畫面靜止時完全沒有速度感，這是最便宜的解法。 */
+  private groundLines: Phaser.GameObjects.Rectangle[] = [];
   private crowd!: Phaser.GameObjects.Container;
   private crowdSprites: Phaser.GameObjects.Sprite[] = [];
   private crowdSlots: CrowdSlot[] = [];
-  private crowdCountText!: Phaser.GameObjects.Text;
   private visibleCount = 0;
   private bobTime = 0;
 
@@ -110,10 +113,12 @@ export class RunScene extends Phaser.Scene {
   private targetX = LANE_X[0];
   private lastCrowdX = LANE_X[0];
 
+  private hudPower!: Phaser.GameObjects.Text;
   private hudDisciples!: Phaser.GameObjects.Text;
   private hudArms!: Phaser.GameObjects.Text;
   private hudGold!: Phaser.GameObjects.Text;
   private hudProgress!: Phaser.GameObjects.Text;
+  private hudProgressBar!: Phaser.GameObjects.Rectangle;
 
   private boss: BossState | null = null;
   private bossGroup: Phaser.GameObjects.Container | null = null;
@@ -163,6 +168,7 @@ export class RunScene extends Phaser.Scene {
 
     const realm = realmForStage(stage);
     createWalkAnimations(this);
+    this.ensureSparkTexture();
     audio.playMusic(realmIndexForStage(stage));
     drawBackdrop(this, realm.color);
     this.drawRoad(realm.color);
@@ -170,6 +176,33 @@ export class RunScene extends Phaser.Scene {
     this.buildCrowd();
     this.bindInput();
     this.showIntro(realm.color);
+  }
+
+  /** 粒子用的小圓點貼圖，程式產生，不需要素材檔。 */
+  private ensureSparkTexture(): void {
+    if (this.textures.exists('spark')) return;
+    const g = this.make.graphics({ x: 0, y: 0 });
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(5, 5, 5);
+    g.generateTexture('spark', 10, 10);
+    g.destroy();
+  }
+
+  /** 在指定位置炸開一小撮光點。通過閘門、衝散敵陣時給的即時回饋。 */
+  private burst(x: number, y: number, color: string, count: number): void {
+    const emitter = this.add.particles(x, y, 'spark', {
+      speed: { min: 70, max: 220 },
+      angle: { min: 200, max: 340 },
+      lifespan: { min: 260, max: 560 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.9, end: 0 },
+      tint: hexToNumber(color),
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false,
+    });
+    emitter.setDepth(45);
+    emitter.explode(count);
+    this.time.delayedCall(700, () => emitter.destroy());
   }
 
   // -------------------------------------------------------------- 建構
@@ -182,6 +215,18 @@ export class RunScene extends Phaser.Scene {
     g.strokeRect(ROAD_LEFT, ROAD_TOP, ROAD_RIGHT - ROAD_LEFT, GAME_HEIGHT - ROAD_TOP);
     g.lineStyle(1, hexToNumber(accentHex), 0.14);
     g.lineBetween(GAME_WIDTH / 2, ROAD_TOP, GAME_WIDTH / 2, GAME_HEIGHT);
+
+    // 路面紋路：等距的橫向細線，跟著關卡速度往下捲，隊伍才像真的在前進。
+    const span = GAME_HEIGHT - ROAD_TOP;
+    const gap = span / 9;
+    this.groundLines = [];
+    for (let i = 0; i < 10; i += 1) {
+      this.groundLines.push(
+        this.add
+          .rectangle(GAME_WIDTH / 2, ROAD_TOP + i * gap, ROAD_RIGHT - ROAD_LEFT - 24, 3, hexToNumber(accentHex), 0.1)
+          .setDepth(-49),
+      );
+    }
   }
 
   private buildHud(accentHex: string): void {
@@ -193,16 +238,35 @@ export class RunScene extends Phaser.Scene {
       .text(24, 22, realmTitle(this.run.stage), textStyle({ size: 26, color: accentHex, bold: true }))
       .setDepth(51);
     this.hudGold = this.add
-      .text(GAME_WIDTH - 24, 26, '金幣 0', textStyle({ size: 20, color: GOLD }))
+      .text(GAME_WIDTH - 118, 26, '金幣 0', textStyle({ size: 19, color: GOLD }))
       .setOrigin(1, 0)
       .setDepth(51);
 
-    this.hudDisciples = this.add.text(24, 64, '', textStyle({ size: 24, color: INK })).setDepth(51);
-    this.hudArms = this.add.text(196, 64, '', textStyle({ size: 24, color: INK })).setDepth(51);
+    // 戰力是玩家唯一需要盯的綜合數字，給它最大的字級與最亮的顏色。
+    this.hudPower = this.add
+      .text(24, 56, '', textStyle({ size: 34, color: GOLD, bold: true }))
+      .setDepth(51);
+    this.hudDisciples = this.add.text(24, 96, '', textStyle({ size: 19, color: INK_DIM })).setDepth(51);
+    this.hudArms = this.add.text(140, 96, '', textStyle({ size: 19, color: INK_DIM })).setDepth(51);
     this.hudProgress = this.add
-      .text(GAME_WIDTH - 24, 66, '', textStyle({ size: 20, color: INK_DIM }))
+      .text(GAME_WIDTH - 24, 96, '', textStyle({ size: 18, color: INK_DIM }))
       .setOrigin(1, 0)
       .setDepth(51);
+
+    // 路程進度條：貼在 HUD 底緣，比純文字更快讀出「還有多遠到首領」。
+    this.add.rectangle(GAME_WIDTH / 2, 120, GAME_WIDTH, 4, LINE, 0.5).setDepth(51);
+    this.hudProgressBar = this.add
+      .rectangle(0, 120, 0, 4, hexToNumber(accentHex), 1)
+      .setOrigin(0, 0.5)
+      .setDepth(52);
+
+    createButton(this, GAME_WIDTH - 62, 34, {
+      width: 84,
+      height: 44,
+      label: '放棄',
+      fontSize: 18,
+      onClick: () => this.finish(false, 'abandon'),
+    }).container.setDepth(52);
 
     this.updateHud();
   }
@@ -241,13 +305,7 @@ export class RunScene extends Phaser.Scene {
       return sprite;
     });
 
-    this.crowdCountText = this.add
-      .text(0, -132, '', textStyle({ size: 30, color: INK, bold: true }))
-      .setOrigin(0.5)
-      .setStroke('#0b0f14', 6);
-    this.crowd = this.add
-      .container(this.targetX, CROWD_Y, [...this.crowdSprites, this.crowdCountText])
-      .setDepth(30);
+    this.crowd = this.add.container(this.targetX, CROWD_Y, [...this.crowdSprites]).setDepth(30);
     this.layoutCrowd();
   }
 
@@ -269,8 +327,6 @@ export class RunScene extends Phaser.Scene {
       sprite.setVisible(true).setPosition(slot.x * spread, slot.y * spread).setScale(scale);
     });
 
-    this.crowdCountText.setText(count > 0 ? `${formatNumber(count)} 人` : '');
-    this.crowdCountText.setColor(count <= 3 ? DANGER : INK);
   }
 
   /** 門人的跑動：上下起伏加輕微擠壓，每個人相位不同，整團看起來像在趕路。 */
@@ -357,6 +413,7 @@ export class RunScene extends Phaser.Scene {
 
   private updateRunning(delta: number): void {
     const step = (this.speed * delta) / 1000;
+    this.scrollGround(step);
     const last = this.views[this.views.length - 1];
 
     if (
@@ -387,6 +444,15 @@ export class RunScene extends Phaser.Scene {
 
     if (this.spawnIndex >= this.run.encounters.length && this.views.every((view) => view.resolved)) {
       this.startBoss();
+    }
+  }
+
+  /** 路面紋路往下捲，超出畫面就繞回頂端。 */
+  private scrollGround(step: number): void {
+    const span = GAME_HEIGHT - ROAD_TOP;
+    for (const line of this.groundLines) {
+      line.y += step;
+      if (line.y > GAME_HEIGHT) line.y -= span;
     }
   }
 
@@ -489,12 +555,14 @@ export class RunScene extends Phaser.Scene {
       const positive = result.discipleDelta + result.armsDelta + result.goldDelta >= 0;
       this.popup(parts.join('　'), positive ? JADE : DANGER);
       audio.play(choice.target === 'gold' ? 'gold' : positive ? 'gateGood' : 'gateTrap');
+      this.burst(this.crowd.x, CROWD_Y - 30, this.gateAccent(choice), positive ? 16 : 10);
       this.tweens.add({ targets: view.container, alpha: 0, duration: 260 });
     } else {
       const loss = resolveMob(this.run, view.encounter);
       this.popup(`-${loss} 人`, DANGER);
       this.cameras.main.shake(160, 0.006);
       audio.play('mob');
+      this.burst(this.crowd.x, CROWD_Y - 40, DANGER, 20);
       this.knockBack(view.enemies);
     }
 
@@ -540,12 +608,15 @@ export class RunScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
+    this.hudPower.setText(`戰力 ${formatNumber(teamPower(this.run))}`);
     this.hudDisciples.setText(`弟子 ${formatNumber(this.run.disciples)}`);
     this.hudArms.setText(`武裝 ${formatNumber(this.run.arms)}`);
     this.hudGold.setText(`金幣 ${formatNumber(this.run.goldCollected)}`);
     const total = this.run.encounters.length;
     const done = Math.min(total, this.spawnIndex);
-    this.hudProgress.setText(this.phase === 'boss' ? '首領戰' : `路程 ${done}/${total}`);
+    const boss = this.phase === 'boss';
+    this.hudProgress.setText(boss ? '首領戰' : `路程 ${done}/${total}`);
+    this.hudProgressBar.setDisplaySize(boss ? GAME_WIDTH : GAME_WIDTH * (done / Math.max(1, total)), 4);
   }
 
   // -------------------------------------------------------------- 首領戰
@@ -762,7 +833,28 @@ export class RunScene extends Phaser.Scene {
 
   // -------------------------------------------------------------- 結束
 
-  private finish(victory: boolean, reason: 'route' | 'wiped' | 'timeout' | null): void {
+  /**
+   * 失敗診斷：從這場的實際數字挑出最該補的一項。
+   * 只說「道消」玩家學不到東西，會一直用同一套打法重撞。
+   */
+  private diagnose(reason: 'route' | 'wiped' | 'timeout' | 'abandon' | null): string {
+    if (reason === 'abandon') return '中途退出，未計入通關';
+    const perUnit = this.run.loadout.attack + this.run.arms;
+    const armsShare = this.run.arms / Math.max(1, perUnit);
+    if (reason === 'route') {
+      return armsShare < 0.5
+        ? '武裝值太低，敵陣的比例傷亡吃掉了整支隊伍——多走武裝閘門，或提升護體罡氣'
+        : '人數不足以撐過沿路消耗——多走人數閘門，或提升聚眾成軍';
+    }
+    if (reason === 'timeout') {
+      return '輸出不足，時限內打不動首領——人數與武裝要一起長，或提升斬妖訣';
+    }
+    return armsShare < 0.5
+      ? '首領的攻勢太猛而減傷太薄——武裝值同時是減傷來源，或提升護體罡氣'
+      : '人數在首領戰中被磨光——需要更大的隊伍，或提升聚眾成軍';
+  }
+
+  private finish(victory: boolean, reason: 'route' | 'wiped' | 'timeout' | 'abandon' | null): void {
     if (this.phase === 'over') return;
     this.phase = 'over';
     this.bossGroup?.setAlpha(0.6);
@@ -770,6 +862,7 @@ export class RunScene extends Phaser.Scene {
 
     const result: RunResultData = {
       victory,
+      diagnosis: victory ? null : this.diagnose(reason),
       stage: this.run.stage,
       bossName: this.boss?.def.name ?? '首領',
       survivors: Math.max(0, this.run.disciples),

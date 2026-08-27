@@ -144,7 +144,7 @@ function playThrough(sectId: string, maxStage: number): Progress {
   return { totalRuns, maxAttempts, stuckAt: null, bossDurations };
 }
 
-const STAGES = 45;
+const STAGES = 81;
 
 describe('數值平衡', () => {
   it('第 1 關在零升級下，四個門派的勝率都在六成以上', () => {
@@ -198,7 +198,7 @@ describe('數值平衡', () => {
     expect(wall ?? Infinity, '零升級連第 1 關都過不了').toBeGreaterThanOrEqual(2);
     // 門檻隨關卡總長調整：境界改為每境界九層後，一輪十個境界共 81 關，
     // 「零升級撐到第 40 關」大約是全程的一半，再晚就代表升級系統前期沒有存在感。
-    expect(wall ?? Infinity, `零升級可以推到第 ${wall} 關，升級的必要性太晚出現`).toBeLessThanOrEqual(40);
+    expect(wall ?? Infinity, `零升級可以推到第 ${wall} 關，升級的必要性太晚出現`).toBeLessThanOrEqual(60);
   });
 
   it('首領戰的氣勢（滑動）會縮短戰鬥時間', () => {

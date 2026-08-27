@@ -34,8 +34,8 @@
     "powerJitter": 0.12
   },
   "boss": {
-    "hpBase": 2100,
-    "hpGrowth": 1.28,
+    "hpBase": 6500,
+    "hpGrowth": 1.29,
     "attackBase": 2,
     "attackGrowth": 1.09,
     "attackIntervalMs": 1100,
@@ -47,9 +47,9 @@
   },
   "gold": {
     "clearBase": 30,
-    "clearPerStage": 10,
+    "clearGrowth": 1.2,
     "gateGoldBase": 20,
-    "gateGoldPerStage": 6,
+    "gateGoldGrowth": 1.2,
     "defeatRatio": 0.35
   }
 }

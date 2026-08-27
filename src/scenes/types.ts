@@ -10,9 +10,12 @@ export interface RunResultData {
   goldCollected: number;
   /** 通關／失敗獎勵金幣。 */
   goldReward: number;
+  /** 失敗時給玩家的具體診斷，勝利時為 null。 */
+  diagnosis: string | null;
   /**
    * 失敗原因，勝利時為 null。
-   * route：還沒走到首領就全滅；wiped：死在首領手上；timeout：時限內沒打死首領。
+   * route：還沒走到首領就全滅；wiped：死在首領手上；
+   * timeout：時限內沒打死首領；abandon：玩家中途放棄。
    */
-  defeatReason: 'route' | 'wiped' | 'timeout' | null;
+  defeatReason: 'route' | 'wiped' | 'timeout' | 'abandon' | null;
 }

@@ -46,6 +46,15 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setAlign('center');
 
+    // 失敗診斷：告訴玩家這場輸在哪、下次該補什麼，而不是只丟一句「道消」。
+    if (result.diagnosis !== null) {
+      this.add
+        .text(cx, 286, wrapText(result.diagnosis, GAME_WIDTH - 90, 19), textStyle({ size: 19, color: GOLD }))
+        .setOrigin(0.5)
+        .setAlign('center')
+        .setLineSpacing(6);
+    }
+
     if (breakthrough) {
       audio.play('breakthrough');
       const banner = this.add
@@ -57,7 +66,7 @@ export class ResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    this.buildPanel(cx, breakthrough ? 500 : 452, result, save.player.wallet.gold);
+    this.buildPanel(cx, breakthrough ? 520 : 480, result, save.player.wallet.gold);
 
     const nextStage = save.world.stage;
     this.add
@@ -90,6 +99,7 @@ export class ResultScene extends Phaser.Scene {
 
   private headline(result: RunResultData): string {
     if (result.victory) return `斬殺 ${result.bossName}，殘部 ${formatNumber(result.survivors)} 人`;
+    if (result.defeatReason === 'abandon') return '半途收兵，來日再戰';
     if (result.defeatReason === 'route') return '尚未見到首領，門人已在半途折損殆盡';
     if (result.defeatReason === 'timeout') return `久攻不下，${result.bossName} 遁走，門人潰散`;
     return `門人盡歿於 ${result.bossName} 之手`;

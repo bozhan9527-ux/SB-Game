@@ -45,7 +45,7 @@ export class UpgradeScene extends Phaser.Scene {
     });
 
     this.summaryText = this.add
-      .text(cx, 838, '', textStyle({ size: 18, color: INK_DIM }))
+      .text(cx, 832, '', textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(0.5)
       .setAlign('center')
       .setLineSpacing(6);
@@ -138,15 +138,17 @@ export class UpgradeScene extends Phaser.Scene {
     this.summaryText.setText(this.summary());
   }
 
-  /** 讓玩家看得到升級實際反映在下一關的起始屬性上。 */
+  /** 讓玩家看得到升級實際反映在下一關的乘區上。 */
   private summary(): string {
     const save = state();
     const sect = sectById(save.player.sectId);
     if (sect === null) return '尚未拜入門派，先選門派再來提升屬性';
-    const loadout = buildLoadout(save, save.world.stage);
+    const l = buildLoadout(save, save.world.stage);
+    const x = (value: number): string => `×${value.toFixed(2)}`;
     return [
-      `${sect.name}　下一關起始：弟子 ${loadout.disciples} 人　攻擊 ${loadout.attack}　防禦 ${loadout.defense}`,
-      `金幣 ×${loadout.goldMultiplier.toFixed(2)}　首領傷害 ×${loadout.bossDamageMultiplier.toFixed(2)}`,
+      `${sect.name}　下一關起始 ${l.disciples} 人`,
+      `人數 ${x(l.discipleMultiplier)}　攻擊 ${x(l.attackMultiplier)}　減傷 ${x(l.mitigationMultiplier)}`,
+      `金幣 ${x(l.goldMultiplier)}　首領傷害 ${x(l.bossDamageMultiplier)}`,
     ].join('\n');
   }
 }

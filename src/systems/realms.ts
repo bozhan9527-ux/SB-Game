@@ -34,6 +34,13 @@ function chineseNumber(value: number): string {
   return String(value);
 }
 
+/** 下一個境界的名稱；已在最後一個境界時回傳自己。 */
+export function nextRealmName(stage: number): string {
+  const index = realmIndexForStage(stage);
+  const next = REALMS[index + 1] ?? REALMS[index];
+  return next?.name ?? '';
+}
+
 /** 例：「煉氣期 二層」。 */
 export function realmTitle(stage: number): string {
   return `${realmForStage(stage).name} ${chineseNumber(layerWithinRealm(stage))}層`;

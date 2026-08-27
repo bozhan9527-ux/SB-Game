@@ -95,9 +95,9 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
     },
     gold: {
       clearBase: p(gold, 'clearBase', 'gold'),
-      clearPerStage: p(gold, 'clearPerStage', 'gold'),
+      clearGrowth: p(gold, 'clearGrowth', 'gold'),
       gateGoldBase: p(gold, 'gateGoldBase', 'gold'),
-      gateGoldPerStage: p(gold, 'gateGoldPerStage', 'gold'),
+      gateGoldGrowth: p(gold, 'gateGoldGrowth', 'gold'),
       defeatRatio: p(gold, 'defeatRatio', 'gold'),
     },
   };

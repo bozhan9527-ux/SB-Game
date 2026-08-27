@@ -74,7 +74,7 @@ function poolFor(target: GateTarget | null, trap: boolean): GateTemplate[] {
 
 function goldValue(template: GateTemplate, stage: number): number {
   const { gold } = BALANCE;
-  return Math.round(template.value * (gold.gateGoldBase + gold.gateGoldPerStage * stage));
+  return Math.round(template.value * gold.gateGoldBase * Math.pow(gold.gateGoldGrowth, stage - 1));
 }
 
 /**
@@ -212,8 +212,11 @@ export function applyGate(state: RunState, choice: GateChoice): GateResult {
   const armsMul = state.loadout.armsMultiplier;
 
   if (choice.target === 'disciples') {
+    // 聚眾成軍是乘算：加算閘門的收益也一起放大，這條線才不會在後期被稀釋。
     state.disciples =
-      choice.op === 'add' ? state.disciples + choice.value : state.disciples * choice.value;
+      choice.op === 'add'
+        ? state.disciples + choice.value * (choice.value > 0 ? state.loadout.discipleMultiplier : 1)
+        : state.disciples * choice.value;
   } else if (choice.target === 'arms') {
     if (choice.op === 'add') {
       const value = choice.value > 0 ? choice.value * armsMul : choice.value;
@@ -239,18 +242,24 @@ export function applyGate(state: RunState, choice: GateChoice): GateResult {
   };
 }
 
-/** 減傷分母：防禦與武裝各以自己的權重計入。 */
+/** 單兵戰力：攻擊與武裝相加後套上淬鍊功法的倍率。 */
+export function perUnitPower(state: RunState): number {
+  return (state.loadout.attack + state.arms) * state.loadout.attackMultiplier;
+}
+
+/** 減傷分母：防禦與武裝各以自己的權重計入，再套上護體罡氣的倍率。 */
 export function mitigation(state: RunState): number {
   const { power } = BALANCE;
   return Math.max(
     power.mitigationFloor,
-    state.loadout.defense * power.defenseMitigation + state.arms * power.armsMitigation,
+    (state.loadout.defense * power.defenseMitigation + state.arms * power.armsMitigation) *
+      state.loadout.mitigationMultiplier,
   );
 }
 
-/** 抵禦敵陣的能力：攻擊與武裝直接對砍，防禦另計。 */
+/** 抵禦敵陣的能力：單兵戰力直接對砍，減傷另計。 */
 function guard(state: RunState): number {
-  return Math.max(BALANCE.power.mitigationFloor, state.loadout.attack + mitigation(state));
+  return Math.max(BALANCE.power.mitigationFloor, perUnitPower(state) + mitigation(state));
 }
 
 /**
@@ -280,11 +289,9 @@ export function resolveMob(state: RunState, encounter: MobEncounter): number {
   return loss;
 }
 
-/** 隊伍總戰力＝人數 ×（攻擊＋武裝）× 境界壓制。 */
+/** 隊伍總戰力＝人數 × 單兵戰力 × 境界壓制。 */
 export function teamPower(state: RunState): number {
-  return (
-    state.disciples * (state.loadout.attack + state.arms) * (1 + state.loadout.realmPowerBonus)
-  );
+  return state.disciples * perUnitPower(state) * (1 + state.loadout.realmPowerBonus);
 }
 
 // ---------------------------------------------------------------- 首領戰
@@ -319,8 +326,7 @@ export function bossDps(state: RunState, momentum: number): number {
  * 比例制讓人數平滑衰減，戰鬥維持在「快一點就贏得下來」的張力。
  */
 export function bossHitRatio(state: RunState, boss: BossState): number {
-  const guard = Math.max(BALANCE.power.mitigationFloor, state.loadout.attack + mitigation(state));
-  return boss.attack / (boss.attack + guard);
+  return boss.attack / (boss.attack + guard(state));
 }
 
 /** 首領一次攻擊造成的傷亡人數。 */
@@ -338,7 +344,7 @@ export function bossHitLoss(state: RunState, boss: BossState): number {
 export function clearReward(state: RunState): number {
   const { gold } = BALANCE;
   return Math.round(
-    (gold.clearBase + gold.clearPerStage * state.stage) * state.loadout.goldMultiplier,
+    gold.clearBase * Math.pow(gold.clearGrowth, state.stage - 1) * state.loadout.goldMultiplier,
   );
 }
 

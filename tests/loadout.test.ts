@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { BALANCE, SECTS } from '../src/data';
 import type { Sect } from '../src/data/types';
 import { buildLoadout, buildLoadoutFor, sectById } from '../src/systems/loadout';
+import { trackById } from '../src/systems/upgrades';
 import { createDefaultSave } from '../src/save';
+
+function trackPerLevel(id: string): number {
+  return trackById(id).perLevel;
+}
 
 function sect(id: string): Sect {
   const found = SECTS.find((item) => item.id === id);
@@ -11,20 +16,30 @@ function sect(id: string): Sect {
 }
 
 describe('開局配置', () => {
-  it('起始屬性＝基礎值＋門派＋升級', () => {
-    const loadout = buildLoadoutFor(sect('body'), { startDisciples: 3, startAttack: 2, startDefense: 1 }, 1);
+  it('未升級時起始屬性＝基礎值＋門派', () => {
+    const loadout = buildLoadoutFor(sect('body'), {}, 1);
     const s = sect('body');
-    expect(loadout.disciples).toBe(BALANCE.power.baseDisciples + s.discipleBonus + 3 * 1);
-    expect(loadout.attack).toBe(BALANCE.power.baseAttack + s.attackBonus + 2 * 1);
-    expect(loadout.defense).toBe(BALANCE.power.baseDefense + s.defenseBonus + 1 * 2);
+    expect(loadout.disciples).toBe(BALANCE.power.baseDisciples + s.discipleBonus);
+    expect(loadout.attack).toBe(BALANCE.power.baseAttack + s.attackBonus);
+    expect(loadout.defense).toBe(BALANCE.power.baseDefense + s.defenseBonus);
   });
 
-  it('五條升級線各自對應到正確的欄位', () => {
+  it('五條升級線都是百分比乘算，各自對應到正確的乘區', () => {
     const plain = buildLoadoutFor(sect('body'), {}, 1);
+    const disciples = buildLoadoutFor(sect('body'), { startDisciples: 10 }, 1);
+    const attack = buildLoadoutFor(sect('body'), { startAttack: 10 }, 1);
+    const defense = buildLoadoutFor(sect('body'), { startDefense: 10 }, 1);
     const gold = buildLoadoutFor(sect('body'), { goldGain: 10 }, 1);
     const boss = buildLoadoutFor(sect('body'), { bossDamage: 10 }, 1);
-    expect(gold.goldMultiplier).toBeCloseTo(plain.goldMultiplier * 1.8, 6);
-    expect(boss.bossDamageMultiplier).toBeCloseTo(plain.bossDamageMultiplier * 2, 6);
+
+    expect(disciples.discipleMultiplier).toBeGreaterThan(plain.discipleMultiplier);
+    expect(disciples.disciples).toBeGreaterThan(plain.disciples);
+    expect(attack.attackMultiplier).toBeGreaterThan(plain.attackMultiplier);
+    expect(defense.mitigationMultiplier).toBeGreaterThan(plain.mitigationMultiplier);
+    expect(gold.goldMultiplier).toBeGreaterThan(plain.goldMultiplier);
+    expect(boss.bossDamageMultiplier).toBeGreaterThan(plain.bossDamageMultiplier);
+    // 乘算才不會在後期被閘門稀釋，這是 L-05 的結論。
+    expect(attack.attackMultiplier).toBeCloseTo(1 + (10 * trackPerLevel('startAttack')) / 100, 6);
   });
 
   it('起始人數至少 1、防禦不為負', () => {

@@ -84,12 +84,17 @@ export interface BossBalance {
   momentumDecayPerSec: number;
 }
 
-/** 金幣產出。 */
+/**
+ * 金幣產出。
+ *
+ * 獎勵採等比成長而非線性：升級花費是指數曲線，收入若是線性，
+ * 深層等級永遠買不起，中後期的升級系統就等於停擺。
+ */
 export interface GoldBalance {
   clearBase: number;
-  clearPerStage: number;
+  clearGrowth: number;
   gateGoldBase: number;
-  gateGoldPerStage: number;
+  gateGoldGrowth: number;
   /** 失敗時保留的比例。 */
   defeatRatio: number;
 }
