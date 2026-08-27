@@ -7,8 +7,11 @@ import {
   ENEMY_DISPLAY_HEIGHT,
   ENEMY_SOURCE_HEIGHT,
   bossTexture,
+  createWalkAnimations,
   discipleTexture,
+  discipleWalkKey,
   enemyTexture,
+  enemyWalkKey,
 } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE } from '../data';
@@ -68,7 +71,7 @@ interface EncounterView {
   container: Phaser.GameObjects.Container;
   resolved: boolean;
   /** 敵陣才有：用於結算時的擊退演出。 */
-  enemies: Phaser.GameObjects.Image[];
+  enemies: Phaser.GameObjects.Sprite[];
   /** 敵陣的說明文字，逼近隊伍時淡出，免得和頭頂的人數字疊在一起。 */
   labels: Phaser.GameObjects.Text[];
 }
@@ -96,7 +99,7 @@ export class RunScene extends Phaser.Scene {
   private spawnIndex = 0;
 
   private crowd!: Phaser.GameObjects.Container;
-  private crowdSprites: Phaser.GameObjects.Image[] = [];
+  private crowdSprites: Phaser.GameObjects.Sprite[] = [];
   private crowdSlots: CrowdSlot[] = [];
   private crowdCountText!: Phaser.GameObjects.Text;
   private visibleCount = 0;
@@ -158,6 +161,7 @@ export class RunScene extends Phaser.Scene {
     this.lastCrowdX = this.targetX;
 
     const realm = realmForStage(stage);
+    createWalkAnimations(this);
     audio.playMusic(realmIndexForStage(stage));
     drawBackdrop(this, realm.color);
     this.drawRoad(realm.color);
@@ -221,15 +225,18 @@ export class RunScene extends Phaser.Scene {
     slots.sort((a, b) => a.y - b.y);
     this.crowdSlots = slots;
 
-    const tint = hexToNumber(this.run.loadout.sect.color);
-    const texture = discipleTexture(this.run.loadout.sect.art);
-    this.crowdSprites = slots.map(() =>
-      this.add
-        .image(0, 0, texture)
+    // 門人已是全彩貼圖，不再用 setTint 上色；門派差異來自造型本身。
+    const art = this.run.loadout.sect.art;
+    this.crowdSprites = slots.map((slot) => {
+      const sprite = this.add
+        .sprite(0, 0, discipleTexture(art, 0))
         .setOrigin(0.5, 0.85)
-        .setTint(tint)
-        .setVisible(false),
-    );
+        .setVisible(false);
+      sprite.play(discipleWalkKey(art));
+      // 每個人的步伐錯開，整團才不會像同一個人複製了三十份。
+      sprite.anims.setProgress((slot.phase / (Math.PI * 2)) % 1);
+      return sprite;
+    });
 
     this.crowdCountText = this.add
       .text(0, -132, '', textStyle({ size: 30, color: INK, bold: true }))
@@ -425,17 +432,18 @@ export class RunScene extends Phaser.Scene {
 
   private buildMobView(encounter: MobEncounter): Omit<EncounterView, 'encounter' | 'resolved'> {
     const container = this.add.container(0, 0).setDepth(20);
-    const enemies: Phaser.GameObjects.Image[] = [];
+    const enemies: Phaser.GameObjects.Sprite[] = [];
     const scale = ENEMY_DISPLAY_HEIGHT / ENEMY_SOURCE_HEIGHT;
     const span = ROAD_RIGHT - ROAD_LEFT - 40;
 
     for (let i = 0; i < MOB_ROW; i += 1) {
       const x = ROAD_LEFT + 20 + (span * i) / (MOB_ROW - 1);
       const enemy = this.add
-        .image(x, i % 2 === 0 ? 0 : 6, enemyTexture(encounter.art))
+        .sprite(x, i % 2 === 0 ? 0 : 6, enemyTexture(encounter.art, 0))
         .setOrigin(0.5, 0.9)
-        .setScale(scale)
-        .setTint(0xc2404e);
+        .setScale(scale);
+      enemy.play(enemyWalkKey(encounter.art));
+      enemy.anims.setProgress((i / MOB_ROW) % 1);
       enemies.push(enemy);
       // 每名兵卒相位不同，整排看起來是在原地踏步逼近，而不是一張貼圖。
       this.tweens.add({
@@ -494,10 +502,12 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** 敵陣被衝散：閃白、向外彈開、淡出。 */
-  private knockBack(enemies: readonly Phaser.GameObjects.Image[]): void {
+  private knockBack(enemies: readonly Phaser.GameObjects.Sprite[]): void {
     enemies.forEach((enemy, index) => {
       this.tweens.killTweensOf(enemy);
-      enemy.setTint(0xffffff);
+      enemy.anims.stop();
+      // 全彩貼圖用 setTintFill 才會整片閃白；setTint(0xffffff) 等於沒上色。
+      enemy.setTintFill(0xffffff);
       this.tweens.add({
         targets: enemy,
         x: enemy.x + (index % 2 === 0 ? -46 : 46),
@@ -563,9 +573,10 @@ export class RunScene extends Phaser.Scene {
     const glow = this.add
       .image(0, 0, texture)
       .setDisplaySize(216, 216)
-      .setTint(hexToNumber(DANGER))
-      .setAlpha(0.38);
-    const body = this.add.image(0, 0, texture).setDisplaySize(200, 200).setTint(this.bossTint);
+      .setTintFill(hexToNumber(DANGER))
+      .setAlpha(0.34);
+    // 首領貼圖本身已上色，只留光暈帶境界色，本體不再整隻染成一個色調。
+    const body = this.add.image(0, 0, texture).setDisplaySize(200, 200);
     this.bossBody = body;
 
     const figure = this.add.container(cx, BOSS_Y, [aura, glow, body]);
@@ -646,8 +657,8 @@ export class RunScene extends Phaser.Scene {
   private bossHitAnimation(): void {
     const body = this.bossBody;
     if (body === null) return;
-    body.setTint(0xffffff);
-    this.time.delayedCall(55, () => body.setTint(this.bossTint));
+    body.setTintFill(0xffffff);
+    this.time.delayedCall(55, () => body.clearTint());
     this.tweens.add({ targets: body, scaleX: body.scaleX * 0.94, duration: 60, yoyo: true });
   }
 

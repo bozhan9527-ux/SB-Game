@@ -1,29 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <!-- 仙庭執法者：光輪、三叉羽冠、肩甲與胸鎧、右手長戟。 -->
   <circle cx="98" cy="76" r="58" fill="none" stroke="#d8d8d8" stroke-width="5" opacity="0.7"/>
-  <circle cx="98" cy="76" r="46" fill="none" stroke="#8f8f8f" stroke-width="2" opacity="0.55"/>
-  <g fill="#b0b0b0">
+  <circle cx="98" cy="76" r="46" fill="none" stroke="#b9c4d0" stroke-width="2" opacity="0.55"/>
+  <g fill="#e8c46a">
     <path d="M98 18l7 26H91z"/>
     <path d="M70 30l12 20-16-6z"/>
     <path d="M126 30l-12 20 16-6z"/>
   </g>
-  <path d="M98 40c17 0 29 13 29 30 0 18-13 32-29 32S69 88 69 70c0-17 12-30 29-30z" fill="#8f8f8f"/>
-  <path d="M98 50c11 0 18 9 18 20 0 12-8 21-18 21s-18-9-18-21c0-11 7-20 18-20z" fill="#3a3a3a"/>
-  <g fill="#ffffff">
+  <path d="M98 40c17 0 29 13 29 30 0 18-13 32-29 32S69 88 69 70c0-17 12-30 29-30z" fill="#b9c4d0"/>
+  <path d="M98 50c11 0 18 9 18 20 0 12-8 21-18 21s-18-9-18-21c0-11 7-20 18-20z" fill="#28303f"/>
+  <g fill="#cfe6ff">
     <path d="M85 70c5-3 10-3 13 1-4 3-9 4-13 2z"/>
     <path d="M111 70c-5-3-10-3-13 1 4 3 9 4 13 2z"/>
   </g>
-  <path d="M98 106l30 14c11 5 17 16 17 28v42H51v-42c0-12 6-23 17-28z" fill="#8a8a8a"/>
-  <path d="M98 106l16 8-16 30-16-30z" fill="#dcdcdc"/>
-  <g fill="#5e5e5e">
+  <path d="M98 106l30 14c11 5 17 16 17 28v42H51v-42c0-12 6-23 17-28z" fill="#dfe6ee"/>
+  <path d="M98 106l16 8-16 30-16-30z" fill="#e8c46a"/>
+  <g fill="#9aa7b4">
     <path d="M66 118c-16 1-28 10-33 24 14 4 28 1 39-8z"/>
     <path d="M130 118c16 1 28 10 33 24-14 4-28 1-39-8z"/>
   </g>
-  <g fill="#3f3f3f" opacity="0.75">
+  <g fill="#7f8b98" opacity="0.75">
     <rect x="72" y="156" width="52" height="4" rx="2"/>
     <rect x="72" y="168" width="52" height="4" rx="2"/>
   </g>
-  <g fill="#e6e6e6">
+  <g fill="#dfe8ef">
     <rect x="168" y="34" width="5" height="158" rx="2"/>
     <path d="M170.5 6l10 22-10 14-10-14z"/>
     <path d="M160 40h21l-4 8h-13z"/>

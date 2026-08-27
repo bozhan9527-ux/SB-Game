@@ -1,24 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <!-- 妖獸首：後掠的雙角、窄長吻部、上吊的眼。灰階繪製，由 Phaser 依境界色 setTint。 -->
-  <g fill="#a5a5a5">
+  <g fill="#efe2c4">
     <path d="M62 68C50 52 36 36 18 24c8 20 22 38 38 52z"/>
     <path d="M56 76C42 66 26 60 10 58c14 12 30 20 46 24z"/>
     <path d="M138 68c12-16 26-32 44-44-8 20-22 38-38 52z"/>
     <path d="M144 76c14-10 30-16 46-18-14 12-30 20-46 24z"/>
   </g>
-  <path d="M100 44c30 0 52 20 56 48 2 16-4 30-14 42l-42 46-42-46c-10-12-16-26-14-42 4-28 26-48 56-48z" fill="#8a8a8a"/>
-  <path d="M100 118c14 0 24 8 24 18 0 14-12 30-24 44-12-14-24-30-24-44 0-10 10-18 24-18z" fill="#4f4f4f"/>
-  <g fill="#ffffff">
+  <path d="M100 44c30 0 52 20 56 48 2 16-4 30-14 42l-42 46-42-46c-10-12-16-26-14-42 4-28 26-48 56-48z" fill="#a0503c"/>
+  <path d="M100 118c14 0 24 8 24 18 0 14-12 30-24 44-12-14-24-30-24-44 0-10 10-18 24-18z" fill="#6b2f22"/>
+  <g fill="#fff5e0">
     <path d="M56 84l32 10-34 6 2-8z"/>
     <path d="M144 84l-32 10 34 6-2-8z"/>
   </g>
-  <g fill="#efefef">
+  <g fill="#fff2dc">
     <path d="M82 148l7 16 6-16z"/>
     <path d="M112 148l7 16 6-16z"/>
     <path d="M76 132l5 10 4-10z"/>
     <path d="M120 132l5 10 4-10z"/>
   </g>
-  <g fill="none" stroke="#2f2f2f" stroke-width="3" stroke-linecap="round" opacity="0.7">
+  <g fill="none" stroke="#3a1a12" stroke-width="3" stroke-linecap="round" opacity="0.7">
     <path d="M70 70c8-6 18-8 26-6"/>
     <path d="M130 70c-8-6-18-8-26-6"/>
   </g>
