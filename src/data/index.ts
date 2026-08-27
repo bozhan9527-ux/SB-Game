@@ -13,6 +13,7 @@ import enemiesJson from '../../data/enemies.json';
 
 import type {
   Balance,
+  BossArt,
   BossDef,
   EnemyBook,
   GateOp,
@@ -27,6 +28,7 @@ import { assertUniqueIds, bool, field, list, num, obj, oneOf, str, DataError } f
 
 const GATE_TARGETS: readonly GateTarget[] = ['disciples', 'arms', 'gold'];
 const GATE_OPS: readonly GateOp[] = ['add', 'mul'];
+const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const swipe = obj(raw, 'swipe', path);
@@ -192,6 +194,7 @@ export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
     realm: str(item, 'realm', p),
     name: str(item, 'name', p),
     taunt: str(item, 'taunt', p),
+    art: oneOf(item, 'art', p, BOSS_ARTS),
   }));
   assertUniqueIds(mobs, `${path}.mobs`);
   assertUniqueIds(bosses, `${path}.bosses`);

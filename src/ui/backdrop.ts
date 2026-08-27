@@ -2,6 +2,7 @@
  * 水墨風背景：遠山、明月、飄浮靈光。全部以程式繪製，不需美術素材。
  */
 import Phaser from 'phaser';
+import { ART } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { hexToNumber } from './theme';
 
@@ -45,6 +46,29 @@ export function drawBackdrop(scene: Phaser.Scene, accentHex: string): Phaser.Gam
   });
 
   layer.add(g);
+
+  // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。
+  const clouds: { y: number; scale: number; alpha: number; duration: number }[] = [
+    { y: GAME_HEIGHT * 0.13, scale: 1.1, alpha: 0.12, duration: 46000 },
+    { y: GAME_HEIGHT * 0.24, scale: 0.8, alpha: 0.09, duration: 62000 },
+    { y: GAME_HEIGHT * 0.34, scale: 1.4, alpha: 0.07, duration: 78000 },
+  ];
+  for (const spec of clouds) {
+    if (!scene.textures.exists(ART.cloud)) break;
+    const cloud = scene.add
+      .image(-140, spec.y, ART.cloud)
+      .setScale(spec.scale)
+      .setAlpha(spec.alpha)
+      .setTint(accent);
+    layer.add(cloud);
+    scene.tweens.add({
+      targets: cloud,
+      x: GAME_WIDTH + 200,
+      duration: spec.duration,
+      delay: Phaser.Math.Between(0, 12000),
+      repeat: -1,
+    });
+  }
 
   // 飄浮靈光：緩慢上升的小點，讓靜態畫面有呼吸感。
   for (let i = 0; i < 18; i += 1) {

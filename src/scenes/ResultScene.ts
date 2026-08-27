@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
+import { audio } from '../audio';
 import { GAME_WIDTH } from '../config';
 import { recordClear, recordDefeat } from '../save';
 import { persist, state } from '../state';
-import { realmForStage, realmTitle } from '../systems/realms';
+import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, formatNumber, textStyle, wrapText } from '../ui/theme';
@@ -33,6 +34,7 @@ export class ResultScene extends Phaser.Scene {
     const breakthrough = result.victory && afterRealm.id !== beforeRealm.id;
 
     const cx = GAME_WIDTH / 2;
+    audio.playMusic(realmIndexForStage(save.world.stage));
     drawBackdrop(this, afterRealm.color);
 
     this.add
@@ -45,6 +47,7 @@ export class ResultScene extends Phaser.Scene {
       .setAlign('center');
 
     if (breakthrough) {
+      audio.play('breakthrough');
       const banner = this.add
         .text(cx, 292, `突破！晉入 ${afterRealm.name}`, textStyle({ size: 34, color: afterRealm.color, bold: true }))
         .setOrigin(0.5);

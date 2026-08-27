@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <!-- 斬擊：一道弧形劍氣，首領受擊時閃現。 -->
+  <path d="M14 128C22 62 68 16 146 8c-56 22-92 62-108 122z" fill="#ffffff"/>
+  <path d="M30 138C40 84 80 44 142 30 92 52 58 88 44 140z" fill="#ffffff" opacity="0.45"/>
+</svg>

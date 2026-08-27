@@ -2,6 +2,7 @@
  * 按鈕。熱區不小於 44×44 px（TECH_SPEC 第 6 節）。
  */
 import Phaser from 'phaser';
+import { audio } from '../audio';
 import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, textStyle } from './theme';
 
 export interface ButtonOptions {
@@ -51,7 +52,9 @@ export function createButton(
   background.on('pointerout', () => container.setScale(1));
   background.on('pointerup', () => {
     container.setScale(1);
-    if (enabled) options.onClick();
+    if (!enabled) return;
+    audio.play('ui');
+    options.onClick();
   });
 
   return {

@@ -6,8 +6,14 @@
  */
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
-/** 目前只有 v1，尚無遷移。新增時往後 push，不得插隊或修改既有項目。 */
-export const MIGRATIONS: readonly Migration[] = [];
+/** v1 → v2：加入音效開關。舊存檔沒有這個欄位，預設開啟。 */
+const addSettings: Migration = (data) => ({
+  ...data,
+  settings: { sound: true },
+});
+
+/** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
+export const MIGRATIONS: readonly Migration[] = [addSettings];
 
 /**
  * 把任意版本的存檔套用至最新版。

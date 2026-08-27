@@ -170,11 +170,15 @@ export interface MobDef {
   name: string;
 }
 
+/** 首領的造型，對應 public/art/boss-*.svg。 */
+export type BossArt = 'beast' | 'demon' | 'storm' | 'celestial';
+
 export interface BossDef {
   id: string;
   realm: string;
   name: string;
   taunt: string;
+  art: BossArt;
 }
 
 export interface EnemyBook {

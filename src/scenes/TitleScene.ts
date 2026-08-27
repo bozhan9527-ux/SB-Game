@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
+import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { sectById } from '../systems/loadout';
-import { realmForStage, realmTitle } from '../systems/realms';
+import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { GOLD, INK, INK_DIM, formatNumber, textStyle } from '../ui/theme';
@@ -17,6 +18,7 @@ export class TitleScene extends Phaser.Scene {
     const save = state();
     const realm = realmForStage(save.world.stage);
     const sect = sectById(save.player.sectId);
+    audio.playMusic(realmIndexForStage(save.world.stage));
     drawBackdrop(this, realm.color);
 
     const cx = GAME_WIDTH / 2;
@@ -73,6 +75,22 @@ export class TitleScene extends Phaser.Scene {
       fontSize: 22,
       onClick: () => this.scene.start('Sect'),
     });
+
+    // 音效開關。放在標題頁右上角，切換後立刻生效並寫進存檔。
+    const soundButton = createButton(this, GAME_WIDTH - 82, 60, {
+      width: 132,
+      height: 52,
+      label: '',
+      fontSize: 20,
+      onClick: () => {
+        save.settings.sound = !save.settings.sound;
+        audio.setEnabled(save.settings.sound);
+        if (save.settings.sound) audio.playMusic(realmIndexForStage(save.world.stage));
+        persist();
+        soundButton.setLabel(save.settings.sound ? '音效 開' : '音效 關');
+      },
+    });
+    soundButton.setLabel(save.settings.sound ? '音效 開' : '音效 關');
 
     this.add
       .text(

@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -34,9 +34,15 @@ export interface WorldState {
   clears: number;
 }
 
+/** 玩家偏好。不是權威數值，純本機設定。 */
+export interface SettingsState {
+  sound: boolean;
+}
+
 export interface SaveData {
   version: number;
   savedAt: number;
   player: PlayerState;
   world: WorldState;
+  settings: SettingsState;
 }

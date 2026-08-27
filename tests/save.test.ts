@@ -68,6 +68,33 @@ describe('存檔（TECH_SPEC 第 4 節）', () => {
     expect(migrated['version']).toBe(SAVE_VERSION);
     expect(migrate({ version: 99 }, SAVE_VERSION)['version']).toBe(99);
   });
+
+  it('v1 舊存檔會被遷移出音效設定，且進度不流失', () => {
+    const storage = createMemoryStorage();
+    storage.write(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: 1,
+        player: { sectId: 'body', wallet: { gold: 320 }, upgrades: { startAttack: 3 } },
+        world: { stage: 9, highestStage: 9, runs: 12, clears: 8 },
+      }),
+    );
+    const loaded = loadSave(storage);
+    expect(loaded.version).toBe(SAVE_VERSION);
+    expect(loaded.settings.sound).toBe(true);
+    expect(loaded.world.stage).toBe(9);
+    expect(loaded.player.wallet.gold).toBe(320);
+    expect(loaded.player.upgrades['startAttack']).toBe(3);
+  });
+
+  it('音效關閉的設定會被存下來', () => {
+    const storage = createMemoryStorage();
+    const save = createDefaultSave(1);
+    save.settings.sound = false;
+    saveGame(save, storage, 2);
+    expect(loadSave(storage).settings.sound).toBe(false);
+  });
 });
 
 describe('金幣升級', () => {

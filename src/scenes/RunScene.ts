@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
+import { audio } from '../audio';
+import { ART, DISCIPLE_DISPLAY_HEIGHT, DISCIPLE_SOURCE_HEIGHT, bossTexture } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE } from '../data';
 import { SwipeTracker } from '../input/swipe';
 import { state } from '../state';
 import { buildLoadout } from '../systems/loadout';
-import { realmForStage, realmTitle } from '../systems/realms';
+import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createRng } from '../systems/rng';
 import type { BossState, Encounter, GateChoice, MobEncounter, RunState } from '../systems/run';
 import {
@@ -68,7 +70,7 @@ export class RunScene extends Phaser.Scene {
   private spawnIndex = 0;
 
   private crowd!: Phaser.GameObjects.Container;
-  private crowdGfx!: Phaser.GameObjects.Graphics;
+  private crowdSprites: Phaser.GameObjects.Image[] = [];
   private crowdCountText!: Phaser.GameObjects.Text;
   private dotOffsets: { x: number; y: number }[] = [];
 
@@ -89,6 +91,7 @@ export class RunScene extends Phaser.Scene {
   private bossTimeLeft = 0;
   private bossTimerBar: Phaser.GameObjects.Rectangle | null = null;
   private bossAttackAccum = 0;
+  private slashAccum = 0;
 
   constructor() {
     super('Run');
@@ -116,8 +119,10 @@ export class RunScene extends Phaser.Scene {
     this.bossGroup = null;
     this.momentum = 0;
     this.bossAttackAccum = 0;
+    this.slashAccum = 0;
 
     const realm = realmForStage(stage);
+    audio.playMusic(realmIndexForStage(stage));
     drawBackdrop(this, realm.color);
     this.drawRoad(realm.color);
     this.buildHud(realm.color);
@@ -163,40 +168,50 @@ export class RunScene extends Phaser.Scene {
   }
 
   private buildCrowd(): void {
-    // 人頭位置先算好一組固定偏移，之後只依人數取前 N 個，避免每幀重算。
+    // 站位先算好一組固定偏移，之後只依人數取前 N 個，避免每幀重算。
+    // 依 y 排序後依序加入容器，後加入的畫在上面，前排才會正確蓋住後排。
     const rng = createRng(20260827);
     this.dotOffsets = [];
     for (let i = 0; i < MAX_CROWD_DOTS; i += 1) {
       const ring = Math.floor(Math.sqrt(i) * 1.35);
       const angle = i * 2.399963;
-      const radius = ring * 13 + rng.next() * 6;
-      this.dotOffsets.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius * 0.7 });
+      const radius = ring * 11 + rng.next() * 6;
+      this.dotOffsets.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius * 0.62 });
     }
+    this.dotOffsets.sort((a, b) => a.y - b.y);
 
-    this.crowdGfx = this.add.graphics();
+    const tint = hexToNumber(this.run.loadout.sect.color);
+    const baseScale = DISCIPLE_DISPLAY_HEIGHT / DISCIPLE_SOURCE_HEIGHT;
+    this.crowdSprites = this.dotOffsets.map(() =>
+      this.add.image(0, 0, ART.disciple).setOrigin(0.5, 0.85).setScale(baseScale).setTint(tint).setVisible(false),
+    );
+
     this.crowdCountText = this.add
-      .text(0, -74, '', textStyle({ size: 30, color: INK, bold: true }))
-      .setOrigin(0.5);
-    this.crowd = this.add.container(LANE_X[0], CROWD_Y, [this.crowdGfx, this.crowdCountText]).setDepth(30);
+      .text(0, -104, '', textStyle({ size: 30, color: INK, bold: true }))
+      .setOrigin(0.5)
+      .setStroke('#0b0f14', 6);
+    this.crowd = this.add
+      .container(LANE_X[0], CROWD_Y, [...this.crowdSprites, this.crowdCountText])
+      .setDepth(30);
     this.drawCrowd();
   }
 
   private drawCrowd(): void {
-    const color = hexToNumber(this.run.loadout.sect.color);
     const count = Math.max(0, this.run.disciples);
     const shown = Math.min(MAX_CROWD_DOTS, count);
-    // 人多時縮小個體，讓整團不會超出車道寬度。
-    const scale = count > 24 ? 0.8 : 1;
+    // 人越多，個體與間距一起縮小，整團才不會超出車道寬度。
+    const spread = Phaser.Math.Clamp(Math.sqrt(16 / Math.max(1, shown)), 0.55, 1);
+    const scale = spread * (DISCIPLE_DISPLAY_HEIGHT / DISCIPLE_SOURCE_HEIGHT);
 
-    this.crowdGfx.clear();
-    for (let i = 0; i < shown; i += 1) {
-      const offset = this.dotOffsets[i];
-      if (offset === undefined) continue;
-      this.crowdGfx.fillStyle(0x000000, 0.35);
-      this.crowdGfx.fillCircle(offset.x * scale, offset.y * scale + 3, 8 * scale);
-      this.crowdGfx.fillStyle(color, 0.95);
-      this.crowdGfx.fillCircle(offset.x * scale, offset.y * scale, 7 * scale);
-    }
+    this.crowdSprites.forEach((sprite, index) => {
+      const offset = this.dotOffsets[index];
+      if (offset === undefined || index >= shown) {
+        sprite.setVisible(false);
+        return;
+      }
+      sprite.setVisible(true).setPosition(offset.x * spread, offset.y * spread).setScale(scale);
+    });
+
     this.crowdCountText.setText(count > 0 ? `${formatNumber(count)} 人` : '');
     this.crowdCountText.setColor(count <= 3 ? DANGER : INK);
   }
@@ -234,6 +249,7 @@ export class RunScene extends Phaser.Scene {
 
   private onSwipe(lane: number): void {
     if (this.phase === 'boss') {
+      audio.play('swipe');
       // 首領戰：滑動累積氣勢，換取傷害加成。
       const { boss } = BALANCE;
       this.momentum = Math.min(boss.momentumMax, this.momentum + boss.momentumPerSwipe);
@@ -243,6 +259,7 @@ export class RunScene extends Phaser.Scene {
     }
     if (this.phase !== 'running' || lane === this.lane) return;
 
+    audio.play('swipe');
     this.lane = lane;
     this.tweens.add({
       targets: this.crowd,
@@ -343,12 +360,17 @@ export class RunScene extends Phaser.Scene {
       const panel = this.add
         .rectangle(x, 0, GATE_WIDTH, GATE_HEIGHT, this.gateColor(choice), 0.82)
         .setStrokeStyle(3, choice.trap ? hexToNumber(DANGER) : hexToNumber(INK), 0.75);
+      const arch = this.add
+        .image(x, 0, ART.gateArch)
+        .setDisplaySize(GATE_WIDTH, GATE_HEIGHT)
+        .setTint(choice.trap ? hexToNumber(DANGER) : hexToNumber(INK))
+        .setAlpha(0.9);
       const label = this.add
-        .text(x, 0, choice.label, textStyle({ size: 30, color: INK, bold: true }))
+        .text(x, 16, choice.label, textStyle({ size: 30, color: INK, bold: true }))
         .setOrigin(0.5);
       // 後期關卡的閘門數字會變成四位數，超寬就等比縮小而不是溢出閘門。
-      fitText(label, GATE_WIDTH - 24);
-      container.add([panel, label]);
+      fitText(label, GATE_WIDTH - 68);
+      container.add([panel, arch, label]);
     });
     return container;
   }
@@ -358,6 +380,11 @@ export class RunScene extends Phaser.Scene {
     const band = this.add
       .rectangle(GAME_WIDTH / 2, 0, GAME_WIDTH - 92, 92, 0x5a1f27, 0.8)
       .setStrokeStyle(3, hexToNumber(DANGER), 0.8);
+    const silhouette = this.add
+      .image(GAME_WIDTH / 2, 0, ART.mobLine)
+      .setDisplaySize(GAME_WIDTH - 92, 92)
+      .setTint(0x120608)
+      .setAlpha(0.55);
     const label = this.add
       .text(GAME_WIDTH / 2, -14, encounter.name, textStyle({ size: 26, color: INK, bold: true }))
       .setOrigin(0.5);
@@ -366,7 +393,7 @@ export class RunScene extends Phaser.Scene {
     const stat = this.add
       .text(GAME_WIDTH / 2, 20, `預估傷亡 −${percent}%`, textStyle({ size: 20, color: DANGER }))
       .setOrigin(0.5);
-    container.add([band, label, stat]);
+    container.add([band, silhouette, label, stat]);
     return container;
   }
 
@@ -382,10 +409,12 @@ export class RunScene extends Phaser.Scene {
       if (result.goldDelta !== 0) parts.push(`+${result.goldDelta} 金幣`);
       const positive = result.discipleDelta + result.armsDelta + result.goldDelta >= 0;
       this.popup(parts.join('　'), positive ? JADE : DANGER);
+      audio.play(choice.target === 'gold' ? 'gold' : positive ? 'gateGood' : 'gateTrap');
     } else {
       const loss = resolveMob(this.run, view.encounter);
       this.popup(`-${loss} 人`, DANGER);
       this.cameras.main.shake(160, 0.006);
+      audio.play('mob');
     }
 
     this.tweens.add({ targets: view.container, alpha: 0, duration: 260 });
@@ -439,10 +468,18 @@ export class RunScene extends Phaser.Scene {
     const container = this.add.container(0, 0).setDepth(25);
     const cx = GAME_WIDTH / 2;
 
-    const body = this.add.circle(cx, 330, 82, 0x6b1f2c, 0.95).setStrokeStyle(4, hexToNumber(DANGER), 0.9);
-    const eyeL = this.add.circle(cx - 30, 316, 9, 0xffd0d0);
-    const eyeR = this.add.circle(cx + 30, 316, 9, 0xffd0d0);
-    this.tweens.add({ targets: body, scale: 1.06, duration: 900, yoyo: true, repeat: -1 });
+    const realm = realmForStage(this.run.stage);
+    const texture = bossTexture(boss.def.art);
+    // 光暈 → 紅色描邊 → 本體，三層疊出「境界色的妖物」而不是單一色塊。
+    const aura = this.add.circle(cx, 330, 104, hexToNumber(realm.color), 0.12);
+    const glow = this.add
+      .image(cx, 330, texture)
+      .setDisplaySize(216, 216)
+      .setTint(hexToNumber(DANGER))
+      .setAlpha(0.38);
+    const body = this.add.image(cx, 330, texture).setDisplaySize(200, 200).setTint(hexToNumber(realm.color));
+    this.tweens.add({ targets: [body, glow], scale: '*=1.05', duration: 1100, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: aura, alpha: 0.22, duration: 1400, yoyo: true, repeat: -1 });
 
     const name = this.add
       .text(cx, 200, boss.def.name, textStyle({ size: 40, color: DANGER, bold: true }))
@@ -471,9 +508,9 @@ export class RunScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     container.add([
+      aura,
+      glow,
       body,
-      eyeL,
-      eyeR,
       name,
       taunt,
       barBg,
@@ -498,6 +535,14 @@ export class RunScene extends Phaser.Scene {
     // 氣勢自然衰退，不滑就掉。
     this.momentum = Math.max(0, this.momentum - cfg.momentumDecayPerSec * seconds);
 
+    // 我方輸出的視覺回饋：氣勢越高，劍氣越密。
+    this.slashAccum += delta * (1 + this.momentum);
+    if (this.slashAccum >= 420) {
+      this.slashAccum = 0;
+      this.spawnSlash();
+      audio.play('bossHit');
+    }
+
     // 我方輸出
     boss.hp -= bossDps(this.run, this.momentum) * seconds;
     if (boss.hp <= 0) {
@@ -515,6 +560,7 @@ export class RunScene extends Phaser.Scene {
       this.run.disciples -= loss;
       this.popup(`-${loss} 人`, DANGER);
       this.cameras.main.shake(180, 0.008);
+      audio.play('bossAttack');
       this.drawCrowd();
       this.updateHud();
       if (this.run.disciples <= 0) {
@@ -530,6 +576,28 @@ export class RunScene extends Phaser.Scene {
     }
 
     this.refreshBossBars();
+  }
+
+  /** 首領身上閃現的一道劍氣。 */
+  private spawnSlash(): void {
+    const slash = this.add
+      .image(
+        GAME_WIDTH / 2 + Phaser.Math.Between(-52, 52),
+        330 + Phaser.Math.Between(-46, 46),
+        ART.slash,
+      )
+      .setDisplaySize(150, 150)
+      .setTint(hexToNumber(this.run.loadout.sect.color))
+      .setAngle(Phaser.Math.Between(-40, 220))
+      .setAlpha(0.85)
+      .setDepth(40);
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: '*=1.3',
+      duration: 260,
+      onComplete: () => slash.destroy(),
+    });
   }
 
   private refreshBossBars(): void {
@@ -555,6 +623,7 @@ export class RunScene extends Phaser.Scene {
     if (this.phase === 'over') return;
     this.phase = 'over';
     this.bossGroup?.setAlpha(0.6);
+    audio.play(victory ? 'victory' : 'defeat');
 
     const result: RunResultData = {
       victory,

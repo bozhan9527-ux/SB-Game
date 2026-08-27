@@ -18,6 +18,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
     savedAt: now,
     player: { sectId: null, wallet: { gold: 0 }, upgrades },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
+    settings: { sound: true },
   };
 }
 
@@ -32,6 +33,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const world = (raw['world'] ?? {}) as Record<string, unknown>;
   const wallet = (player['wallet'] ?? {}) as Record<string, unknown>;
   const upgrades = (player['upgrades'] ?? {}) as Record<string, unknown>;
+  const settings = (raw['settings'] ?? {}) as Record<string, unknown>;
 
   const merged: Record<string, number> = { ...base.player.upgrades };
   for (const track of UPGRADES) {
@@ -54,6 +56,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       runs: Math.max(0, Math.floor(asNumber(world['runs'], 0))),
       clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
     },
+    settings: { sound: settings['sound'] !== false },
   };
 }
 
