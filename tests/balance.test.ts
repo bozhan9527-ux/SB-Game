@@ -144,7 +144,7 @@ function playThrough(sectId: string, maxStage: number): Progress {
   return { totalRuns, maxAttempts, stuckAt: null, bossDurations };
 }
 
-const STAGES = 30;
+const STAGES = 45;
 
 describe('數值平衡', () => {
   it('第 1 關在零升級下，四個門派的勝率都在六成以上', () => {
@@ -196,7 +196,9 @@ describe('數值平衡', () => {
     expect(wall, '零升級也能一路推到 30 關，升級系統形同虛設').not.toBeNull();
     // 第 1 關必須在零升級下打得過，否則新玩家一開始就沒有金幣來源。
     expect(wall ?? Infinity, '零升級連第 1 關都過不了').toBeGreaterThanOrEqual(2);
-    expect(wall ?? Infinity, `零升級可以推到第 ${wall} 關，升級的必要性太晚出現`).toBeLessThanOrEqual(25);
+    // 門檻隨關卡總長調整：境界改為每境界九層後，一輪十個境界共 81 關，
+    // 「零升級撐到第 40 關」大約是全程的一半，再晚就代表升級系統前期沒有存在感。
+    expect(wall ?? Infinity, `零升級可以推到第 ${wall} 關，升級的必要性太晚出現`).toBeLessThanOrEqual(40);
   });
 
   it('首領戰的氣勢（滑動）會縮短戰鬥時間', () => {
@@ -208,12 +210,12 @@ describe('數值平衡', () => {
   it('敵陣造成比例傷亡：小隊不會被一波抹平', () => {
     const state = createRunState(buildLoadoutFor(SECTS[0]!, {}, 1), 1);
     state.disciples = 4;
-    resolveMob(state, { kind: 'mob', name: '測試', power: 9999 });
+    resolveMob(state, { kind: 'mob', name: '測試', art: 'bandit', power: 9999 });
     // 比例傷亡最多打光，但一般情況下必有殘存；這裡驗的是不會因為固定人數而必死。
     const survivable = createRunState(buildLoadoutFor(SECTS[0]!, {}, 1), 1);
     survivable.disciples = 40;
     survivable.arms = 30;
-    const loss = resolveMob(survivable, { kind: 'mob', name: '測試', power: 20 });
+    const loss = resolveMob(survivable, { kind: 'mob', name: '測試', art: 'bandit', power: 20 });
     expect(loss).toBeLessThan(40);
     expect(survivable.disciples).toBeGreaterThan(0);
   });

@@ -5,7 +5,7 @@
  * 場景（src/scenes/RunScene.ts）只負責把這裡的狀態畫出來。
  */
 import { BALANCE, ENEMIES, GATES } from '../data';
-import type { BossDef, GateOp, GateTarget, GateTemplate } from '../data/types';
+import type { BossDef, GateOp, GateTarget, GateTemplate, MobArt } from '../data/types';
 import type { Loadout } from './loadout';
 import { realmForStage, realmIndexForStage } from './realms';
 import type { Rng } from './rng';
@@ -30,6 +30,8 @@ export interface GateEncounter {
 export interface MobEncounter {
   kind: 'mob';
   name: string;
+  /** 造型，決定畫面上用哪一種兵卒。 */
+  art: MobArt;
   power: number;
 }
 
@@ -150,6 +152,7 @@ function buildMobEncounter(stage: number, rng: Rng): MobEncounter {
   return {
     kind: 'mob',
     name: mob?.name ?? '無名之敵',
+    art: mob?.art ?? 'bandit',
     power: Math.max(0.1, powerBase * Math.pow(stage, powerExponent) * jitter),
   };
 }

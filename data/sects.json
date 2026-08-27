@@ -12,7 +12,8 @@
     "armsMultiplier": 1,
     "bossDamageMultiplier": 1,
     "goldMultiplier": 1,
-    "mobLossMultiplier": 0.7
+    "mobLossMultiplier": 0.7,
+    "art": "body"
   },
   {
     "id": "sword",
@@ -27,7 +28,8 @@
     "armsMultiplier": 1,
     "bossDamageMultiplier": 1.35,
     "goldMultiplier": 1,
-    "mobLossMultiplier": 1.15
+    "mobLossMultiplier": 1.15,
+    "art": "sword"
   },
   {
     "id": "talisman",
@@ -42,7 +44,8 @@
     "armsMultiplier": 1.5,
     "bossDamageMultiplier": 1,
     "goldMultiplier": 1,
-    "mobLossMultiplier": 1
+    "mobLossMultiplier": 1,
+    "art": "talisman"
   },
   {
     "id": "alchemy",
@@ -57,6 +60,7 @@
     "armsMultiplier": 1,
     "bossDamageMultiplier": 0.95,
     "goldMultiplier": 1.5,
-    "mobLossMultiplier": 0.85
+    "mobLossMultiplier": 0.85,
+    "art": "alchemy"
   }
 ]

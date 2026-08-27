@@ -1,7 +1,7 @@
 {
   "input": {
     "followSpeed": 15,
-    "trackMarginPx": 95,
+    "trackMarginPx": 110,
     "momentumPerPixel": 0.004
   },
   "run": {
@@ -9,10 +9,10 @@
     "gateSpeedPerStage": 5,
     "gateSpeedMax": 380,
     "encounterSpacingPx": 520,
-    "gateValueGrowth": 1.08,
-    "gatesPerStageBase": 4,
+    "gateValueGrowth": 1.09,
+    "gatesPerStageBase": 6,
     "gatesPerStagePerRealm": 1,
-    "gatesPerStageMax": 9,
+    "gatesPerStageMax": 14,
     "mobWaveEvery": 2,
     "goldGateChance": 0.18,
     "trapChance": 0.22
@@ -35,7 +35,7 @@
   },
   "boss": {
     "hpBase": 2100,
-    "hpGrowth": 1.295,
+    "hpGrowth": 1.28,
     "attackBase": 2,
     "attackGrowth": 1.09,
     "attackIntervalMs": 1100,

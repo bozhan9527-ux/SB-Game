@@ -126,13 +126,13 @@ describe('戰鬥數值', () => {
     const weak = stateFor('sword');
     const strong = stateFor('sword');
     strong.arms = 60;
-    const wave = { kind: 'mob', name: '測試', power: 200 } as const;
+    const wave = { kind: 'mob', name: '測試', art: 'bandit', power: 200 } as const;
     expect(mobLoss(weak, wave)).toBeGreaterThan(mobLoss(strong, wave));
-    expect(mobLoss(strong, { kind: 'mob', name: '測試', power: 1 })).toBeGreaterThanOrEqual(1);
+    expect(mobLoss(strong, { kind: 'mob', name: '測試', art: 'bandit', power: 1 })).toBeGreaterThanOrEqual(1);
   });
 
   it('體修的敵陣傷亡比例低於劍修', () => {
-    const wave = { kind: 'mob', name: '測試', power: 200 } as const;
+    const wave = { kind: 'mob', name: '測試', art: 'bandit', power: 200 } as const;
     // 傷亡是比例制，人數多寡不影響比例，這裡比的是耐打程度而非絕對人數。
     expect(mobLossRatio(stateFor('body'), wave)).toBeLessThan(mobLossRatio(stateFor('sword'), wave));
   });
@@ -140,7 +140,7 @@ describe('戰鬥數值', () => {
   it('敵陣不會讓人數變成負數', () => {
     const state = stateFor('sword');
     state.disciples = 2;
-    const loss = resolveMob(state, { kind: 'mob', name: '測試', power: 99999 });
+    const loss = resolveMob(state, { kind: 'mob', name: '測試', art: 'bandit', power: 99999 });
     expect(loss).toBe(2);
     expect(state.disciples).toBe(0);
   });

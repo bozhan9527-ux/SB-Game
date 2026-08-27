@@ -3,102 +3,122 @@
     {
       "id": "m_qi_1",
       "realm": "qi",
-      "name": "山野妖狼群"
+      "name": "山野妖狼群",
+      "art": "beast"
     },
     {
       "id": "m_qi_2",
       "realm": "qi",
-      "name": "散修流寇"
+      "name": "散修流寇",
+      "art": "bandit"
     },
     {
       "id": "m_foundation_1",
       "realm": "foundation",
-      "name": "黑風寨馬賊"
+      "name": "黑風寨馬賊",
+      "art": "bandit"
     },
     {
       "id": "m_foundation_2",
       "realm": "foundation",
-      "name": "屍傀陣列"
+      "name": "屍傀陣列",
+      "art": "undead"
     },
     {
       "id": "m_golden_1",
       "realm": "golden",
-      "name": "血煞門弟子"
+      "name": "血煞門弟子",
+      "art": "demon"
     },
     {
       "id": "m_golden_2",
       "realm": "golden",
-      "name": "赤炎蠍潮"
+      "name": "赤炎蠍潮",
+      "art": "beast"
     },
     {
       "id": "m_nascent_1",
       "realm": "nascent",
-      "name": "魔宗傀儡軍"
+      "name": "魔宗傀儡軍",
+      "art": "undead"
     },
     {
       "id": "m_nascent_2",
       "realm": "nascent",
-      "name": "怨魂鬼騎"
+      "name": "怨魂鬼騎",
+      "art": "undead"
     },
     {
       "id": "m_spirit_1",
       "realm": "spirit",
-      "name": "神念傀儡"
+      "name": "神念傀儡",
+      "art": "demon"
     },
     {
       "id": "m_spirit_2",
       "realm": "spirit",
-      "name": "噬魂蟲群"
+      "name": "噬魂蟲群",
+      "art": "beast"
     },
     {
       "id": "m_void_1",
       "realm": "void",
-      "name": "虛空裂獸"
+      "name": "虛空裂獸",
+      "art": "beast"
     },
     {
       "id": "m_void_2",
       "realm": "void",
-      "name": "幽冥劍奴"
+      "name": "幽冥劍奴",
+      "art": "demon"
     },
     {
       "id": "m_unity_1",
       "realm": "unity",
-      "name": "合體邪修"
+      "name": "合體邪修",
+      "art": "demon"
     },
     {
       "id": "m_unity_2",
       "realm": "unity",
-      "name": "天魔化身"
+      "name": "天魔化身",
+      "art": "demon"
     },
     {
       "id": "m_mahayana_1",
       "realm": "mahayana",
-      "name": "大乘魔軍"
+      "name": "大乘魔軍",
+      "art": "demon"
     },
     {
       "id": "m_mahayana_2",
       "realm": "mahayana",
-      "name": "仙門叛徒"
+      "name": "仙門叛徒",
+      "art": "celestial"
     },
     {
       "id": "m_tribulation_1",
       "realm": "tribulation",
-      "name": "雷劫魔影"
+      "name": "雷劫魔影",
+      "art": "demon"
     },
     {
       "id": "m_tribulation_2",
       "realm": "tribulation",
-      "name": "劫雲鬼將"
+      "name": "劫雲鬼將",
+      "art": "undead"
     },
     {
       "id": "m_ascension_1",
       "realm": "ascension",
-      "name": "仙庭天兵"
+      "name": "仙庭天兵",
+      "art": "celestial"
     },
     {
       "id": "m_ascension_2",
       "realm": "ascension",
-      "name": "墮仙殘魂"
+      "name": "墮仙殘魂",
+      "art": "celestial"
     }
   ],
   "bosses": [

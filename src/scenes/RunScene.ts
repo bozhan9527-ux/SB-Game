@@ -7,6 +7,8 @@ import {
   ENEMY_DISPLAY_HEIGHT,
   ENEMY_SOURCE_HEIGHT,
   bossTexture,
+  discipleTexture,
+  enemyTexture,
 } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE } from '../data';
@@ -56,9 +58,9 @@ const ROAD_TOP = 128;
 const GATE_WIDTH = 224;
 const GATE_HEIGHT = 116;
 /** 畫面上最多畫幾名門人，超過只改數字，避免手機爆掉。 */
-const MAX_CROWD_DOTS = 48;
+const MAX_CROWD_DOTS = 30;
 /** 敵陣一排幾名兵卒。 */
-const MOB_ROW = 7;
+const MOB_ROW = 6;
 const BOSS_Y = 330;
 
 interface EncounterView {
@@ -208,7 +210,7 @@ export class RunScene extends Phaser.Scene {
     for (let i = 0; i < MAX_CROWD_DOTS; i += 1) {
       const ring = Math.floor(Math.sqrt(i) * 1.35);
       const angle = i * 2.399963;
-      const radius = ring * 14 + rng.next() * 7;
+      const radius = ring * 17 + rng.next() * 8;
       slots.push({
         x: Math.cos(angle) * radius,
         y: Math.sin(angle) * radius * 0.62,
@@ -220,9 +222,10 @@ export class RunScene extends Phaser.Scene {
     this.crowdSlots = slots;
 
     const tint = hexToNumber(this.run.loadout.sect.color);
+    const texture = discipleTexture(this.run.loadout.sect.art);
     this.crowdSprites = slots.map(() =>
       this.add
-        .image(0, 0, ART.disciple)
+        .image(0, 0, texture)
         .setOrigin(0.5, 0.85)
         .setTint(tint)
         .setVisible(false),
@@ -429,7 +432,7 @@ export class RunScene extends Phaser.Scene {
     for (let i = 0; i < MOB_ROW; i += 1) {
       const x = ROAD_LEFT + 20 + (span * i) / (MOB_ROW - 1);
       const enemy = this.add
-        .image(x, i % 2 === 0 ? 0 : 6, ART.enemy)
+        .image(x, i % 2 === 0 ? 0 : 6, enemyTexture(encounter.art))
         .setOrigin(0.5, 0.9)
         .setScale(scale)
         .setTint(0xc2404e);

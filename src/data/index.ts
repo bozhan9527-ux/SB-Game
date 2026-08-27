@@ -15,6 +15,7 @@ import type {
   Balance,
   BossArt,
   BossDef,
+  MobArt,
   EnemyBook,
   GateOp,
   GateTarget,
@@ -22,6 +23,7 @@ import type {
   MobDef,
   Realm,
   Sect,
+  SectArt,
   UpgradeTrack,
 } from './types';
 import { assertUniqueIds, bool, field, list, num, obj, oneOf, str, DataError } from './validate';
@@ -29,6 +31,8 @@ import { assertUniqueIds, bool, field, list, num, obj, oneOf, str, DataError } f
 const GATE_TARGETS: readonly GateTarget[] = ['disciples', 'arms', 'gold'];
 const GATE_OPS: readonly GateOp[] = ['add', 'mul'];
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
+const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
+const MOB_ARTS: readonly MobArt[] = ['beast', 'bandit', 'undead', 'demon', 'celestial'];
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const input = obj(raw, 'input', path);
@@ -127,6 +131,7 @@ export function parseRealms(raw: unknown, path = 'realms.json'): Realm[] {
 export function parseSects(raw: unknown, path = 'sects.json'): Sect[] {
   const sects = list(raw, path, (item, p) => ({
     id: str(item, 'id', p),
+    art: oneOf(item, 'art', p, SECT_ARTS),
     name: str(item, 'name', p),
     path: str(item, 'path', p),
     motto: str(item, 'motto', p),
@@ -187,6 +192,7 @@ export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
     id: str(item, 'id', p),
     realm: str(item, 'realm', p),
     name: str(item, 'name', p),
+    art: oneOf(item, 'art', p, MOB_ARTS),
   }));
   const bosses: BossDef[] = list(field(raw, 'bosses', path), `${path}.bosses`, (item, p) => ({
     id: str(item, 'id', p),

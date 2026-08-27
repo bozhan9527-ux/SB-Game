@@ -28,9 +28,18 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
     expect(realmIndexForStage(9999)).toBe(REALMS.length - 1);
   });
 
-  it('境界名稱含層數', () => {
+  it('每個境界九層，關卡編號換算成境界與層數', () => {
     expect(realmTitle(1)).toBe('煉氣期 一層');
-    expect(realmTitle(5)).toBe('築基期 二層');
+    expect(realmTitle(9)).toBe('煉氣期 九層');
+    expect(realmTitle(10)).toBe('築基期 一層');
+    expect(realmTitle(27)).toBe('金丹期 九層');
+    expect(realmTitle(73)).toBe('渡劫期 一層');
+  });
+
+  it('境界區間一律九關', () => {
+    for (const realm of REALMS.slice(0, -1)) {
+      expect(realm.stageTo - realm.stageFrom + 1, `${realm.name} 不是九層`).toBe(9);
+    }
   });
 
   it('門派齊備體修 / 劍修 / 符修 / 丹修', () => {

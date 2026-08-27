@@ -116,9 +116,14 @@ export interface Realm {
   powerBonus: number;
 }
 
+/** 門派造型，對應 public/art/disciple-*.svg。 */
+export type SectArt = 'body' | 'sword' | 'talisman' | 'alchemy';
+
 /** 門派。開局選擇，影響起始屬性與若干乘區。 */
 export interface Sect {
   id: string;
+  /** 門人的造型。 */
+  art: SectArt;
   name: string;
   /** 體修 / 劍修 / 符修 / 丹修。 */
   path: string;
@@ -163,10 +168,14 @@ export interface UpgradeTrack {
   maxLevel: number;
 }
 
+/** 敵陣造型，對應 public/art/enemy-*.svg。 */
+export type MobArt = 'beast' | 'bandit' | 'undead' | 'demon' | 'celestial';
+
 export interface MobDef {
   id: string;
   realm: string;
   name: string;
+  art: MobArt;
 }
 
 /** 首領的造型，對應 public/art/boss-*.svg。 */
