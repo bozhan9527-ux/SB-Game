@@ -1,0 +1,131 @@
+/**
+ * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
+ */
+import { UPGRADES } from '../data';
+import { trackById, upgradeCost } from '../systems/upgrades';
+import type { Storage } from './storage';
+import { defaultStorage } from './storage';
+import { migrate } from './migrations';
+import type { SaveData } from './types';
+import { SAVE_KEY, SAVE_VERSION } from './types';
+
+export function createDefaultSave(now: number = Date.now()): SaveData {
+  const upgrades: Record<string, number> = {};
+  for (const track of UPGRADES) upgrades[track.id] = 0;
+
+  return {
+    version: SAVE_VERSION,
+    savedAt: now,
+    player: { sectId: null, wallet: { gold: 0 }, upgrades },
+    world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
+  };
+}
+
+function asNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** 把讀進來的物件補齊成完整存檔。欄位缺漏一律以預設值補，不讓壞存檔炸掉遊戲。 */
+function normalize(raw: Record<string, unknown>, now: number): SaveData {
+  const base = createDefaultSave(now);
+  const player = (raw['player'] ?? {}) as Record<string, unknown>;
+  const world = (raw['world'] ?? {}) as Record<string, unknown>;
+  const wallet = (player['wallet'] ?? {}) as Record<string, unknown>;
+  const upgrades = (player['upgrades'] ?? {}) as Record<string, unknown>;
+
+  const merged: Record<string, number> = { ...base.player.upgrades };
+  for (const track of UPGRADES) {
+    const level = asNumber(upgrades[track.id], 0);
+    merged[track.id] = Math.max(0, Math.min(track.maxLevel, Math.floor(level)));
+  }
+
+  const stage = Math.max(1, Math.floor(asNumber(world['stage'], 1)));
+  return {
+    version: SAVE_VERSION,
+    savedAt: asNumber(raw['savedAt'], now),
+    player: {
+      sectId: typeof player['sectId'] === 'string' ? player['sectId'] : null,
+      wallet: { gold: Math.max(0, Math.floor(asNumber(wallet['gold'], 0))) },
+      upgrades: merged,
+    },
+    world: {
+      stage,
+      highestStage: Math.max(stage, Math.floor(asNumber(world['highestStage'], stage))),
+      runs: Math.max(0, Math.floor(asNumber(world['runs'], 0))),
+      clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
+    },
+  };
+}
+
+export function loadSave(storage: Storage = defaultStorage(), now: number = Date.now()): SaveData {
+  const raw = storage.read(SAVE_KEY);
+  if (raw === null) return createDefaultSave(now);
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return createDefaultSave(now);
+    }
+    const migrated = migrate(parsed as Record<string, unknown>, SAVE_VERSION);
+    return normalize(migrated, now);
+  } catch {
+    // 壞掉的 JSON：當作新檔，不阻擋遊戲啟動。
+    return createDefaultSave(now);
+  }
+}
+
+export function saveGame(
+  data: SaveData,
+  storage: Storage = defaultStorage(),
+  now: number = Date.now(),
+): void {
+  data.savedAt = now;
+  storage.write(SAVE_KEY, JSON.stringify(data));
+}
+
+export function resetSave(storage: Storage = defaultStorage()): SaveData {
+  storage.remove(SAVE_KEY);
+  return createDefaultSave();
+}
+
+// ---------------------------------------------------------------- 變更操作
+
+export function addGold(data: SaveData, amount: number): void {
+  data.player.wallet.gold = Math.max(0, data.player.wallet.gold + Math.round(amount));
+}
+
+export interface PurchaseResult {
+  ok: boolean;
+  /** 失敗原因，成功時為 null。 */
+  reason: 'maxed' | 'insufficient' | null;
+  cost: number | null;
+}
+
+/** 買一級升級。金幣不足或已滿級都不會改動存檔。 */
+export function buyUpgrade(data: SaveData, trackId: string): PurchaseResult {
+  const track = trackById(trackId);
+  const level = data.player.upgrades[trackId] ?? 0;
+  const cost = upgradeCost(track, level);
+
+  if (cost === null) return { ok: false, reason: 'maxed', cost: null };
+  if (data.player.wallet.gold < cost) return { ok: false, reason: 'insufficient', cost };
+
+  data.player.wallet.gold -= cost;
+  data.player.upgrades[trackId] = level + 1;
+  return { ok: true, reason: null, cost };
+}
+
+/** 通關：關卡前進一關，並記錄最高境界。 */
+export function recordClear(data: SaveData, gold: number): void {
+  addGold(data, gold);
+  data.world.stage += 1;
+  data.world.highestStage = Math.max(data.world.highestStage, data.world.stage);
+  data.world.runs += 1;
+  data.world.clears += 1;
+}
+
+/** 失敗：停在原關卡，只給安慰獎。 */
+export function recordDefeat(data: SaveData, gold: number): void {
+  addGold(data, gold);
+  data.world.runs += 1;
+}

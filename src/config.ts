@@ -11,7 +11,7 @@ export const GAME_WIDTH = 540;
 export const GAME_HEIGHT = 960;
 
 /** 背景色，與 index.html 的 body 背景一致，避免 letterbox 邊條看起來像破圖。 */
-export const BACKGROUND_COLOR = '#0d1b1e';
+export const BACKGROUND_COLOR = '#0d1116';
 
 /** TECH_SPEC 第 6 節：目標裝置最小支援 360×640 CSS px。 */
 export const MIN_SUPPORTED_WIDTH = 360;

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "body",
+    "name": "天罡宗",
+    "path": "體修",
+    "motto": "銅皮鐵骨，以身鎮道",
+    "desc": "門人肉身強橫，開局弟子多、防禦高，敵陣衝殺時傷亡最少。",
+    "color": "#e08a5a",
+    "discipleBonus": 4,
+    "attackBonus": 0,
+    "defenseBonus": 6,
+    "armsMultiplier": 1,
+    "bossDamageMultiplier": 1,
+    "goldMultiplier": 1,
+    "mobLossMultiplier": 0.7
+  },
+  {
+    "id": "sword",
+    "name": "青霄劍宗",
+    "path": "劍修",
+    "motto": "一劍破萬法",
+    "desc": "劍氣凌厲，攻擊極高、對首領傷害加成三成五，代價是開局人少又不耐打。",
+    "color": "#7fd8ff",
+    "discipleBonus": -1,
+    "attackBonus": 5,
+    "defenseBonus": 0,
+    "armsMultiplier": 1,
+    "bossDamageMultiplier": 1.35,
+    "goldMultiplier": 1,
+    "mobLossMultiplier": 1.15
+  },
+  {
+    "id": "talisman",
+    "name": "玄符門",
+    "path": "符修",
+    "motto": "一紙符籙，可鎮山河",
+    "desc": "擅以符籙加持靈兵，所有武裝值效果提升五成，走武裝流的最佳選擇。",
+    "color": "#c79cf0",
+    "discipleBonus": 0,
+    "attackBonus": 2,
+    "defenseBonus": 2,
+    "armsMultiplier": 1.5,
+    "bossDamageMultiplier": 1,
+    "goldMultiplier": 1,
+    "mobLossMultiplier": 1
+  },
+  {
+    "id": "alchemy",
+    "name": "百草丹閣",
+    "path": "丹修",
+    "motto": "藥香所至，寸草皆兵",
+    "desc": "以丹藥聚眾斂財，金幣收益提升五成，升級速度最快，但首領傷害略低。",
+    "color": "#8fe08a",
+    "discipleBonus": 2,
+    "attackBonus": 1,
+    "defenseBonus": 2,
+    "armsMultiplier": 1,
+    "bossDamageMultiplier": 0.95,
+    "goldMultiplier": 1.5,
+    "mobLossMultiplier": 0.85
+  }
+]

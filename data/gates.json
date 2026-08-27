@@ -1,0 +1,170 @@
+[
+  {
+    "id": "d_add_5",
+    "target": "disciples",
+    "op": "add",
+    "value": 5,
+    "weight": 10,
+    "trap": false
+  },
+  {
+    "id": "d_add_8",
+    "target": "disciples",
+    "op": "add",
+    "value": 8,
+    "weight": 10,
+    "trap": false
+  },
+  {
+    "id": "d_add_12",
+    "target": "disciples",
+    "op": "add",
+    "value": 12,
+    "weight": 9,
+    "trap": false
+  },
+  {
+    "id": "d_add_18",
+    "target": "disciples",
+    "op": "add",
+    "value": 18,
+    "weight": 8,
+    "trap": false
+  },
+  {
+    "id": "d_mul_15",
+    "target": "disciples",
+    "op": "mul",
+    "value": 1.5,
+    "weight": 8,
+    "trap": false
+  },
+  {
+    "id": "d_mul_2",
+    "target": "disciples",
+    "op": "mul",
+    "value": 2,
+    "weight": 7,
+    "trap": false
+  },
+  {
+    "id": "d_mul_25",
+    "target": "disciples",
+    "op": "mul",
+    "value": 2.5,
+    "weight": 5,
+    "trap": false
+  },
+  {
+    "id": "a_add_4",
+    "target": "arms",
+    "op": "add",
+    "value": 4,
+    "weight": 10,
+    "trap": false
+  },
+  {
+    "id": "a_add_7",
+    "target": "arms",
+    "op": "add",
+    "value": 7,
+    "weight": 9,
+    "trap": false
+  },
+  {
+    "id": "a_add_11",
+    "target": "arms",
+    "op": "add",
+    "value": 11,
+    "weight": 9,
+    "trap": false
+  },
+  {
+    "id": "a_add_17",
+    "target": "arms",
+    "op": "add",
+    "value": 17,
+    "weight": 8,
+    "trap": false
+  },
+  {
+    "id": "a_mul_15",
+    "target": "arms",
+    "op": "mul",
+    "value": 1.5,
+    "weight": 6,
+    "trap": false
+  },
+  {
+    "id": "a_mul_2",
+    "target": "arms",
+    "op": "mul",
+    "value": 2,
+    "weight": 5,
+    "trap": false
+  },
+  {
+    "id": "g_add_1",
+    "target": "gold",
+    "op": "add",
+    "value": 1,
+    "weight": 6,
+    "trap": false
+  },
+  {
+    "id": "g_add_2",
+    "target": "gold",
+    "op": "add",
+    "value": 2,
+    "weight": 5,
+    "trap": false
+  },
+  {
+    "id": "g_add_4",
+    "target": "gold",
+    "op": "add",
+    "value": 4,
+    "weight": 4,
+    "trap": false
+  },
+  {
+    "id": "d_sub_4",
+    "target": "disciples",
+    "op": "add",
+    "value": -4,
+    "weight": 8,
+    "trap": true
+  },
+  {
+    "id": "d_sub_9",
+    "target": "disciples",
+    "op": "add",
+    "value": -9,
+    "weight": 7,
+    "trap": true
+  },
+  {
+    "id": "d_mul_05",
+    "target": "disciples",
+    "op": "mul",
+    "value": 0.5,
+    "weight": 6,
+    "trap": true
+  },
+  {
+    "id": "a_sub_5",
+    "target": "arms",
+    "op": "add",
+    "value": -5,
+    "weight": 6,
+    "trap": true
+  },
+  {
+    "id": "a_mul_05",
+    "target": "arms",
+    "op": "mul",
+    "value": 0.5,
+    "weight": 5,
+    "trap": true
+  }
+]

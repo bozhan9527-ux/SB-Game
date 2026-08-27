@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { initState } from '../state';
+import { INK, DANGER, textStyle, wrapText } from '../ui/theme';
 
 /**
- * 階段 0 的佔位場景：只負責證明建置與部署鏈路是通的。
- * 進入階段 1a 後會被 ExploreScene 取代。
+ * 啟動場景：載入並驗證資料、讀取存檔，然後進標題。
+ * 資料格式錯誤會在這裡被擋下並顯示在畫面上，而不是讓遊戲跑到一半才崩。
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -11,33 +13,23 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT / 2;
-
-    // 畫出基準畫布的邊框，用來在手機上肉眼確認 9:16 縮放是否正確。
-    this.add
-      .rectangle(cx, cy, GAME_WIDTH - 4, GAME_HEIGHT - 4)
-      .setStrokeStyle(2, 0x2f6f5f);
-
-    // 史萊姆佔位圖：程式繪製的幾何圖形（PROGRESS D-08，正式素材未定）
-    this.add.circle(cx, cy - 40, 70, 0x4fd1a5).setAlpha(0.9);
-    this.add.circle(cx - 26, cy - 60, 10, 0x0d1b1e);
-    this.add.circle(cx + 26, cy - 60, 10, 0x0d1b1e);
-
-    this.add
-      .text(cx, cy + 90, 'Hello', {
-        fontFamily: 'sans-serif',
-        fontSize: '48px',
-        color: '#e8f5f0',
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(cx, cy + 150, `${GAME_WIDTH}×${GAME_HEIGHT}`, {
-        fontFamily: 'monospace',
-        fontSize: '22px',
-        color: '#6f9c92',
-      })
-      .setOrigin(0.5);
+    try {
+      initState();
+      this.scene.start('Title');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.add
+        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, '啟動失敗', textStyle({ size: 34, color: DANGER, bold: true }))
+        .setOrigin(0.5);
+      this.add
+        .text(
+          GAME_WIDTH / 2,
+          GAME_HEIGHT / 2 + 20,
+          wrapText(message, GAME_WIDTH - 60, 18),
+          textStyle({ size: 18, color: INK }),
+        )
+        .setOrigin(0.5)
+        .setAlign('center');
+    }
   }
 }
