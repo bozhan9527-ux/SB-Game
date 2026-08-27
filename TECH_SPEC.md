@@ -27,21 +27,22 @@
 ```
 /
 ├─ .github/workflows/deploy.yml   # CI：build + 部署 Pages
-├─ public/                        # 靜態資源（圖片、音效）
+├─ public/art/                    # 手寫 SVG 美術資源
 ├─ data/                          # 遊戲資料（JSON）— 見第 3 節
-│   ├─ enemies.json
-│   ├─ abilities.json
-│   ├─ forms.json
-│   ├─ gates.json                # 戰鬥階段 A：閘門類型與數值
-│   ├─ attackPatterns.json      # 戰鬥階段 B：敵人出招序列與預兆窗
-│   ├─ areas.json               # 含 affinity：地圖屬性 × 形變加成
-│   └─ balance.json             # 全域數值常數（含體力、經驗曲線係數）
+│   ├─ balance.json              # 全域數值常數（滑動門檻、戰力公式、敵陣、首領、金幣）
+│   ├─ realms.json               # 境界：關卡區間、配色、境界壓制
+│   ├─ sects.json                # 門派：起始屬性與各項乘區
+│   ├─ gates.json                # 閘門模板：資源、加算／乘算、基準值、權重、是否陷阱
+│   ├─ upgrades.json             # 五條金幣升級線
+│   └─ enemies.json              # 各境界的敵陣與首領
 ├─ src/
 │   ├─ main.ts                    # 進入點
-│   ├─ scenes/                    # ExploreScene / BattleScene / 轉場
-│   ├─ input/                     # 搖桿（探索）與滑動手勢辨識（戰鬥）
-│   ├─ systems/                   # 吸收 / 形變 / 分裂 / 閘門 / 閃避
-│   ├─ entities/                  # 玩家、敵人
+│   ├─ art.ts                     # 美術資源載入
+│   ├─ state.ts                   # 執行期的存檔單例
+│   ├─ scenes/                    # Boot / Title / Sect / Run / Result / Upgrade
+│   ├─ input/                     # 滑動手勢辨識
+│   ├─ systems/                   # 閘門 / 敵陣 / 首領 / 境界 / 升級 / 開局配置
+│   ├─ audio/                     # 音高、合成、播放與配樂排程
 │   ├─ data/                      # JSON 讀取與型別定義
 │   ├─ save/                      # 存檔、遷移
 │   └─ ui/
@@ -57,13 +58,17 @@
 
 **所有遊戲數值一律寫在 `data/*.json`，禁止硬編碼於 `src/`。**
 
-包含但不限於：敵人屬性、能力效果、形變參數、經驗曲線、掉落表、區域配置、**閘門類型與數值、敵人出招序列與預兆時間窗**。
+包含但不限於：**閘門類型與數值、境界區間與壓制、門派加成、升級線的效果與花費曲線、
+敵陣威脅值、首領血量與攻擊的成長曲線**。
 
-戰鬥難度的調整一律透過 `attackPatterns.json` 與 `gates.json` 完成，不得改動 `src/`。
+關卡難度的調整一律透過 `balance.json` 與 `gates.json` 完成，不得改動 `src/`。
 
 程式碼中只允許出現：讀取資料的邏輯、計算公式的結構。公式中的係數本身也放進 `balance.json`。
 
-理由：三大系統各自會膨脹至數十至數百筆項目，硬編碼在第二個月就會失控，且每次調整數值都要重新建置。
+理由：這些表會膨脹至數十至數百筆項目，硬編碼在第二個月就會失控，且每次調整數值都要重新建置。
+
+例外：畫面座標、面板大小、字級這類**版面參數**，以及音色合成參數，留在 `src/`。
+本節規範的是遊戲數值，把版面搬進 JSON 只會讓調整變麻煩。
 
 ### 型別對應
 
@@ -72,17 +77,12 @@
 範例：
 
 ```jsonc
-// data/enemies.json
-{
-  "slime_green": {
-    "name": "綠泥",
-    "hp": 40,
-    "atk": 6,
-    "ai": "charger",
-    "absorbThreshold": 0.3,
-    "drops": { "type": "ability", "id": "acid_spit" }
-  }
-}
+// data/gates.json — 閘門模板
+[
+  { "id": "d_mul_2", "target": "disciples", "op": "mul", "value": 2, "weight": 7, "trap": false },
+  { "id": "a_add_7", "target": "arms",      "op": "add", "value": 7, "weight": 9, "trap": false },
+  { "id": "d_sub_4", "target": "disciples", "op": "add", "value": -4, "weight": 8, "trap": true }
+]
 ```
 
 ---
@@ -97,9 +97,9 @@
 interface SaveData {
   version: number;      // 每次結構變更 +1
   savedAt: number;      // Unix ms，用於離線結算
-  player: PlayerState;
-  world: WorldState;
-  spawns: SpawnState[]; // 分裂系統，Lv.15 前為空陣列
+  player: PlayerState;   // 門派、金幣、升級等級
+  world: WorldState;     // 關卡進度與統計
+  settings: SettingsState; // 本機偏好（音效開關）
 }
 ```
 
@@ -111,28 +111,19 @@ interface SaveData {
 
 ### 4.3 儲存位置
 
-- 網頁版：`localStorage`（鍵名 `slime_save_v1`）
+- 網頁版：`localStorage`（鍵名 `xianxia_save_v1`）
 - App 版：Capacitor Preferences API
 - 抽象於 `src/save/storage.ts`，上層程式碼不直接接觸任一實作。
 
-### 4.4 離線結算與時間防護
+### 4.4 時間防護
 
-分裂系統結算依 `savedAt` 與當前時間差計算。**必須防範系統時間竄改**：
-
-1. 若 `now < savedAt`（時間倒退）→ 判定為異常，該次結算產出為 0，並將 `savedAt` 更新為 `now`。
-2. 單次結算上限封頂（見 `balance.json` 的 `offlineCapHours`）。
-3. 伺服器授時：單機版不做。上架變現版必須做，見第 9 節。
+`savedAt` 一律存 Unix ms 絕對時間戳。日後若加入任何依時間差計算的機制，
+**必須防範系統時間竄改**：`now < savedAt`（時間倒退）視為異常，該次產出為 0 並把 `savedAt` 更新為 `now`。
+伺服器授時單機版不做，上架變現版必須做，見第 9 節。
 
 ---
 
-## 4.5 兩種場景與輸入層
-
-本作有兩個操作模式，實作上必須分離：
-
-| Scene | 輸入 | 說明 |
-|---|---|---|
-| `ExploreScene` | 虛擬搖桿 / 拖曳 | 2D 俯視自由走動，物理碰撞由 Phaser Arcade Physics 處理 |
-| `BattleScene` | 左滑 / 右滑 / 上滑 | 直向推進，不使用物理引擎，以時間軸驅動 |
+## 4.5 輸入層
 
 **滑動手勢辨識規範**（`src/input/swipe.ts`）：
 
@@ -141,9 +132,10 @@ interface SaveData {
 - 一次手勢只觸發一次事件，抬指前不重複觸發
 - 需可設定判定閾值（放進 `balance.json`），手機實測後再調
 
-**禁止**在 `BattleScene` 使用搖桿，或在 `ExploreScene` 綁定滑動戰鬥手勢。兩套輸入不共用。
+**禁止**在關卡場景引入搖桿或連續拖曳操作。左右滑是唯一的推進輸入，
+另外允許點擊畫面左／右半邊作為誤觸補救——那仍是單次離散輸入。
 
-戰鬥時間軸與畫格率解耦：所有時間窗以毫秒計，不以 frame 計。低階手機掉幀時預兆窗長度不得改變。
+戰鬥時間軸與畫格率解耦：所有時間窗以毫秒計，不以 frame 計。低階手機掉幀時節奏不得改變。
 
 ---
 
@@ -191,8 +183,8 @@ Capacitor 加入時機：網頁版首章可完整遊玩之後。提前導入只�
 
 1. **存檔為單一可序列化物件**，不散落在多個 localStorage 鍵。搬遷時整包上傳即可。
 2. **所有存取走 `src/save/storage.ts` 抽象層**，上層程式碼不直接呼叫 `localStorage`。日後只需替換該檔為 API 呼叫。
-3. **權威數值集中**：體力、貨幣、素材等日後需伺服器驗證的欄位，統一放在 `SaveData.player.wallet` 之下，不與 UI 狀態混雜。
-4. **不在存檔中儲存衍生值**（如「當前體力上限」）。只存等級，上限由公式算出。伺服器化後才不會出現前後端算法不一致。
+3. **權威數值集中**：金幣等日後需伺服器驗證的欄位，統一放在 `SaveData.player.wallet` 之下，不與 UI 狀態混雜。
+4. **不在存檔中儲存衍生值**（如「目前的起始人數」）。只存升級等級，實際數值由公式算出。伺服器化後才不會出現前後端算法不一致。
 5. **時間相關欄位一律存 Unix ms 絕對時間戳**，不存「剩餘秒數」。
 
 ### 上架版才需要的（尚未規劃）
