@@ -168,8 +168,21 @@ export interface UpgradeTrack {
   maxLevel: number;
 }
 
-/** 敵陣造型，對應 public/art/enemy-*.svg。 */
-export type MobArt = 'beast' | 'bandit' | 'undead' | 'demon' | 'celestial';
+/**
+ * 敵陣造型，對應 public/art/enemy-*.svg。
+ * 前六種是妖獸，各自畫成名字裡的那種生物；後四種是人形。
+ */
+export type MobArt =
+  | 'wolf'
+  | 'bear'
+  | 'yeti'
+  | 'centipede'
+  | 'scorpion'
+  | 'serpent'
+  | 'bandit'
+  | 'undead'
+  | 'demon'
+  | 'celestial';
 
 export interface MobDef {
   id: string;

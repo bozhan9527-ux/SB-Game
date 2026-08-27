@@ -32,7 +32,10 @@ const GATE_TARGETS: readonly GateTarget[] = ['disciples', 'arms', 'gold'];
 const GATE_OPS: readonly GateOp[] = ['add', 'mul'];
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
-const MOB_ARTS: readonly MobArt[] = ['beast', 'bandit', 'undead', 'demon', 'celestial'];
+const MOB_ARTS: readonly MobArt[] = [
+  'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
+  'bandit', 'undead', 'demon', 'celestial',
+];
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const input = obj(raw, 'input', path);

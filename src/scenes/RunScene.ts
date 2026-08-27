@@ -9,6 +9,7 @@ import {
   bossTexture,
   createWalkAnimations,
   discipleTexture,
+  discipleTierForRealm,
   discipleWalkKey,
   enemyTexture,
   enemyWalkKey,
@@ -226,13 +227,15 @@ export class RunScene extends Phaser.Scene {
     this.crowdSlots = slots;
 
     // 門人已是全彩貼圖，不再用 setTint 上色；門派差異來自造型本身。
+    // 造型階級隨境界提升，越後面的境界穿得越好。
     const art = this.run.loadout.sect.art;
+    const tier = discipleTierForRealm(realmIndexForStage(this.run.stage));
     this.crowdSprites = slots.map((slot) => {
       const sprite = this.add
-        .sprite(0, 0, discipleTexture(art, 0))
+        .sprite(0, 0, discipleTexture(art, tier, 0))
         .setOrigin(0.5, 0.85)
         .setVisible(false);
-      sprite.play(discipleWalkKey(art));
+      sprite.play(discipleWalkKey(art, tier));
       // 每個人的步伐錯開，整團才不會像同一個人複製了三十份。
       sprite.anims.setProgress((slot.phase / (Math.PI * 2)) % 1);
       return sprite;

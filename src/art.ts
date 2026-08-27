@@ -26,9 +26,22 @@ export function bossTexture(art: BossArt): string {
 /** 走路循環的兩幀。以兩張獨立貼圖組成動畫，不需要 spritesheet。 */
 export const WALK_FRAMES = [0, 1] as const;
 
-/** 門人造型依門派而異：體修、劍修、符修、丹修各有一套兩幀。 */
-export function discipleTexture(art: SectArt, frame: number): string {
-  return `disciple-${art}-${frame}`;
+/** 門人造型分三階，隨境界提升換裝。 */
+export const DISCIPLE_TIERS = [0, 1, 2] as const;
+
+/**
+ * 境界索引 → 門人造型階級。
+ * 0：煉氣–金丹（素袍）／1：元嬰–煉虛（金邊披肩）／2：合體以上（披風、頭冠、靈光）。
+ */
+export function discipleTierForRealm(realmIndex: number): number {
+  if (realmIndex >= 6) return 2;
+  if (realmIndex >= 3) return 1;
+  return 0;
+}
+
+/** 門人造型依門派與階級而異，各有一套兩幀。 */
+export function discipleTexture(art: SectArt, tier: number, frame: number): string {
+  return `disciple-${art}-t${tier}-${frame}`;
 }
 
 /** 敵陣造型依敵人類型而異：妖獸、流寇、屍傀、魔修、天兵。 */
@@ -36,13 +49,19 @@ export function enemyTexture(art: MobArt, frame: number): string {
   return `enemy-${art}-${frame}`;
 }
 
-export function discipleWalkKey(art: SectArt): string {
-  return `walk-disciple-${art}`;
+export function discipleWalkKey(art: SectArt, tier: number): string {
+  return `walk-disciple-${art}-t${tier}`;
 }
 
 export function enemyWalkKey(art: MobArt): string {
   return `walk-enemy-${art}`;
 }
+
+/** 各敵陣造型的 viewBox 寬度，未列出者為 46。 */
+const MOB_VIEWBOX_WIDTH: Partial<Record<MobArt, number>> = {
+  centipede: 58,
+  scorpion: 50,
+};
 
 interface SvgSpec {
   key: string;
@@ -52,22 +71,28 @@ interface SvgSpec {
 }
 
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
-const MOB_ARTS: readonly MobArt[] = ['beast', 'bandit', 'undead', 'demon', 'celestial'];
+const MOB_ARTS: readonly MobArt[] = [
+  'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
+  'bandit', 'undead', 'demon', 'celestial',
+];
 
 const SVGS: readonly SvgSpec[] = [
   ...SECT_ARTS.flatMap((art) =>
-    WALK_FRAMES.map((frame) => ({
-      key: discipleTexture(art, frame),
-      file: `disciple-${art}-${frame}.svg`,
-      width: 80,
-      height: DISCIPLE_SOURCE_HEIGHT,
-    })),
+    DISCIPLE_TIERS.flatMap((tier) =>
+      WALK_FRAMES.map((frame) => ({
+        key: discipleTexture(art, tier, frame),
+        file: `disciple-${art}-t${tier}-${frame}.svg`,
+        width: 80,
+        height: DISCIPLE_SOURCE_HEIGHT,
+      })),
+    ),
   ),
   ...MOB_ARTS.flatMap((art) =>
     WALK_FRAMES.map((frame) => ({
       key: enemyTexture(art, frame),
       file: `enemy-${art}-${frame}.svg`,
-      width: 92,
+      // 蜈蚣與火蠍的 viewBox 較寬，貼圖寬度要跟著走，否則會被拉扁。
+      width: (MOB_VIEWBOX_WIDTH[art] ?? 46) * 2,
       height: ENEMY_SOURCE_HEIGHT,
     })),
   ),
@@ -92,7 +117,9 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
     });
   };
   for (const art of SECT_ARTS) {
-    define(discipleWalkKey(art), WALK_FRAMES.map((f) => discipleTexture(art, f)));
+    for (const tier of DISCIPLE_TIERS) {
+      define(discipleWalkKey(art, tier), WALK_FRAMES.map((f) => discipleTexture(art, tier, f)));
+    }
   }
   for (const art of MOB_ARTS) {
     define(enemyWalkKey(art), WALK_FRAMES.map((f) => enemyTexture(art, f)));

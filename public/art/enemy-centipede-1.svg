@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58 56" width="58" height="56">
+  <path d="M49.0 33.7 l-4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M51.0 33.7 l4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="50.0" cy="33.7" rx="4.6" ry="4" fill="#4a7d30"/>
+  <path d="M41.8 33.5 l-4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M43.8 33.5 l4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="42.8" cy="33.5" rx="4.6" ry="4" fill="#74b34e"/>
+  <path d="M34.6 30.6 l-4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M36.6 30.6 l4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="35.6" cy="30.6" rx="4.6" ry="4" fill="#4a7d30"/>
+  <path d="M27.4 27.2 l-4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M29.4 27.2 l4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="28.4" cy="27.2" rx="4.6" ry="4" fill="#74b34e"/>
+  <path d="M20.2 26.0 l-4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M22.2 26.0 l4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="21.2" cy="26.0" rx="4.6" ry="4" fill="#4a7d30"/>
+  <path d="M13.0 27.8 l-4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M15.0 27.8 l4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="14.0" cy="27.8" rx="4.6" ry="4" fill="#74b34e"/>
+  <path d="M5.8 31.2 l-4 12.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M7.8 31.2 l4 9.0" stroke="#3c6624" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="6.8" cy="31.2" rx="4.6" ry="4" fill="#4a7d30"/>
+  <path d="M4.0 27.2l-5-6 1.6 7z" fill="#4a7d30"/>
+  <path d="M8.0 27.2l-2-7 3.4 6z" fill="#4a7d30"/>
+  <ellipse cx="6.0" cy="31.2" rx="6" ry="5.2" fill="#74b34e"/>
+  <path d="M1.0 33.2l-5 3 5 1.6z" fill="#4a7d30"/>
+  <circle cx="5.0" cy="30.6" r="1.6" fill="#ff6a4a"/>
+</svg>
