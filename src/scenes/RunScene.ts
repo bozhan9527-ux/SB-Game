@@ -26,11 +26,15 @@ import {
   applyGate,
   bossDps,
   bossHitLoss,
+  clampWeaken,
   clearReward,
+  comboBossMomentum,
+  comboMultiplier,
   createBoss,
   createRunState,
   defeatReward,
   gateSpeedForStage,
+  mobLoss,
   mobLossRatio,
   resolveMob,
   teamPower,
@@ -67,7 +71,8 @@ const GATE_HEIGHT = 116;
 const MAX_CROWD_DOTS = 30;
 /** 敵陣一排幾名兵卒。 */
 const MOB_ROW = 6;
-const BOSS_Y = 330;
+/** 首領往下移，把畫面頂端讓給血條，中段留給隊伍的攻勢演出。 */
+const BOSS_Y = 372;
 
 interface EncounterView {
   encounter: Encounter;
@@ -75,6 +80,12 @@ interface EncounterView {
   resolved: boolean;
   /** 敵陣才有：用於結算時的擊退演出。 */
   enemies: Phaser.GameObjects.Sprite[];
+  /** 敵陣中還沒被靈光鎖定的兵卒。 */
+  alive: Phaser.GameObjects.Sprite[];
+  /** 已鎖定但靈光還在飛的數量，計入上限判定，避免同一幀連發超打。 */
+  pending: number;
+  /** 已被齊射削掉的威脅比例（0–1），結算時計入。 */
+  weaken: number;
   /** 敵陣的說明文字，逼近隊伍時淡出，免得和頭頂的人數字疊在一起。 */
   labels: Phaser.GameObjects.Text[];
 }
@@ -119,6 +130,13 @@ export class RunScene extends Phaser.Scene {
   private hudGold!: Phaser.GameObjects.Text;
   private hudProgress!: Phaser.GameObjects.Text;
   private hudProgressBar!: Phaser.GameObjects.Rectangle;
+  /** 左上角的連擊層數，仿影片那疊會越疊越高的倍率牌。 */
+  private comboPlate!: Phaser.GameObjects.Rectangle;
+  private comboBig!: Phaser.GameObjects.Text;
+  private comboSub!: Phaser.GameObjects.Text;
+
+  /** 陣前齊射的計時器。 */
+  private volleyAccum = 0;
 
   private boss: BossState | null = null;
   private bossGroup: Phaser.GameObjects.Container | null = null;
@@ -129,6 +147,10 @@ export class RunScene extends Phaser.Scene {
   private bossHpText: Phaser.GameObjects.Text | null = null;
   private momentum = 0;
   private momentumBar: Phaser.GameObjects.Rectangle | null = null;
+  /** 首領戰的氣勢倍率讀數（×1.8 這種大字），比長條好讀得多。 */
+  private momentumText: Phaser.GameObjects.Text | null = null;
+  /** 上一次劍氣之後累積的傷害，用來跳傷害數字。 */
+  private slashDamage = 0;
   private bossTimeLeft = 0;
   private bossTimerBar: Phaser.GameObjects.Rectangle | null = null;
   private bossAttackAccum = 0;
@@ -167,8 +189,11 @@ export class RunScene extends Phaser.Scene {
     this.bossFigure = null;
     this.bossBody = null;
     this.momentum = 0;
+    this.momentumText = null;
     this.bossAttackAccum = 0;
     this.slashAccum = 0;
+    this.slashDamage = 0;
+    this.volleyAccum = 0;
     this.idleMs = 0;
     this.peakDisciples = 0;
     this.bossElapsed = 0;
@@ -215,6 +240,30 @@ export class RunScene extends Phaser.Scene {
     emitter.setDepth(45);
     emitter.explode(count);
     this.time.delayedCall(700, () => emitter.destroy());
+  }
+
+  /**
+   * 命中處跳出來的傷害數字。
+   *
+   * 固定在頭頂的一行字看不出「打到誰、打了幾下」；數字長在被打中的座標上，
+   * 連續命中時整片畫面都在跳數字，出手的節奏才讀得出來。
+   */
+  private floatNumber(x: number, y: number, text: string, color: string, size = 28, rise = 64): void {
+    const label = this.add
+      .text(x + Phaser.Math.Between(-16, 16), y, text, textStyle({ size, color, bold: true }))
+      .setOrigin(0.5)
+      .setStroke('#0b0f14', 6)
+      .setDepth(70);
+    this.tweens.add({
+      targets: label,
+      y: y - rise - Phaser.Math.Between(-10, 10),
+      x: label.x + Phaser.Math.Between(-22, 22),
+      alpha: 0,
+      scale: 1.18,
+      duration: 720,
+      ease: 'Quad.easeOut',
+      onComplete: () => label.destroy(),
+    });
   }
 
   // -------------------------------------------------------------- 建構
@@ -271,6 +320,22 @@ export class RunScene extends Phaser.Scene {
       .rectangle(0, 120, 0, 4, hexToNumber(accentHex), 1)
       .setOrigin(0, 0.5)
       .setDepth(52);
+
+    // 連擊讀數：仿影片左上角那疊倍率牌，越連越大，踩陷阱就整個掉下來。
+    // 底板是必要的：閘門會從這一區捲過去，沒有底板時數字會和閘門的字糊在一起。
+    this.comboPlate = this.add
+      .rectangle(22, 126, 168, 78, BG_PANEL, 0.82)
+      .setOrigin(0, 0)
+      .setDepth(50)
+      .setVisible(false);
+    this.comboBig = this.add
+      .text(30, 132, '', textStyle({ size: 44, color: GOLD, bold: true }))
+      .setStroke('#0b0f14', 7)
+      .setDepth(51);
+    this.comboSub = this.add
+      .text(32, 180, '', textStyle({ size: 16, color: GOLD }))
+      .setStroke('#0b0f14', 5)
+      .setDepth(51);
 
     createButton(this, GAME_WIDTH - 62, 34, {
       width: 84,
@@ -446,6 +511,8 @@ export class RunScene extends Phaser.Scene {
       if (!view.resolved && view.container.y >= CROWD_Y) this.resolveView(view);
     }
 
+    this.updateVolley(delta);
+
     this.views = this.views.filter((view) => {
       if (view.container.y > GAME_HEIGHT + 200) {
         view.container.destroy();
@@ -476,7 +543,14 @@ export class RunScene extends Phaser.Scene {
         ? this.buildGateView(encounter.left, encounter.right)
         : this.buildMobView(encounter);
     view.container.setY(SPAWN_Y);
-    this.views.push({ encounter, ...view, resolved: false });
+    this.views.push({
+      encounter,
+      ...view,
+      alive: [...view.enemies],
+      pending: 0,
+      weaken: 0,
+      resolved: false,
+    });
   }
 
   /** 閘門的顏色只用在線條與文字上，不鋪底色。 */
@@ -487,7 +561,10 @@ export class RunScene extends Phaser.Scene {
     return JADE;
   }
 
-  private buildGateView(left: GateChoice, right: GateChoice): Omit<EncounterView, 'encounter' | 'resolved'> {
+  private buildGateView(
+    left: GateChoice,
+    right: GateChoice,
+  ): Omit<EncounterView, 'encounter' | 'resolved' | 'alive' | 'pending' | 'weaken'> {
     const container = this.add.container(0, 0).setDepth(20);
 
     ([left, right] as const).forEach((choice, index) => {
@@ -511,7 +588,9 @@ export class RunScene extends Phaser.Scene {
     return { container, enemies: [], labels: [] };
   }
 
-  private buildMobView(encounter: MobEncounter): Omit<EncounterView, 'encounter' | 'resolved'> {
+  private buildMobView(
+    encounter: MobEncounter,
+  ): Omit<EncounterView, 'encounter' | 'resolved' | 'alive' | 'pending' | 'weaken'> {
     const container = this.add.container(0, 0).setDepth(20);
     const enemies: Phaser.GameObjects.Sprite[] = [];
     const scale = ENEMY_DISPLAY_HEIGHT / ENEMY_SOURCE_HEIGHT;
@@ -553,6 +632,106 @@ export class RunScene extends Phaser.Scene {
     return { container, enemies, labels: [label, stat] };
   }
 
+  /**
+   * 陣前齊射。
+   *
+   * 敵陣進入射程後，門人會朝正前方的敵人放出靈光；被打掉的兵卒不只是消失，
+   * 而是實際削掉這一排的威脅（上限見 balance.json 的 volleyMaxWeaken）。
+   * 射界有寬度限制，所以「敵陣還遠的時候就走到人多的那一側」是有回報的操作，
+   * 讓走位在選閘門之外多了一層用途。
+   */
+  private updateVolley(delta: number): void {
+    const target = this.views.find(
+      (view) =>
+        !view.resolved &&
+        view.encounter.kind === 'mob' &&
+        view.alive.length > 0 &&
+        // 在途的靈光也算進上限，否則同一幀連發會打掉超過上限的兵卒。
+        view.weaken + view.pending / MOB_ROW < BALANCE.run.volleyMaxWeaken &&
+        CROWD_Y - view.container.y <= BALANCE.run.volleyRangePx &&
+        view.container.y > ROAD_TOP - 40,
+    );
+    if (target === undefined) {
+      this.volleyAccum = 0;
+      return;
+    }
+
+    this.volleyAccum += delta;
+    while (this.volleyAccum >= BALANCE.run.volleyIntervalMs) {
+      this.volleyAccum -= BALANCE.run.volleyIntervalMs;
+      this.fireVolley(target);
+    }
+  }
+
+  private fireVolley(view: EncounterView): void {
+    if (view.encounter.kind !== 'mob') return;
+    const cone = BALANCE.run.volleyConeHalfPx;
+    const inCone = view.alive.filter((enemy) => Math.abs(enemy.x - this.crowd.x) <= cone);
+    if (inCone.length === 0) return;
+
+    // 射界內挑最近的一個，讓玩家覺得靈光是自己「瞄」出去的。
+    let enemy = inCone[0];
+    if (enemy === undefined) return;
+    for (const candidate of inCone) {
+      if (Math.abs(candidate.x - this.crowd.x) < Math.abs(enemy.x - this.crowd.x)) enemy = candidate;
+    }
+    const chosen = enemy;
+    // 鎖定當下就從待打名單移除，兩道靈光才不會撲同一個人。
+    view.alive.splice(view.alive.indexOf(chosen), 1);
+    view.pending += 1;
+
+    const fromX = this.crowd.x;
+    const fromY = CROWD_Y - 46;
+    const toX = chosen.x;
+    const toY = view.container.y + chosen.y - 30;
+    const bolt = this.add
+      .image(fromX, fromY, 'spark')
+      .setDisplaySize(9, 30)
+      .setTint(hexToNumber(this.run.loadout.sect.color))
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(35);
+    bolt.setRotation(Math.atan2(toY - fromY, toX - fromX) + Math.PI / 2);
+    audio.play('swipe');
+
+    this.tweens.add({
+      targets: bolt,
+      x: toX,
+      y: toY,
+      duration: Phaser.Math.Clamp(Phaser.Math.Distance.Between(fromX, fromY, toX, toY) * 0.55, 110, 320),
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        bolt.destroy();
+        this.landVolley(view, chosen);
+      },
+    });
+  }
+
+  /** 靈光命中：削掉這一排的威脅，並把「少死幾個人」直接寫在畫面上。 */
+  private landVolley(view: EncounterView, enemy: Phaser.GameObjects.Sprite): void {
+    view.pending -= 1;
+    if (view.resolved || view.encounter.kind !== 'mob') return;
+
+    const before = mobLoss(this.run, view.encounter, view.weaken);
+    view.weaken = clampWeaken(view.weaken + 1 / MOB_ROW);
+    const saved = before - mobLoss(this.run, view.encounter, view.weaken);
+
+    const worldY = view.container.y + enemy.y;
+    this.burst(enemy.x, worldY - 30, this.run.loadout.sect.color, 8);
+    if (saved > 0) this.floatNumber(enemy.x, worldY - 54, `+${saved}`, JADE, 26);
+
+    this.tweens.killTweensOf(enemy);
+    enemy.anims.stop();
+    enemy.setTintFill(0xffffff);
+    this.tweens.add({
+      targets: enemy,
+      y: enemy.y - 26,
+      alpha: 0,
+      angle: Phaser.Math.Between(-70, 70),
+      duration: 260,
+      ease: 'Quad.easeOut',
+    });
+  }
+
   private resolveView(view: EncounterView): void {
     view.resolved = true;
 
@@ -560,23 +739,54 @@ export class RunScene extends Phaser.Scene {
       // 隊伍中心落在哪一半，就吃哪一側的閘門。
       const choice = this.crowd.x < GAME_WIDTH / 2 ? view.encounter.left : view.encounter.right;
       const result = applyGate(this.run, choice);
-      const parts: string[] = [];
-      if (result.discipleDelta !== 0) parts.push(`${result.discipleDelta > 0 ? '+' : ''}${result.discipleDelta} 人`);
-      if (result.armsDelta !== 0) parts.push(`${result.armsDelta > 0 ? '+' : ''}${result.armsDelta} 武裝`);
-      if (result.goldDelta !== 0) parts.push(`+${result.goldDelta} 金幣`);
-      if (result.passiveNote !== null) parts.push(result.passiveNote);
       const positive = result.discipleDelta + result.armsDelta + result.goldDelta >= 0;
-      this.popup(parts.join('　'), positive ? JADE : DANGER);
+
+      // 收益直接跳在隊伍身上，一項一個數字：不用先讀完一整行字才知道剛剛拿到什麼。
+      if (result.discipleDelta !== 0) {
+        this.floatNumber(
+          this.crowd.x,
+          CROWD_Y - 96,
+          `${result.discipleDelta > 0 ? '+' : ''}${formatNumber(result.discipleDelta)} 人`,
+          result.discipleDelta > 0 ? JADE : DANGER,
+          34,
+        );
+      }
+      if (result.armsDelta !== 0) {
+        this.floatNumber(
+          this.crowd.x - 74,
+          CROWD_Y - 134,
+          `${result.armsDelta > 0 ? '+' : ''}${formatNumber(result.armsDelta)} 武裝`,
+          result.armsDelta > 0 ? '#7fd8ff' : DANGER,
+          28,
+        );
+      }
+      if (result.goldDelta !== 0) {
+        this.floatNumber(this.crowd.x + 74, CROWD_Y - 134, `+${formatNumber(result.goldDelta)} 金`, GOLD, 28);
+      }
+      // 文字只留給「數字說不清楚」的被動效果。
+      if (result.passiveNote !== null) this.popup(result.passiveNote, JADE);
+      this.refreshCombo(result.comboBroken);
       audio.play(choice.target === 'gold' ? 'gold' : positive ? 'gateGood' : 'gateTrap');
       this.burst(this.crowd.x, CROWD_Y - 30, this.gateAccent(choice), positive ? 16 : 10);
       this.tweens.add({ targets: view.container, alpha: 0, duration: 260 });
     } else {
-      const loss = resolveMob(this.run, view.encounter);
-      this.popup(loss === 0 ? '銅皮鐵骨　免傷' : `-${loss} 人`, loss === 0 ? JADE : DANGER);
+      const loss = resolveMob(this.run, view.encounter, view.weaken);
+      if (loss === 0) this.popup('銅皮鐵骨　免傷', JADE);
+      else this.floatNumber(this.crowd.x, CROWD_Y - 96, `-${formatNumber(loss)} 人`, DANGER, 36);
+      if (view.weaken > 0) {
+        this.floatNumber(
+          this.crowd.x,
+          CROWD_Y - 150,
+          `齊射削弱 ${Math.round(view.weaken * 100)}%`,
+          '#7fd8ff',
+          22,
+        );
+      }
       this.cameras.main.shake(160, 0.006);
       audio.play('mob');
       this.burst(this.crowd.x, CROWD_Y - 40, DANGER, 20);
-      this.knockBack(view.enemies);
+      // 已被靈光打掉的不再演出擊退，剩下的才被隊伍衝散。
+      this.knockBack(view.enemies.filter((enemy) => enemy.alpha > 0.1));
     }
 
     this.layoutCrowd();
@@ -620,6 +830,39 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * 連擊讀數的更新與演出。
+   *
+   * 連擊只放大金幣與首領戰的開場氣勢，不放大當場戰力——所以它是「這一場走得多乾淨」的
+   * 計分板，而不是又一條讓本關變簡單的捷徑。
+   */
+  private refreshCombo(broken = false): void {
+    const combo = this.run.combo;
+    if (broken || combo < 2) {
+      if (broken) this.floatNumber(this.crowd.x, CROWD_Y - 210, '連擊中斷', DANGER, 26);
+      this.hideCombo();
+      return;
+    }
+
+    const bonus = Math.round((comboMultiplier(combo) - 1) * 100);
+    this.comboPlate.setVisible(true);
+    this.comboBig.setText(`×${combo}`);
+    this.comboSub.setText(`連擊　金幣 +${bonus}%`);
+    // 每疊一層彈一下，疊到上限就改成常亮的翠色，讓玩家知道再連也不會更多。
+    const capped = combo >= BALANCE.run.comboMaxStack;
+    this.comboBig.setColor(capped ? JADE : GOLD);
+    this.comboSub.setColor(capped ? JADE : GOLD);
+    this.tweens.killTweensOf(this.comboBig);
+    this.comboBig.setScale(1.35);
+    this.tweens.add({ targets: this.comboBig, scale: 1, duration: 220, ease: 'Back.easeOut' });
+  }
+
+  private hideCombo(): void {
+    this.comboPlate.setVisible(false);
+    this.comboBig.setText('');
+    this.comboSub.setText('');
+  }
+
   private updateHud(): void {
     this.peakDisciples = Math.max(this.peakDisciples, this.run.disciples);
     this.hudPower.setText(`戰力 ${formatNumber(teamPower(this.run))}`);
@@ -644,7 +887,16 @@ export class RunScene extends Phaser.Scene {
     this.bossTimeLeft = BALANCE.boss.timeLimitMs;
     this.bossAttackAccum = 0;
     // 劍修：開場氣勢全滿，換來的是衰退加倍——前段爆發型的打法。
-    this.momentum = BALANCE.boss.momentumMax * this.run.loadout.sect.bossStartMomentum;
+    // 沿路累積的連擊也換成開場氣勢：走得乾淨的人，決戰第一秒就領先。
+    const carried = comboBossMomentum(this.run.combo);
+    this.momentum = Math.min(
+      BALANCE.boss.momentumMax,
+      BALANCE.boss.momentumMax * this.run.loadout.sect.bossStartMomentum + carried,
+    );
+    if (carried > 0) {
+      this.floatNumber(GAME_WIDTH / 2, CROWD_Y - 240, `連擊 ×${this.run.combo} → 開場氣勢`, GOLD, 26);
+    }
+    this.hideCombo();
     this.updateHud();
 
     this.targetX = GAME_WIDTH / 2;
@@ -677,31 +929,37 @@ export class RunScene extends Phaser.Scene {
     this.tweens.add({ targets: figure, angle: 2.5, duration: 1900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: aura, alpha: 0.24, duration: 1400, yoyo: true, repeat: -1 });
 
+    // 血條移到畫面最上緣：戰鬥發生在中段，玩家的視線不必在血條與首領之間來回跳。
     const name = this.add
-      .text(cx, 200, boss.def.name, textStyle({ size: 40, color: DANGER, bold: true }))
+      .text(cx, 150, boss.def.name, textStyle({ size: 34, color: DANGER, bold: true }))
       .setOrigin(0.5)
       .setStroke('#0b0f14', 6);
     const taunt = this.add
-      .text(cx, 244, `「${boss.def.taunt}」`, textStyle({ size: 19, color: INK_DIM }))
+      .text(cx, 182, `「${boss.def.taunt}」`, textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(0.5);
 
     const barWidth = GAME_WIDTH - 120;
-    const barBg = this.add.rectangle(cx, 446, barWidth, 26, 0x2a1216, 1).setStrokeStyle(2, LINE);
-    this.bossHpBar = this.add.rectangle(cx - barWidth / 2, 446, barWidth, 22, 0xc03a4a, 1).setOrigin(0, 0.5);
+    const barBg = this.add.rectangle(cx, 212, barWidth, 26, 0x2a1216, 1).setStrokeStyle(2, LINE);
+    this.bossHpBar = this.add.rectangle(cx - barWidth / 2, 212, barWidth, 22, 0xc03a4a, 1).setOrigin(0, 0.5);
     this.bossHpText = this.add
-      .text(cx, 446, '', textStyle({ size: 17, color: INK, bold: true }))
+      .text(cx, 212, '', textStyle({ size: 17, color: INK, bold: true }))
       .setOrigin(0.5);
 
-    const timerBg = this.add.rectangle(cx, 472, barWidth, 8, 0x1b232b, 1);
-    this.bossTimerBar = this.add.rectangle(cx - barWidth / 2, 472, barWidth, 8, 0x7a8fa0, 1).setOrigin(0, 0.5);
+    const timerBg = this.add.rectangle(cx, 234, barWidth, 8, 0x1b232b, 1);
+    this.bossTimerBar = this.add.rectangle(cx - barWidth / 2, 234, barWidth, 8, 0x7a8fa0, 1).setOrigin(0, 0.5);
 
-    const momentumBg = this.add.rectangle(cx, 524, barWidth, 16, 0x1b232b, 1).setStrokeStyle(2, LINE);
-    this.momentumBar = this.add.rectangle(cx - barWidth / 2, 524, 0, 12, hexToNumber(GOLD), 1).setOrigin(0, 0.5);
+    // 氣勢改成大字倍率讀數：長條只看得出「多還是少」，×1.8 才看得出「值不值得再晃」。
+    this.momentumText = this.add
+      .text(cx, 512, '', textStyle({ size: 52, color: GOLD, bold: true }))
+      .setOrigin(0.5)
+      .setStroke('#0b0f14', 8);
     const momentumLabel = this.add
-      .text(cx, 498, '氣勢　左右晃動可提升傷害', textStyle({ size: 18, color: GOLD }))
+      .text(cx, 550, '氣勢　左右晃動可提升傷害', textStyle({ size: 17, color: GOLD }))
       .setOrigin(0.5);
+    const momentumBg = this.add.rectangle(cx, 574, barWidth, 14, 0x1b232b, 1).setStrokeStyle(2, LINE);
+    this.momentumBar = this.add.rectangle(cx - barWidth / 2, 574, 0, 10, hexToNumber(GOLD), 1).setOrigin(0, 0.5);
     this.stanceText = this.add
-      .text(cx, 572, '', textStyle({ size: 20, color: INK, bold: true }))
+      .text(cx, 604, '', textStyle({ size: 20, color: INK, bold: true }))
       .setOrigin(0.5);
 
     container.add([
@@ -713,6 +971,7 @@ export class RunScene extends Phaser.Scene {
       this.bossHpText,
       timerBg,
       this.bossTimerBar,
+      this.momentumText,
       momentumBg,
       this.momentumBar,
       momentumLabel,
@@ -777,16 +1036,27 @@ export class RunScene extends Phaser.Scene {
     this.stanceText?.setColor(this.guarding ? '#7fd8ff' : DANGER);
     const dpsScale = this.guarding ? cfg.guardDpsMultiplier : 1;
 
-    // 我方輸出的視覺回饋：氣勢越高，劍氣越密。
+    const damage = bossDps(this.run, this.momentum) * dpsScale * seconds;
+    boss.hp -= damage;
+    this.slashDamage += damage;
+
+    // 我方輸出的視覺回饋：氣勢越高，劍氣越密，並在首領身上跳出這一擊的傷害。
     this.slashAccum += delta * (1 + this.momentum) * dpsScale;
     if (this.slashAccum >= 420) {
       this.slashAccum = 0;
       this.spawnSlash();
       this.bossHitAnimation();
+      this.floatNumber(
+        GAME_WIDTH / 2 + Phaser.Math.Between(-70, 70),
+        BOSS_Y + Phaser.Math.Between(-40, 30),
+        `-${formatNumber(this.slashDamage)}`,
+        this.momentum > BALANCE.boss.momentumMax * 0.6 ? GOLD : INK,
+        this.momentum > BALANCE.boss.momentumMax * 0.6 ? 34 : 28,
+      );
+      this.slashDamage = 0;
       audio.play('bossHit');
     }
 
-    boss.hp -= bossDps(this.run, this.momentum) * dpsScale * seconds;
     if (boss.hp <= 0) {
       boss.hp = 0;
       this.refreshBossBars();
@@ -804,7 +1074,7 @@ export class RunScene extends Phaser.Scene {
         Math.max(1, Math.round(raw * (this.guarding ? cfg.guardDamageMultiplier : 1))),
       );
       this.run.disciples -= loss;
-      this.popup(`-${loss} 人`, DANGER);
+      this.floatNumber(this.crowd.x, CROWD_Y - 92, `-${formatNumber(loss)}`, DANGER, 36, 32);
       this.cameras.main.shake(180, 0.008);
       this.bossAttackAnimation();
       audio.play('bossAttack');
@@ -863,8 +1133,10 @@ export class RunScene extends Phaser.Scene {
     );
     this.momentumBar?.setDisplaySize(
       Math.max(0, barWidth * (this.momentum / BALANCE.boss.momentumMax)),
-      12,
+      10,
     );
+    this.momentumText?.setText(`×${(1 + this.momentum).toFixed(2)}`);
+    this.momentumText?.setColor(this.momentum > BALANCE.boss.momentumMax * 0.6 ? GOLD : INK_DIM);
   }
 
   // -------------------------------------------------------------- 結束

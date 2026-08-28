@@ -49,6 +49,8 @@ export interface RunState {
   cursor: number;
   /** 已用掉幾次敵陣免傷（體修被動）。 */
   mobImmunityUsed: number;
+  /** 連擊層數：連續吃到好處的閘門會累積，踩到陷阱歸零。 */
+  combo: number;
 }
 
 export interface GateResult {
@@ -58,6 +60,10 @@ export interface GateResult {
   goldDelta: number;
   /** 被動生效時的提示文字，沒有就是 null。 */
   passiveNote: string | null;
+  /** 結算後的連擊層數。 */
+  combo: number;
+  /** 這一道閘門是否讓連擊中斷。 */
+  comboBroken: boolean;
 }
 
 export interface BossState {
@@ -203,7 +209,26 @@ export function createRunState(loadout: Loadout, seed: number): RunState {
     encounters: buildEncounters(loadout.stage, rng),
     cursor: 0,
     mobImmunityUsed: 0,
+    combo: 0,
   };
+}
+
+/**
+ * 連擊倍率：連續吃到好處的閘門會讓金幣收益疊加，踩到陷阱就歸零。
+ *
+ * 這條線只放大金幣，不放大人數與武裝——金幣是長期成長，放大它獎勵「這一場走得乾淨」，
+ * 放大戰力則會直接讓本關難度崩掉。
+ */
+export function comboMultiplier(combo: number): number {
+  const { run } = BALANCE;
+  return 1 + Math.min(combo, run.comboMaxStack) * run.comboGoldPerStack;
+}
+
+/** 連擊帶進首領戰的開場氣勢。乾淨走完全程的人，決戰第一秒就有優勢。 */
+export function comboBossMomentum(combo: number): number {
+  const { run, boss } = BALANCE;
+  const ratio = Math.min(combo, run.comboMaxStack) / run.comboMaxStack;
+  return boss.momentumMax * boss.comboMomentumRatio * ratio;
 }
 
 /**
@@ -218,10 +243,22 @@ export function applyGate(state: RunState, choice: GateChoice): GateResult {
   const sect = state.loadout.sect;
   let passiveNote: string | null = null;
 
-  // 符修：陷阱完全無效。玩家因此可以無視陷阱側，選擇邏輯與其他門派不同。
+  // 符修：陷阱完全無效。連擊也因此不會被打斷，這是這個門派真正的長處。
   if (choice.trap && sect.trapImmune) {
-    return { choice, discipleDelta: 0, armsDelta: 0, goldDelta: 0, passiveNote: '符籙鎮邪' };
+    state.combo += 1;
+    return {
+      choice,
+      discipleDelta: 0,
+      armsDelta: 0,
+      goldDelta: 0,
+      passiveNote: '符籙鎮邪',
+      combo: state.combo,
+      comboBroken: false,
+    };
   }
+
+  const comboBroken = choice.trap;
+  state.combo = comboBroken ? 0 : state.combo + 1;
 
   if (choice.target === 'disciples') {
     // 聚眾成軍是乘算：加算閘門的收益也一起放大，這條線才不會在後期被稀釋。
@@ -243,7 +280,9 @@ export function applyGate(state: RunState, choice: GateChoice): GateResult {
   state.arms = Math.max(0, Math.round(state.arms));
 
   const goldDelta =
-    choice.target === 'gold' ? Math.round(choice.value * state.loadout.goldMultiplier) : 0;
+    choice.target === 'gold'
+      ? Math.round(choice.value * state.loadout.goldMultiplier * comboMultiplier(state.combo))
+      : 0;
   state.goldCollected += goldDelta;
 
   // 丹修：金幣閘門兼具補血，讓「拿錢」與「保人」不再是互斥選擇。
@@ -259,6 +298,8 @@ export function applyGate(state: RunState, choice: GateChoice): GateResult {
     armsDelta: state.arms - before.arms,
     goldDelta,
     passiveNote,
+    combo: state.combo,
+    comboBroken,
   };
 }
 
@@ -288,14 +329,19 @@ function guard(state: RunState): number {
  * 用比例而非固定人數，是因為固定人數會讓運氣不好的小隊在中途直接被抹平，
  * 關卡難度應該由首領決定，敵陣只是消耗。武裝值越高，這個比例越低。
  */
-export function mobLossRatio(state: RunState, encounter: MobEncounter): number {
-  const threat = encounter.power * state.loadout.mobLossMultiplier;
+export function mobLossRatio(state: RunState, encounter: MobEncounter, weaken = 0): number {
+  const threat = encounter.power * state.loadout.mobLossMultiplier * (1 - clampWeaken(weaken));
   return threat / (threat + guard(state));
 }
 
+/** 陣前齊射能削掉的威脅比例，上限由 data/balance.json 決定。 */
+export function clampWeaken(weaken: number): number {
+  return Math.max(0, Math.min(BALANCE.run.volleyMaxWeaken, weaken));
+}
+
 /** 敵陣衝殺造成的傷亡人數。 */
-export function mobLoss(state: RunState, encounter: MobEncounter): number {
-  const raw = state.disciples * mobLossRatio(state, encounter);
+export function mobLoss(state: RunState, encounter: MobEncounter, weaken = 0): number {
+  const raw = state.disciples * mobLossRatio(state, encounter, weaken);
   return Math.min(
     state.disciples,
     Math.max(BALANCE.power.minLossPerHit, Math.round(raw)),
@@ -308,12 +354,12 @@ export function mobLoss(state: RunState, encounter: MobEncounter): number {
  * 體修的前幾次敵陣完全免傷（被動），因此體修可以先放心堆人數，
  * 不必像其他門派那樣一開場就得顧武裝——這是玩法上的差異，不只是數值。
  */
-export function resolveMob(state: RunState, encounter: MobEncounter): number {
+export function resolveMob(state: RunState, encounter: MobEncounter, weaken = 0): number {
   if (state.mobImmunityUsed < state.loadout.sect.mobImmunityCount) {
     state.mobImmunityUsed += 1;
     return 0;
   }
-  const loss = Math.min(state.disciples, mobLoss(state, encounter));
+  const loss = Math.min(state.disciples, mobLoss(state, encounter, weaken));
   state.disciples -= loss;
   return loss;
 }

@@ -74,6 +74,12 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       mobWaveEvery: p(run, 'mobWaveEvery', 'run'),
       goldGateChance: p(run, 'goldGateChance', 'run'),
       trapChance: p(run, 'trapChance', 'run'),
+      volleyMaxWeaken: p(run, 'volleyMaxWeaken', 'run'),
+      volleyRangePx: p(run, 'volleyRangePx', 'run'),
+      volleyIntervalMs: p(run, 'volleyIntervalMs', 'run'),
+      volleyConeHalfPx: p(run, 'volleyConeHalfPx', 'run'),
+      comboGoldPerStack: p(run, 'comboGoldPerStack', 'run'),
+      comboMaxStack: p(run, 'comboMaxStack', 'run'),
     },
     power: {
       baseDisciples: p(power, 'baseDisciples', 'power'),
@@ -105,6 +111,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       guardIdleMs: p(boss, 'guardIdleMs', 'boss'),
       guardDpsMultiplier: p(boss, 'guardDpsMultiplier', 'boss'),
       guardDamageMultiplier: p(boss, 'guardDamageMultiplier', 'boss'),
+      comboMomentumRatio: p(boss, 'comboMomentumRatio', 'boss'),
     },
     gold: {
       clearBase: p(gold, 'clearBase', 'gold'),

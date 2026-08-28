@@ -8,6 +8,7 @@ import {
   bossDps,
   bossHitLoss,
   clearReward,
+  comboBossMomentum,
   createBoss,
   createRunState,
   defeatReward,
@@ -45,6 +46,14 @@ interface RunOutcome {
 }
 
 /**
+ * 陣前齊射的平均削弱量。
+ *
+ * 上限是 balance.json 的 volleyMaxWeaken，但那要走位走得很準才吃得滿；
+ * 這裡取大約一半，代表「會用但沒用好」的普通玩家，模擬結果因此偏保守。
+ */
+const AVERAGE_WEAKEN = BALANCE.run.volleyMaxWeaken * 0.5;
+
+/**
  * 完整跑一場挑戰。
  * momentum 給的是「普通玩家的滑動頻率」，不假設玩家能一直把氣勢頂滿。
  */
@@ -61,18 +70,20 @@ function runOnce(
 
   for (const encounter of state.encounters) {
     if (encounter.kind === 'gate') applyGate(state, encounter[chooseBest(state, encounter)]);
-    else resolveMob(state, encounter);
+    else resolveMob(state, encounter, AVERAGE_WEAKEN);
     if (state.disciples <= 0) break;
   }
 
   const cfg = BALANCE.boss;
   const boss = createBoss(stage, createRng(seed));
+  // 沿路累積的連擊會換成開場氣勢，模擬時一併計入，否則首領戰會被低估。
+  const startMomentum = Math.min(cfg.momentumMax, momentum + comboBossMomentum(state.combo));
   let victory = false;
   let elapsed = 0;
   let attackAccum = 0;
 
   while (state.disciples > 0 && elapsed < cfg.timeLimitMs) {
-    boss.hp -= (bossDps(state, momentum) * cfg.tickMs) / 1000;
+    boss.hp -= (bossDps(state, startMomentum) * cfg.tickMs) / 1000;
     if (boss.hp <= 0) {
       victory = true;
       break;

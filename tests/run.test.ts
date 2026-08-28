@@ -3,6 +3,7 @@ import { BALANCE, SECTS } from '../src/data';
 import type { Sect } from '../src/data/types';
 import { buildLoadoutFor } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
+import type { MobEncounter } from '../src/systems/run';
 import {
   applyGate,
   bossDps,
@@ -11,6 +12,8 @@ import {
   buildEncounters,
   buildGateEncounter,
   clearReward,
+  comboBossMomentum,
+  comboMultiplier,
   createBoss,
   createRunState,
   defeatReward,
@@ -104,10 +107,52 @@ describe('閘門結算', () => {
     expect(result.passiveNote).toContain('丹藥回春');
   });
 
-  it('金幣閘門依門派與升級倍率折算', () => {
+  it('金幣閘門依門派、升級與連擊倍率折算', () => {
     const alchemy = stateFor('alchemy');
     applyGate(alchemy, { templateId: 'g', target: 'gold', op: 'add', value: 100, trap: false, label: '' });
-    expect(alchemy.goldCollected).toBe(Math.round(100 * sect('alchemy').goldMultiplier));
+    // 這是本場第一道閘門，結算後連擊為 1。
+    expect(alchemy.goldCollected).toBe(
+      Math.round(100 * sect('alchemy').goldMultiplier * comboMultiplier(1)),
+    );
+  });
+
+  it('連擊：連續好處會疊加，踩陷阱歸零', () => {
+    const state = stateFor('body');
+    const good = { templateId: 'g', target: 'disciples', op: 'add', value: 5, trap: false, label: '' } as const;
+    const trap = { templateId: 't', target: 'disciples', op: 'add', value: -5, trap: true, label: '' } as const;
+
+    applyGate(state, good);
+    applyGate(state, good);
+    expect(state.combo).toBe(2);
+    expect(comboMultiplier(state.combo)).toBeGreaterThan(1);
+
+    const broken = applyGate(state, trap);
+    expect(broken.comboBroken).toBe(true);
+    expect(state.combo).toBe(0);
+    expect(comboMultiplier(0)).toBe(1);
+  });
+
+  it('連擊倍率有上限，開場氣勢也隨之封頂', () => {
+    const cap = BALANCE.run.comboMaxStack;
+    expect(comboMultiplier(cap + 50)).toBe(comboMultiplier(cap));
+    expect(comboBossMomentum(cap + 50)).toBeCloseTo(comboBossMomentum(cap));
+    expect(comboBossMomentum(0)).toBe(0);
+  });
+
+  it('陣前齊射會等比降低敵陣的傷亡，且不超過上限', () => {
+    const state = stateFor('sword');
+    state.disciples = 200;
+    const encounter: MobEncounter = { kind: 'mob', name: '測試', art: 'bandit', power: 40 };
+
+    const full = mobLossRatio(state, encounter, 0);
+    const half = mobLossRatio(state, encounter, BALANCE.run.volleyMaxWeaken / 2);
+    const capped = mobLossRatio(state, encounter, 1);
+
+    expect(half).toBeLessThan(full);
+    expect(capped).toBeLessThan(half);
+    // 削弱有上限：再怎麼射也不可能完全免傷。
+    expect(capped).toBe(mobLossRatio(state, encounter, BALANCE.run.volleyMaxWeaken));
+    expect(capped).toBeGreaterThan(0);
   });
 
   it('閘門文字依資料格式化', () => {

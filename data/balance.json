@@ -15,7 +15,13 @@
     "gatesPerStageMax": 14,
     "mobWaveEvery": 2,
     "goldGateChance": 0.18,
-    "trapChance": 0.22
+    "trapChance": 0.22,
+    "volleyMaxWeaken": 0.45,
+    "volleyRangePx": 560,
+    "volleyIntervalMs": 230,
+    "volleyConeHalfPx": 135,
+    "comboGoldPerStack": 0.1,
+    "comboMaxStack": 10
   },
   "power": {
     "baseDisciples": 8,
@@ -34,7 +40,7 @@
     "powerJitter": 0.12
   },
   "boss": {
-    "hpBase": 6500,
+    "hpBase": 9000,
     "hpGrowth": 1.29,
     "attackBase": 2,
     "attackGrowth": 1.09,
@@ -46,7 +52,8 @@
     "momentumDecayPerSec": 0.25,
     "guardIdleMs": 420,
     "guardDpsMultiplier": 0.45,
-    "guardDamageMultiplier": 0.45
+    "guardDamageMultiplier": 0.45,
+    "comboMomentumRatio": 0.3
   },
   "gold": {
     "clearBase": 30,

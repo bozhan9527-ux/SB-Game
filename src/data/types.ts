@@ -33,6 +33,18 @@ export interface RunBalance {
   goldGateChance: number;
   /** 閘門對其中一側出現陷阱的機率。 */
   trapChance: number;
+  /** 陣前齊射最多能削掉敵陣多少比例的威脅（0–1）。 */
+  volleyMaxWeaken: number;
+  /** 敵陣進入這個距離內才開始被齊射，單位 px。 */
+  volleyRangePx: number;
+  /** 齊射的間隔，單位 ms。 */
+  volleyIntervalMs: number;
+  /** 齊射的射界半寬：只有落在隊伍正前方這個範圍內的敵人會被射中。 */
+  volleyConeHalfPx: number;
+  /** 連擊每一層增加的金幣倍率。 */
+  comboGoldPerStack: number;
+  /** 連擊層數上限。 */
+  comboMaxStack: number;
 }
 
 /** 隊伍戰力公式的係數。 */
@@ -91,6 +103,8 @@ export interface BossBalance {
   guardDpsMultiplier: number;
   /** 守勢時承受傷害的倍率。 */
   guardDamageMultiplier: number;
+  /** 進首領戰時，連擊層數換算成開場氣勢的比例。 */
+  comboMomentumRatio: number;
 }
 
 /**
