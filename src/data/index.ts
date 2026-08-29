@@ -20,6 +20,7 @@ import type {
   BossArt,
   BossDef,
   CardDef,
+  FormationTierBalance,
   MobArt,
   EnemyBook,
   MobDef,
@@ -42,6 +43,14 @@ const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial',
 ];
+
+function parseFormationTier(raw: unknown, path: string): FormationTierBalance {
+  return {
+    rowDamage: num(raw, 'rowDamage', path),
+    columnFireRate: num(raw, 'columnFireRate', path),
+    diagonalDamage: num(raw, 'diagonalDamage', path),
+  };
+}
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const field_ = obj(raw, 'field', path);
@@ -67,9 +76,11 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
     },
     formation: {
       columns: p(formation, 'columns', 'formation'),
-      rowDamage: p(formation, 'rowDamage', 'formation'),
-      columnFireRate: p(formation, 'columnFireRate', 'formation'),
-      diagonalDamage: p(formation, 'diagonalDamage', 'formation'),
+      same: parseFormationTier(obj(formation, 'same', `${path}.formation`), `${path}.formation.same`),
+      distinct: parseFormationTier(
+        obj(formation, 'distinct', `${path}.formation`),
+        `${path}.formation.distinct`,
+      ),
     },
     wave: {
       wavesPerStage: p(wave, 'wavesPerStage', 'wave'),

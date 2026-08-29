@@ -6,23 +6,30 @@
  * 為什麼需要它：沒有陣法的話，六個陣位彼此完全可以互換——那個格子只是「放東西的地方」，
  * 玩家沒有任何理由在意哪一張放哪一格，畫面上的網格等於在說謊。
  *
- * 為什麼條件是「一整條線都**不同種**」：
+ * 一條線有兩種成陣方式，效果不同：
  *
- * 第一版寫成「同種連線」，結果全場鋪同一種符會同時吃到三橫、三縱、兩斜共八條陣，
- * 而同種本來就最好合成——湊同色是純上位解，完全沒有取捨可言。
+ * - **同心陣**：三張都是同一種符。好排，而且同種本來就好合成，所以給得少。
+ * - **五行陣**：三張都不同種。難排，而且和合成互相牽制（合成要湊同種），所以給得多。
  *
- * 反過來要求「線上每一張都不同種」之後，兩件事直接對立：
- * **合成需要湊同種，結陣需要湊不同種**。全場同色的陣法數是零。
- * 玩家因此得決定哪幾格拿來排陣、哪幾格（與手牌）拿來養合成，這才是真的取捨。
- * 設定上也說得通：陣法本就要五行俱全，清一色成不了陣。
+ * 混在一起（兩同一異）什麼都不算——這是唯一「白放」的情況，
+ * 所以擺放仍然要想，但兩種自然的打法都有回報，不會逼玩家只能走一條路。
+ *
+ * 走過的兩個極端都不好：
+ * 只認同種時，同色是純上位解（好排又好合），取捨消失；
+ * 只認異種時，走同色流的玩家一條陣都吃不到，後期硬得過頭。
+ * 兩種都認、但給不同的量，才同時保住「好上手」與「排得好有賞」。
  */
 import { BALANCE } from '../data';
+import type { FormationTierBalance } from '../data/types';
 import type { Card } from './deck';
 
 export type FormationKind = 'row' | 'column' | 'diagonal';
+/** same＝三張同種（同心陣）；distinct＝三張皆不同種（五行陣）。 */
+export type FormationPattern = 'same' | 'distinct';
 
 export interface FormationLine {
   kind: FormationKind;
+  pattern: FormationPattern;
   /** 構成這一條線的陣位索引。 */
   slots: number[];
 }
@@ -44,30 +51,45 @@ export function formationRows(slots: number): number {
   return Math.ceil(slots / formationColumns());
 }
 
-/** 名稱只用於畫面提示。 */
-export function formationName(kind: FormationKind): string {
-  if (kind === 'row') return '橫陣';
-  if (kind === 'column') return '縱陣';
-  return '斜陣';
+export function patternName(pattern: FormationPattern): string {
+  return pattern === 'same' ? '同心' : '五行';
 }
 
-export function formationEffect(kind: FormationKind): string {
-  const { formation } = BALANCE;
-  if (kind === 'row') return `傷害 +${Math.round(formation.rowDamage * 100)}%`;
-  if (kind === 'column') return `出手 +${Math.round(formation.columnFireRate * 100)}%`;
-  return `傷害 +${Math.round(formation.diagonalDamage * 100)}%`;
+/** 名稱只用於畫面提示，例如「五行橫陣」。 */
+export function formationName(line: FormationLine): string {
+  const direction = line.kind === 'row' ? '橫陣' : line.kind === 'column' ? '縱陣' : '斜陣';
+  return `${patternName(line.pattern)}${direction}`;
 }
 
-/** 一整條線都放了符、而且彼此都不同種，才算成陣。 */
-function lineIsFormed(field: readonly (Card | null)[], slots: readonly number[]): boolean {
-  const seen = new Set<string>();
+export function tierOf(pattern: FormationPattern): FormationTierBalance {
+  return pattern === 'same' ? BALANCE.formation.same : BALANCE.formation.distinct;
+}
+
+export function formationEffect(line: FormationLine): string {
+  const tier = tierOf(line.pattern);
+  if (line.kind === 'row') return `傷害 +${Math.round(tier.rowDamage * 100)}%`;
+  if (line.kind === 'column') return `出手 +${Math.round(tier.columnFireRate * 100)}%`;
+  return `傷害 +${Math.round(tier.diagonalDamage * 100)}%`;
+}
+
+/**
+ * 一整條線都放了符，而且「全部同種」或「全部不同種」，才算成陣。
+ * 兩同一異這種夾雜的情況什麼都不算——那是唯一擺錯的方式。
+ */
+function patternOf(
+  field: readonly (Card | null)[],
+  slots: readonly number[],
+): FormationPattern | null {
+  const types: string[] = [];
   for (const slot of slots) {
     const card = field[slot];
-    if (card === undefined || card === null) return false;
-    if (seen.has(card.type)) return false;
-    seen.add(card.type);
+    if (card === undefined || card === null) return null;
+    types.push(card.type);
   }
-  return true;
+  const unique = new Set(types).size;
+  if (unique === 1) return 'same';
+  if (unique === types.length) return 'distinct';
+  return null;
 }
 
 /**
@@ -85,7 +107,8 @@ export function activeFormations(field: readonly (Card | null)[]): FormationLine
     // 因此六格的場上只有兩條橫陣，要有縱陣與斜陣得先把陣法擴充買起來。
     if (slots.length !== columns) return;
     if (slots.some((slot) => slot >= field.length)) return;
-    if (lineIsFormed(field, slots)) found.push({ kind, slots });
+    const pattern = patternOf(field, slots);
+    if (pattern !== null) found.push({ kind, pattern, slots });
   };
 
   for (let row = 0; row < rows; row += 1) {
@@ -119,14 +142,15 @@ export function bonusesForField(field: readonly (Card | null)[]): FormationBonus
   const bonuses: FormationBonus[] = field.map(() => ({ damage: 1, fireRate: 1 }));
   const diagonalCounted = new Set<number>();
   for (const line of activeFormations(field)) {
+    const tier = line.pattern === 'same' ? formation.same : formation.distinct;
     for (const slot of line.slots) {
       const bonus = bonuses[slot];
       if (bonus === undefined) continue;
-      if (line.kind === 'row') bonus.damage += formation.rowDamage;
-      else if (line.kind === 'column') bonus.fireRate += formation.columnFireRate;
+      if (line.kind === 'row') bonus.damage += tier.rowDamage;
+      else if (line.kind === 'column') bonus.fireRate += tier.columnFireRate;
       else if (!diagonalCounted.has(slot)) {
         diagonalCounted.add(slot);
-        bonus.damage += formation.diagonalDamage;
+        bonus.damage += tier.diagonalDamage;
       }
     }
   }

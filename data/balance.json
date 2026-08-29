@@ -13,9 +13,16 @@
   },
   "formation": {
     "columns": 3,
-    "rowDamage": 0.18,
-    "columnFireRate": 0.18,
-    "diagonalDamage": 0.25
+    "same": {
+      "rowDamage": 0.14,
+      "columnFireRate": 0.14,
+      "diagonalDamage": 0.18
+    },
+    "distinct": {
+      "rowDamage": 0.18,
+      "columnFireRate": 0.18,
+      "diagonalDamage": 0.26
+    }
   },
   "wave": {
     "wavesPerStage": 5,

@@ -41,15 +41,31 @@ export interface FieldBalance {
  * 加成刻意小於一階的成長（tierGrowth 1.35）——陣法是「排得好有賞」，
  * 不能大到讓「為了排陣而不敢合成」變成最佳解。
  */
+/** 一種陣式在三個方向上的加成。 */
+export interface FormationTierBalance {
+  /** 一整橫列成陣：該列的傷害加成。 */
+  rowDamage: number;
+  /** 一整直行成陣：該行的出手速度加成。 */
+  columnFireRate: number;
+  /** 對角線成陣（需要 3×3，也就是陣法擴充買滿）：傷害加成。 */
+  diagonalDamage: number;
+}
+
 export interface FormationBalance {
   /** 場上格位分幾欄。列數由格位總數推得。 */
   columns: number;
-  /** 一整橫列同種符：該列的傷害加成。 */
-  rowDamage: number;
-  /** 一整直行同種符：該行的出手速度加成。 */
-  columnFireRate: number;
-  /** 對角線同種符（需要 3×3，也就是陣法擴充買滿）：傷害加成。 */
-  diagonalDamage: number;
+  /**
+   * 同心陣：一整條線都是同一種符。
+   *
+   * 好排、而且同種本來就好合成，所以給得少——這是「順手就有」的那一條路。
+   */
+  same: FormationTierBalance;
+  /**
+   * 五行陣：一整條線每一張都不同種。
+   *
+   * 難排，而且和合成互相牽制（合成要湊同種），所以給得多。
+   */
+  distinct: FormationTierBalance;
 }
 
 /** 一波妖魔的組成與推進速度。 */

@@ -12,6 +12,11 @@ interface Section {
   lines: string[];
 }
 
+/** 陣法加成一律以百分比呈現，四捨五入到整數。 */
+function pct(ratio: number): number {
+  return Math.round(ratio * 100);
+}
+
 /**
  * 玩法說明。
  *
@@ -63,14 +68,16 @@ export class HelpScene extends Phaser.Scene {
       {
         title: '陣法：擺哪一格有差',
         lines: [
-          '一整條線上每一張符都「不同種」（階數不拘）就會成陣：',
-          `・橫陣：一整橫列不同種 → 該列傷害 +${Math.round(formation.rowDamage * 100)}%`,
-          `・縱陣：一整直行不同種 → 該行出手速度 +${Math.round(formation.columnFireRate * 100)}%`,
-          `・斜陣：對角線不同種 → 傷害 +${Math.round(formation.diagonalDamage * 100)}%`,
+          '一整條線「全部同種」或「全部不同種」就會成陣（階數不拘），',
+          '兩同一異什麼都不算——那是唯一擺錯的方式。',
+          `・同心陣（全同種）：橫 +${pct(formation.same.rowDamage)}% 傷害、`,
+          `　縱 +${pct(formation.same.columnFireRate)}% 出手、斜 +${pct(formation.same.diagonalDamage)}% 傷害`,
+          `・五行陣（全不同種）：橫 +${pct(formation.distinct.rowDamage)}% 傷害、`,
+          `　縱 +${pct(formation.distinct.columnFireRate)}% 出手、斜 +${pct(formation.distinct.diagonalDamage)}% 傷害`,
+          '同心好排、同種又好合成，所以給得少；五行難排、和合成互相牽制，所以給得多。',
           '六格的場上只有橫陣；縱陣與斜陣要把「陣法擴充」買滿成 3×3。',
           '同時落在橫陣與縱陣上的那一格，兩種加成相加。',
-          '注意：合成要湊同種、結陣要湊不同種，這兩件事是對立的。',
-          '全場鋪同一種符一條陣都成不了；要留幾格排陣，還是全拿去養合成，自己取捨。',
+          '3×3 最多能同時成八條：全場同種，或橫列各自同種、直行剛好湊齊四種中的三種。',
         ],
       },
       {

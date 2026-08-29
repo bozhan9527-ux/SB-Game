@@ -527,9 +527,10 @@ export class RunScene extends Phaser.Scene {
     }
 
     // 剛成立的那一條才報，已經成立的不重複報。
-    const keys = new Set(lines.map((line) => `${line.kind}:${line.slots.join(',')}`));
+    // 鍵含 pattern：同一條線從同心變五行是不同的陣，要重報一次。
+    const keys = new Set(lines.map((line) => `${line.kind}:${line.pattern}:${line.slots.join(',')}`));
     for (const line of lines) {
-      const key = `${line.kind}:${line.slots.join(',')}`;
+      const key = `${line.kind}:${line.pattern}:${line.slots.join(',')}`;
       if (this.formationKeys.has(key)) continue;
       this.announceFormation(line);
     }
@@ -539,11 +540,11 @@ export class RunScene extends Phaser.Scene {
   private announceFormation(line: FormationLine): void {
     const slot = line.slots[Math.floor(line.slots.length / 2)] ?? 0;
     const pos = this.slotPosition({ where: 'field', index: slot });
-    this.floatText(pos.x, pos.y - 56, `${formationName(line.kind)}成　${formationEffect(line.kind)}`, GOLD, 22);
+    this.floatText(pos.x, pos.y - 56, `${formationName(line)}成　${formationEffect(line)}`, GOLD, 22);
     audio.play('gold');
     this.showHintOnce(
       HINT_FORMATION,
-      '一整條線都是不同種的符就會成陣：橫排加傷害、直排加出手速度',
+      '一整條線全同種或全不同種都會成陣：橫排加傷害、直排加出手速度',
       260,
     );
   }
