@@ -45,6 +45,12 @@
     "leakCostBase": 1,
     "leakCostGrowth": 1.02
   },
+  "sect": {
+    "clearsPerMastery": 5,
+    "maxMasteryTier": 4,
+    "masteryDamagePerTier": 0.04,
+    "switchCostPerClear": 400
+  },
   "power": {
     "baseDisciples": 20,
     "maxDisciples": 999

@@ -153,6 +153,23 @@ export interface WaveBalance {
   leakCostGrowth: number;
 }
 
+/**
+ * 門派的長期承諾。
+ *
+ * 門派原本是「隨時可改的修飾選單」：換派完全免費、沒有任何門派專屬的長期進度，
+ * 於是它不是身分，只是一個下拉選單。這一塊給它重量——
+ * 修為只在該門派身上累積，換派要付錢，而且離開時把已經累積的加成留在原地。
+ */
+export interface SectBalance {
+  /** 每通關幾次升一階修為。 */
+  clearsPerMastery: number;
+  maxMasteryTier: number;
+  /** 每一階修為給該門派多少法寶傷害（加算後乘進 damageMultiplier）。 */
+  masteryDamagePerTier: number;
+  /** 換派費用 = 現任門派已累積的通關次數 × 這個數。沒有累積就不用錢。 */
+  switchCostPerClear: number;
+}
+
 /** 山門的耐久（弟子數）。 */
 export interface PowerBalance {
   baseDisciples: number;
@@ -198,6 +215,7 @@ export interface Balance {
   field: FieldBalance;
   formation: FormationBalance;
   wave: WaveBalance;
+  sect: SectBalance;
   power: PowerBalance;
   boss: BossBalance;
   gold: GoldBalance;
@@ -406,7 +424,8 @@ export type AchievementKind =
   | 'perfect'
   | 'clears'
   | 'gold'
-  | 'sects';
+  | 'sects'
+  | 'sectMastery';
 
 export interface Achievement {
   id: string;

@@ -4,6 +4,7 @@ import { CARDS } from '../data';
 import { GAME_WIDTH } from '../config';
 import type { CardDef } from '../data/types';
 import { persist, state } from '../state';
+import { sectById } from '../systems/loadout';
 import { realmForStage } from '../systems/realms';
 import {
   TALISMAN_SLOTS,
@@ -18,9 +19,11 @@ import { drawBackdrop } from '../ui/backdrop';
 import {
   BG_PANEL,
   BG_PANEL_ALT,
+  DANGER,
   GOLD,
   INK,
   INK_DIM,
+  JADE,
   LINE,
   hexToNumber,
   textStyle,
@@ -39,9 +42,9 @@ interface Tile {
 
 // 540×960 之下的版面。四張已選、二十張符（4 欄 × 5 列）、一塊說明、一排按鈕，
 // 每一段的高度都是算出來的——資料筆數變了就得重算，這是 PROGRESS 的 L-08。
-const CHOSEN_Y = 158;
+const CHOSEN_Y = 180;
 const CHOSEN_STEP = 96;
-const GRID_TOP = 216;
+const GRID_TOP = 222;
 const TILE_W = 120;
 const TILE_H = 80;
 const TILE_GAP = 5;
@@ -66,6 +69,7 @@ export class TalismanScene extends Phaser.Scene {
   private hint: Phaser.GameObjects.Text | null = null;
   private confirm: { setEnabled(enabled: boolean): void } | null = null;
   private focused: CardDef | null = null;
+  private sectLine: Phaser.GameObjects.Text | undefined;
 
   constructor() {
     super('Talisman');
@@ -82,12 +86,12 @@ export class TalismanScene extends Phaser.Scene {
     this.chosen = sanitizeTalismans(save.player.talismans, highest);
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 50, '符籙譜', textStyle({ size: 38, color: INK, bold: true })).setOrigin(0.5);
+    this.add.text(cx, 46, '符籙譜', textStyle({ size: 38, color: INK, bold: true })).setOrigin(0.5);
     const upcoming = nextUnlock(highest);
     this.add
       .text(
         cx,
-        84,
+        80,
         upcoming === null
           ? `二十張已全數參悟，每次帶 ${TALISMAN_SLOTS} 張入場`
           : `每次帶 ${TALISMAN_SLOTS} 張入場　推到第 ${upcoming.unlockStage} 關可得「${upcoming.name}」`,
@@ -95,6 +99,7 @@ export class TalismanScene extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
+    this.buildSectLine(cx);
     this.buildChosenSlots(cx);
     this.buildGrid(highest);
     this.buildDetail(cx);
@@ -124,10 +129,49 @@ export class TalismanScene extends Phaser.Scene {
     this.refresh();
   }
 
+  /**
+   * 門派專精那一行。
+   *
+   * 這兩個畫面原本互不知情：符籙譜從頭到尾沒提過門派，選門派也沒提過符。
+   * 於是劍修帶著不含劍陣符的牌組，被動整場歸零，畫面上一個字都沒有——
+   * **已經存在的取捨被藏起來，比沒有取捨還糟**，玩家連自己選錯了都不知道。
+   */
+  private buildSectLine(cx: number): void {
+    const save = state();
+    const sect = sectById(save.player.sectId);
+    if (sect === null) return;
+    const favored = CARDS.find((card) => card.id === sect.favoredCard);
+    if (favored === undefined) return;
+    const has = this.chosen.includes(sect.favoredCard);
+    const gain = Math.round((sect.favoredDamageMultiplier - 1) * 100);
+    this.sectLine = this.add
+      .text(cx, 104, '', textStyle({ size: 15, bold: true }))
+      .setOrigin(0.5)
+      .setData('sect', sect.name)
+      .setData('favored', favored.name)
+      .setData('gain', gain);
+    this.refreshSectLine(has);
+  }
+
+  private refreshSectLine(has: boolean): void {
+    const label = this.sectLine;
+    if (label === undefined) return;
+    const sectName = label.getData('sect') as string;
+    const favored = label.getData('favored') as string;
+    const gain = label.getData('gain') as number;
+    label
+      .setText(
+        has
+          ? `${sectName}專精 ${favored}：已帶入場，傷害 +${gain}%`
+          : `${sectName}專精 ${favored}：沒帶就吃不到那 +${gain}%`,
+      )
+      .setColor(has ? JADE : DANGER);
+  }
+
   /** 上方四格：目前帶的四張。點一下就卸下，這是最短的「換掉一張」路徑。 */
   private buildChosenSlots(cx: number): void {
     this.add
-      .text(cx, 106, '入場的四張（點一下卸下）', textStyle({ size: 15, color: GOLD }))
+      .text(cx, 128, '入場的四張（點一下卸下）', textStyle({ size: 15, color: GOLD }))
       .setOrigin(0.5);
 
     for (let i = 0; i < TALISMAN_SLOTS; i += 1) {
@@ -156,6 +200,7 @@ export class TalismanScene extends Phaser.Scene {
   private buildGrid(highest: number): void {
     const gridWidth = GRID_COLUMNS * TILE_W + (GRID_COLUMNS - 1) * TILE_GAP;
     const left = (GAME_WIDTH - gridWidth) / 2 + TILE_W / 2;
+    const favoredId = sectById(state().player.sectId)?.favoredCard ?? null;
 
     CARDS.forEach((def, index) => {
       const col = index % GRID_COLUMNS;
@@ -183,6 +228,12 @@ export class TalismanScene extends Phaser.Scene {
           textStyle({ size: 12, color: INK_DIM }),
         )
         .setOrigin(0.5);
+      // 門派專精的那一張在格子上直接掛個記號，不必回選門派畫面對照。
+      if (def.id === favoredId) {
+        this.add
+          .text(x + TILE_W / 2 - 4, y - TILE_H / 2 + 3, '專', textStyle({ size: 13, color: GOLD, bold: true }))
+          .setOrigin(1, 0);
+      }
 
       background.on('pointerup', () => this.tap(def, unlocked));
       this.tiles.push({ def, unlocked, background, glyph, name, note });
@@ -268,6 +319,10 @@ export class TalismanScene extends Phaser.Scene {
         background.setStrokeStyle(3, hexToNumber(def.color)).setFillStyle(BG_PANEL_ALT, 1);
       }
     }
+
+    this.refreshSectLine(
+      this.sectLine === undefined ? false : this.chosen.includes(sectById(state().player.sectId)?.favoredCard ?? ''),
+    );
 
     for (const tile of this.tiles) {
       const picked = this.chosen.includes(tile.def.id);

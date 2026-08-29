@@ -14,5 +14,6 @@
   { "id": "clears_25",    "name": "身經百戰", "desc": "累計通關 25 次",          "kind": "clears",   "value": 25,      "reward": 2000 },
   { "id": "clears_100",   "name": "百戰不殆", "desc": "累計通關 100 次",         "kind": "clears",   "value": 100,     "reward": 30000 },
   { "id": "gold_million", "name": "富甲一方", "desc": "累計獲得 100 萬金幣",     "kind": "gold",     "value": 1000000, "reward": 50000 },
-  { "id": "all_sects",    "name": "四道皆通", "desc": "以四個門派各通關至少一次", "kind": "sects",    "value": 4,       "reward": 20000 }
+  { "id": "all_sects",    "name": "四道皆通", "desc": "以四個門派各通關至少一次", "kind": "sects",    "value": 4,       "reward": 3000 },
+  { "id": "sect_master",  "name": "一道通神", "desc": "單一門派修為練到四階",     "kind": "sectMastery", "value": 4,    "reward": 30000 }
 ]

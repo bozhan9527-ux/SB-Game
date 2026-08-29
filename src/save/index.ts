@@ -1,7 +1,7 @@
 /**
  * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
  */
-import { UPGRADES } from '../data';
+import { SECTS, UPGRADES } from '../data';
 import { sanitizeTalismans, starterTalismans } from '../systems/talismans';
 import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
@@ -24,6 +24,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       achievements: [],
       hints: [],
       talismans: starterTalismans(),
+      sectClears: {},
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
@@ -33,6 +34,21 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
 
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * 門派修為只收「已存在的門派」的非負整數。
+ *
+ * 這份紀錄會直接換成傷害加成，所以壞值不能放行：手改成 99999 等於自己把難度調成零。
+ */
+function normalizeSectClears(raw: unknown): Record<string, number> {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const sect of SECTS) {
+    const value = Math.floor(asNumber(source[sect.id], 0));
+    if (value > 0) out[sect.id] = value;
+  }
+  return out;
 }
 
 /** 把讀進來的物件補齊成完整存檔。欄位缺漏一律以預設值補，不讓壞存檔炸掉遊戲。 */
@@ -76,6 +92,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       hints,
       // 存檔可能引用到已改名或尚未解鎖的符，一律修補成一份能直接開場的四張。
       talismans: sanitizeTalismans(savedTalismans, highestStage),
+      sectClears: normalizeSectClears(player['sectClears']),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),
@@ -162,8 +179,10 @@ export function buyUpgrade(data: SaveData, trackId: string): PurchaseResult {
 export function recordClear(data: SaveData, gold: number): void {
   addGold(data, gold);
   const sectId = data.player.sectId;
-  if (sectId !== null && !data.player.stats.clearedSects.includes(sectId)) {
-    data.player.stats.clearedSects.push(sectId);
+  if (sectId !== null) {
+    if (!data.player.stats.clearedSects.includes(sectId)) data.player.stats.clearedSects.push(sectId);
+    // 門派修為只在「用這一派通關」時長，而且只長在這一派身上。
+    data.player.sectClears[sectId] = (data.player.sectClears[sectId] ?? 0) + 1;
   }
   data.world.stage += 1;
   data.world.highestStage = Math.max(data.world.highestStage, data.world.stage);

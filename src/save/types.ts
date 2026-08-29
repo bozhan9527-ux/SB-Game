@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -50,6 +50,14 @@ export interface PlayerState {
    * 存到的 id 可能已經失效（改版、手改存檔），讀取端一律走 sanitizeTalismans 修補。
    */
   talismans: string[];
+  /**
+   * 各門派各自累積的通關次數，也就是「門派修為」的原始事實。
+   *
+   * 分派記而不是記一個總數，是這整條設計的關鍵：修為留在門派身上，
+   * 換派時不會跟著走，也不會被沒收——回來就還在。門派因此變成一個要投入的身分，
+   * 而不是一個隨時可改的修飾選單。存等級是衍生值，所以只存次數。
+   */
+  sectClears: Record<string, number>;
   stats: StatsState;
 }
 

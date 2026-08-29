@@ -63,6 +63,7 @@ const SCENERIES: readonly Scenery[] = [
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
 const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
   'stage', 'maxTier', 'kills', 'perfect', 'clears', 'gold', 'sects',
+  'sectMastery',
 ];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
@@ -82,6 +83,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const formation = obj(raw, 'formation', path);
   const wave = obj(raw, 'wave', path);
   const power = obj(raw, 'power', path);
+  const sect = obj(raw, 'sect', path);
   const boss = obj(raw, 'boss', path);
   const gold = obj(raw, 'gold', path);
   const p = (o: unknown, k: string, sub: string): number => num(o, k, `${path}.${sub}`);
@@ -127,6 +129,12 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       trackPx: p(wave, 'trackPx', 'wave'),
       leakCostBase: p(wave, 'leakCostBase', 'wave'),
       leakCostGrowth: p(wave, 'leakCostGrowth', 'wave'),
+    },
+    sect: {
+      clearsPerMastery: p(sect, 'clearsPerMastery', 'sect'),
+      maxMasteryTier: p(sect, 'maxMasteryTier', 'sect'),
+      masteryDamagePerTier: p(sect, 'masteryDamagePerTier', 'sect'),
+      switchCostPerClear: p(sect, 'switchCostPerClear', 'sect'),
     },
     power: {
       baseDisciples: p(power, 'baseDisciples', 'power'),

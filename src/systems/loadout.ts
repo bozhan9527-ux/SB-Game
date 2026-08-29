@@ -11,6 +11,7 @@
 import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect } from '../data/types';
 import type { SaveData } from '../save/types';
+import { masteryBonus, masteryTier } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
 import { amountOf } from './upgrades';
@@ -53,7 +54,8 @@ export function buildLoadout(save: SaveData, stage: number): Loadout {
   if (sect === null) throw new Error('尚未選擇門派，無法開始挑戰');
   // 帶哪四張符看的是**歷史最高關卡**而不是這一關：重打舊關卡時不該被沒收選擇。
   const talismans = talismanDefs(save.player.talismans, save.world.highestStage);
-  return buildLoadoutFor(sect, save.player.upgrades, stage, talismans);
+  const mastery = masteryBonus(masteryTier(save, sect.id));
+  return buildLoadoutFor(sect, save.player.upgrades, stage, talismans, mastery);
 }
 
 /** 百分比升級換算成倍率。 */
@@ -61,11 +63,18 @@ function multiplierOf(upgrades: Readonly<Record<string, number>>, id: string): n
   return 1 + amountOf(upgrades, id) / 100;
 }
 
+/**
+ * masteryBonus 是**門派修為**換來的法寶傷害加成（0.12 = +12%）。
+ *
+ * 它獨立成一個參數而不是從存檔裡撈：平衡模擬沒有存檔，
+ * 而「同一個門派在不同修為下有多強」正是要能單獨掃的一個維度。
+ */
 export function buildLoadoutFor(
   sect: Sect,
   upgrades: Readonly<Record<string, number>>,
   stage: number,
   talismans?: readonly CardDef[],
+  masteryBonusValue = 0,
 ): Loadout {
   const { power } = BALANCE;
   const realm = realmForStage(stage);
@@ -82,7 +91,8 @@ export function buildLoadoutFor(
         power.baseDisciples * sect.discipleMultiplier * multiplierOf(upgrades, 'startDisciples'),
       ),
     ),
-    damageMultiplier: sect.damageMultiplier * multiplierOf(upgrades, 'startAttack'),
+    damageMultiplier:
+      sect.damageMultiplier * multiplierOf(upgrades, 'startAttack') * (1 + Math.max(0, masteryBonusValue)),
     fireRateMultiplier: multiplierOf(upgrades, 'startDefense'),
     drawSpeedMultiplier: sect.drawSpeedMultiplier * multiplierOf(upgrades, 'drawSpeed'),
     bossDamageMultiplier: sect.bossDamageMultiplier,

@@ -4,9 +4,10 @@
  * 條件只看存檔裡的原始事實（最高關卡、累計通關、單場最高人數…），
  * 不存衍生值，日後要調門檻只要改 data/achievements.json。
  */
-import { ACHIEVEMENTS } from '../data';
+import { ACHIEVEMENTS, SECTS } from '../data';
 import type { Achievement } from '../data/types';
 import type { SaveData } from '../save/types';
+import { masteryTier } from './sects';
 
 function reached(save: SaveData, item: Achievement): boolean {
   const { stats } = save.player;
@@ -25,6 +26,9 @@ function reached(save: SaveData, item: Achievement): boolean {
       return stats.totalGoldEarned >= item.value;
     case 'sects':
       return stats.clearedSects.length >= item.value;
+    case 'sectMastery':
+      // 任何一派到達門檻即可。這是「專精一道」的獎勵，不是「四道都練滿」。
+      return SECTS.some((sect) => masteryTier(save, sect.id) >= item.value);
   }
 }
 
@@ -61,5 +65,9 @@ export function progressOf(save: SaveData, item: Achievement): string {
       return `${stats.totalGoldEarned} / ${item.value}`;
     case 'sects':
       return `${stats.clearedSects.length} / ${item.value} 派`;
+    case 'sectMastery': {
+      const best = SECTS.reduce((max, sect) => Math.max(max, masteryTier(save, sect.id)), 0);
+      return `最高 ${best} / ${item.value} 階`;
+    }
   }
 }

@@ -84,6 +84,22 @@ const addSpeed: Migration = (data) => {
   return { ...data, settings: { ...settings, speed: 1 } };
 };
 
+/**
+ * v7 → v8：加入門派修為（各門派各自累積的通關次數）。
+ *
+ * 舊存檔沒有逐派的紀錄，只有「曾用哪些門派通關過」這份名單。
+ * 一律以每派 1 次補上：這是名單唯一保證為真的下界，寧可少算也不憑空給修為——
+ * 修為會直接換成傷害加成，浮報等於偷偷把舊玩家的難度調低。
+ */
+const addSectClears: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const stats = (player['stats'] ?? {}) as Record<string, unknown>;
+  const cleared = Array.isArray(stats['clearedSects']) ? stats['clearedSects'] : [];
+  const sectClears: Record<string, number> = {};
+  for (const id of cleared) if (typeof id === 'string') sectClears[id] = 1;
+  return { ...data, player: { ...player, sectClears } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -92,6 +108,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addHints,
   addTalismans,
   addSpeed,
+  addSectClears,
 ];
 
 /**
