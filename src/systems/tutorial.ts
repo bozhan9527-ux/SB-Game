@@ -16,6 +16,8 @@ export const HINT_TUTORIAL = 'tutorial';
 export const HINT_HAND_FULL = 'handFull';
 /** 首領第一次出場時提醒一次。 */
 export const HINT_BOSS = 'boss';
+/** 第一次排出陣法時說明一次。 */
+export const HINT_FORMATION = 'formation';
 
 export type TutorialStep = 'deploy' | 'merge' | 'watch' | 'done';
 

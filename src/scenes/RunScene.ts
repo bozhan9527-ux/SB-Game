@@ -29,10 +29,13 @@ import {
   dropOn,
   tickCombat,
 } from '../systems/defense';
+import type { FormationLine } from '../systems/formation';
+import { activeFormations, formationEffect, formationName } from '../systems/formation';
 import { buildLoadout } from '../systems/loadout';
 import type { TutorialStep } from '../systems/tutorial';
 import {
   HINT_BOSS,
+  HINT_FORMATION,
   HINT_HAND_FULL,
   HINT_TUTORIAL,
   advanceStep,
@@ -71,7 +74,7 @@ const ARENA_RIGHT = GAME_WIDTH - 22;
 const LANE_WIDTH = (ARENA_RIGHT - ARENA_LEFT) / LANES;
 
 /** 場上陣位：三欄，往上疊列。陣法擴充買到的格位會往上長一列。 */
-const FIELD_COLUMNS = 3;
+const FIELD_COLUMNS = BALANCE.formation.columns;
 const FIELD_COL_X = [GAME_WIDTH / 2 - 100, GAME_WIDTH / 2, GAME_WIDTH / 2 + 100] as const;
 const FIELD_BOTTOM_Y = GATE_Y - 48;
 const FIELD_ROW_GAP = 96;
@@ -131,6 +134,11 @@ export class RunScene extends Phaser.Scene {
   private coachBody: Phaser.GameObjects.Text | null = null;
   private coachArrow: Phaser.GameObjects.Text | null = null;
 
+  /** 成陣時連起來的光線。陣法看不見就等於不存在。 */
+  private formationLayer!: Phaser.GameObjects.Graphics;
+  /** 上一次的成陣狀態，用來判斷「剛剛新成了一陣」。 */
+  private formationKeys = new Set<string>();
+
   constructor() {
     super('Run');
   }
@@ -169,6 +177,8 @@ export class RunScene extends Phaser.Scene {
     this.buildFieldSlots();
     this.buildHand();
     this.buildDragLayer();
+    this.formationLayer = this.add.graphics().setDepth(24);
+    this.formationKeys = new Set<string>();
     this.buildCoach();
     this.refreshCards();
     this.updateHud();
@@ -479,6 +489,55 @@ export class RunScene extends Phaser.Scene {
     this.burst(view.container.x, view.container.y, color, 12);
   }
 
+  /**
+   * 把成立中的陣法連成光線。
+   *
+   * 沒有這條線的話，陣法就是一個只會反映在「道行」數字上的隱形加成——
+   * 玩家不會知道自己剛剛做對了什麼，也就學不會下次要怎麼排。
+   */
+  private refreshFormations(): void {
+    const lines = activeFormations(this.run.field);
+    this.formationLayer.clear();
+
+    for (const line of lines) {
+      const color = hexToNumber(CARDS.find((card) => card.id === line.type)?.color ?? INK);
+      const points = line.slots.map((slot) => this.slotPosition({ where: 'field', index: slot }));
+      const first = points[0];
+      const last = points[points.length - 1];
+      if (first === undefined || last === undefined) continue;
+      // 外粗內細兩道：外面那道是光暈，裡面那道才是線本身。
+      this.formationLayer.lineStyle(10, color, 0.16);
+      this.formationLayer.lineBetween(first.x, first.y, last.x, last.y);
+      this.formationLayer.lineStyle(3, color, 0.85);
+      this.formationLayer.lineBetween(first.x, first.y, last.x, last.y);
+      for (const point of points) {
+        this.formationLayer.fillStyle(color, 0.9);
+        this.formationLayer.fillCircle(point.x, point.y, 5);
+      }
+    }
+
+    // 剛成立的那一條才報，已經成立的不重複報。
+    const keys = new Set(lines.map((line) => `${line.kind}:${line.slots.join(',')}:${line.type}`));
+    for (const line of lines) {
+      const key = `${line.kind}:${line.slots.join(',')}:${line.type}`;
+      if (this.formationKeys.has(key)) continue;
+      this.announceFormation(line);
+    }
+    this.formationKeys = keys;
+  }
+
+  private announceFormation(line: FormationLine): void {
+    const slot = line.slots[Math.floor(line.slots.length / 2)] ?? 0;
+    const pos = this.slotPosition({ where: 'field', index: slot });
+    this.floatText(pos.x, pos.y - 56, `${formationName(line.kind)}成　${formationEffect(line.kind)}`, GOLD, 22);
+    audio.play('gold');
+    this.showHintOnce(
+      HINT_FORMATION,
+      '同一種符連成一線就會成陣：橫排加傷害、直排加出手速度',
+      260,
+    );
+  }
+
   private refreshCards(): void {
     this.handViews.forEach((view, index) => {
       const card = this.run.hand[index] ?? null;
@@ -490,6 +549,7 @@ export class RunScene extends Phaser.Scene {
       const dragging = this.drag?.where === 'field' && this.drag.index === index;
       view.refresh(dragging ? null : card);
     });
+    this.refreshFormations();
   }
 
   // -------------------------------------------------------------- 主迴圈
@@ -776,6 +836,9 @@ export class RunScene extends Phaser.Scene {
 
   /** 一次性提示：看過就不再出現，免得老玩家每一關都被同一句話打斷。 */
   private showHintOnce(id: string, text: string, y: number): void {
+    // 教學進行中不插話：兩段說明疊在一起，新手一段都讀不進去。
+    // 這裡直接跳過而不是記成看過，之後再遇到同樣情況還是會提示。
+    if (this.step !== 'done') return;
     const save = state();
     if (!markHintSeen(save, id)) return;
     persist();

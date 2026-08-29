@@ -45,6 +45,7 @@ const MOB_ARTS: readonly MobArt[] = [
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const field_ = obj(raw, 'field', path);
+  const formation = obj(raw, 'formation', path);
   const wave = obj(raw, 'wave', path);
   const power = obj(raw, 'power', path);
   const boss = obj(raw, 'boss', path);
@@ -63,6 +64,12 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       drawTierBelowMax: p(field_, 'drawTierBelowMax', 'field'),
       drawTierBonusChance: p(field_, 'drawTierBonusChance', 'field'),
       drawIntervalMs: p(field_, 'drawIntervalMs', 'field'),
+    },
+    formation: {
+      columns: p(formation, 'columns', 'formation'),
+      rowDamage: p(formation, 'rowDamage', 'formation'),
+      columnFireRate: p(formation, 'columnFireRate', 'formation'),
+      diagonalDamage: p(formation, 'diagonalDamage', 'formation'),
     },
     wave: {
       wavesPerStage: p(wave, 'wavesPerStage', 'wave'),

@@ -31,6 +31,7 @@ import {
   waveCount,
   waveHp,
 } from '../src/systems/defense';
+import { activeFormations } from '../src/systems/formation';
 import { buildLoadoutFor } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
 
@@ -94,11 +95,18 @@ describe('法寶符', () => {
     );
   });
 
-  it('場上總輸出是各張符的加總', () => {
+  it('沒有成陣時，場上總輸出就是各張符的加總', () => {
     const loadout = buildLoadoutFor(sect('body'), {}, 1);
-    const field: (Card | null)[] = [{ type: 'sword', tier: 2 }, null, { type: 'fan', tier: 1 }];
+    // 六格兩列三欄，刻意排成沒有任何一條線同種。
+    const field: (Card | null)[] = [
+      { type: 'sword', tier: 2 }, null, { type: 'fan', tier: 1 },
+      null, { type: 'bolt', tier: 1 }, null,
+    ];
+    expect(activeFormations(field)).toHaveLength(0);
     expect(fieldDps(field, loadout)).toBeCloseTo(
-      cardDps({ type: 'sword', tier: 2 }, loadout) + cardDps({ type: 'fan', tier: 1 }, loadout),
+      cardDps({ type: 'sword', tier: 2 }, loadout) +
+        cardDps({ type: 'fan', tier: 1 }, loadout) +
+        cardDps({ type: 'bolt', tier: 1 }, loadout),
       6,
     );
   });

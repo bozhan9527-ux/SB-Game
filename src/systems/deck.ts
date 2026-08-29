@@ -12,6 +12,7 @@ import { BALANCE, CARDS } from '../data';
 import type { CardDef } from '../data/types';
 import type { Loadout } from './loadout';
 import type { Rng } from './rng';
+import { NO_BONUS, bonusesForField } from './formation';
 
 export interface Card {
   /** 對應 cards.json 的 id。 */
@@ -83,9 +84,20 @@ export function cardDps(card: Card, loadout: Loadout): number {
   return (cardDamage(card, loadout) * def.targets * 1000) / cardInterval(card, loadout);
 }
 
-/** 場上所有符的理論總輸出，用於 HUD 的「道行」。 */
+/**
+ * 場上所有符的理論總輸出，用於 HUD 的「道行」。
+ *
+ * 陣法加成算在裡面——玩家把一列排成同種符時，這個數字要立刻跳，
+ * 不然他不會知道剛剛那一下有沒有用。
+ */
 export function fieldDps(field: readonly (Card | null)[], loadout: Loadout): number {
+  const bonuses = bonusesForField(field);
   let total = 0;
-  for (const card of field) if (card !== null) total += cardDps(card, loadout);
+  for (let i = 0; i < field.length; i += 1) {
+    const card = field[i];
+    if (card === undefined || card === null) continue;
+    const bonus = bonuses[i] ?? NO_BONUS;
+    total += cardDps(card, loadout) * bonus.damage * bonus.fireRate;
+  }
   return total;
 }

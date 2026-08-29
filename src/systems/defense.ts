@@ -12,6 +12,7 @@ import { BALANCE, ENEMIES } from '../data';
 import type { BossArt, BossDef, MobArt } from '../data/types';
 import type { Card } from './deck';
 import { cardDamage, cardDef, cardInterval, drawCard, maxTierForStage } from './deck';
+import { NO_BONUS, bonusesForField } from './formation';
 import type { Loadout } from './loadout';
 import { realmForStage, realmIndexForStage } from './realms';
 import type { Rng } from './rng';
@@ -457,11 +458,13 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     }
   }
 
-  // 3. 法寶開火
+  // 3. 法寶開火。陣法加成每一拍重算一次——玩家隨時可能把符搬到別格。
+  const bonuses = bonusesForField(state.field);
   for (let slot = 0; slot < state.field.length; slot += 1) {
     const card = state.field[slot];
     if (card === undefined || card === null) continue;
-    const interval = cardInterval(card, state.loadout);
+    const bonus = bonuses[slot] ?? NO_BONUS;
+    const interval = cardInterval(card, state.loadout) / bonus.fireRate;
     const cooling = state.cooldowns[slot] ?? 0;
     let remaining = cooling - deltaMs;
     // 出手間隔可能比一拍還短，用 while 補齊，掉幀時輸出不會憑空消失。
@@ -475,7 +478,9 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       for (const target of frontMost(state, def.targets)) {
         if (target.hp <= 0) continue;
         const damage =
-          cardDamage(card, state.loadout) * (target.boss ? state.loadout.bossDamageMultiplier : 1);
+          cardDamage(card, state.loadout) *
+          bonus.damage *
+          (target.boss ? state.loadout.bossDamageMultiplier : 1);
         target.hp -= damage;
         report.shots.push({ slot, enemyId: target.id, damage, killed: target.hp <= 0 });
       }

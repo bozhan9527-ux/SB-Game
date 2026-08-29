@@ -11,6 +11,12 @@
     "drawTierBonusChance": 0.28,
     "drawIntervalMs": 2600
   },
+  "formation": {
+    "columns": 3,
+    "rowDamage": 0.22,
+    "columnFireRate": 0.25,
+    "diagonalDamage": 0.34
+  },
   "wave": {
     "wavesPerStage": 5,
     "waveIntervalMs": 9000,

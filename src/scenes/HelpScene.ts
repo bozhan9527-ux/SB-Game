@@ -26,7 +26,7 @@ export class HelpScene extends Phaser.Scene {
   }
 
   private sections(): Section[] {
-    const { field, wave } = BALANCE;
+    const { field, formation, wave } = BALANCE;
     const cards = CARDS.map(
       (card) =>
         `・${card.name}：一次打 ${card.targets} 個、每 ${(card.intervalMs / 1000).toFixed(2)} 秒出手一次`,
@@ -58,6 +58,17 @@ export class HelpScene extends Phaser.Scene {
           `抽到的符固定比上限低 ${field.drawTierBelowMax} 階——`,
           '要把一張符推到上限得合十六張，所以抽符速度就是成長速度。',
           '與其鋪滿一堆低階符，不如集中合同一種。',
+        ],
+      },
+      {
+        title: '陣法：擺哪一格有差',
+        lines: [
+          '同一種符（階數不必相同）連成一整條線就會成陣：',
+          `・橫陣：一整橫列同種 → 該列傷害 +${Math.round(formation.rowDamage * 100)}%`,
+          `・縱陣：一整直行同種 → 該行出手速度 +${Math.round(formation.columnFireRate * 100)}%`,
+          `・斜陣：對角線同種 → 傷害 +${Math.round(formation.diagonalDamage * 100)}%（要陣法擴充買滿成 3×3）`,
+          '同時落在橫陣與縱陣上的那一格，兩種加成相加。',
+          '合成會空出一格、把線打斷——「現在合，還是先讓這一列成陣」是每次都要做的取捨。',
         ],
       },
       {

@@ -32,6 +32,26 @@ export interface FieldBalance {
   drawIntervalMs: number;
 }
 
+/**
+ * 陣法：場上格位排成一線時的加成。
+ *
+ * 這是格子唯一的意義。沒有它的話，六個陣位彼此完全可以互換，
+ * 那個 3×N 的格子就只是個擺放位置而已，玩家沒有理由在意誰放哪裡。
+ *
+ * 加成刻意小於一階的成長（tierGrowth 1.35）——陣法是「排得好有賞」，
+ * 不能大到讓「為了排陣而不敢合成」變成最佳解。
+ */
+export interface FormationBalance {
+  /** 場上格位分幾欄。列數由格位總數推得。 */
+  columns: number;
+  /** 一整橫列同種符：該列的傷害加成。 */
+  rowDamage: number;
+  /** 一整直行同種符：該行的出手速度加成。 */
+  columnFireRate: number;
+  /** 對角線同種符（需要 3×3，也就是陣法擴充買滿）：傷害加成。 */
+  diagonalDamage: number;
+}
+
 /** 一波妖魔的組成與推進速度。 */
 export interface WaveBalance {
   wavesPerStage: number;
@@ -107,6 +127,7 @@ export interface GoldBalance {
 
 export interface Balance {
   field: FieldBalance;
+  formation: FormationBalance;
   wave: WaveBalance;
   power: PowerBalance;
   boss: BossBalance;
