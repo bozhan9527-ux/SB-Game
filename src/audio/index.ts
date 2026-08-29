@@ -8,13 +8,16 @@
  * 整個模組都是靜默的，unlock() 由 main.ts 掛的一次性事件觸發。
  */
 import {
+  BARS_PER_PHRASE,
   BASS_BEATS,
-  MELODY_BEATS,
+  BEATS_PER_BAR,
+  DRUM_BEATS,
   MELODY_CEILING,
   PENTATONIC,
   SPARKLE_CEILING,
-  octaveShift,
+  barForRealm,
   noteFrequency,
+  octaveShift,
   phraseForRealm,
   rootForRealm,
   scaleNote,
@@ -46,7 +49,6 @@ const SFX_GAIN = 0.5;
  * 配樂比玩家慢，整體就顯得沉。0.30 大約 100 BPM，跟得上手上的動作。
  */
 const BEAT_SECONDS = 0.3;
-const BEATS_PER_BAR = 8;
 
 type AudioContextCtor = new () => AudioContext;
 
@@ -69,6 +71,8 @@ class AudioEngine {
   private musicRealm: number | null = null;
   private musicTimer: ReturnType<typeof setTimeout> | null = null;
   private nextBarTime = 0;
+  /** 目前排到整段四小節裡的第幾節。 */
+  private musicBar = 0;
   private enabled = true;
 
   /** 使用者是否開著音效。關閉時不只靜音，也停掉配樂排程。 */
@@ -273,6 +277,7 @@ class AudioEngine {
 
     this.stopMusic();
     this.musicRealm = realmIndex;
+    this.musicBar = 0;
     this.nextBarTime = this.ctx.currentTime + 0.1;
     this.scheduleBar();
   }
@@ -295,34 +300,38 @@ class AudioEngine {
     if (ctx === null || realm === null || !this.enabled) return;
 
     const root = rootForRealm(realm);
-    const phrase = phraseForRealm(realm);
+    const bar = barForRealm(realm, this.musicBar % BARS_PER_PHRASE);
+    this.musicBar += 1;
     const start = Math.max(this.nextBarTime, ctx.currentTime + 0.05);
 
-    // 整段一起移到舒服的音域，而不是逐音折——逐音折會把旋律的輪廓折壞。
-    const melodyNotes = phrase.map((degree) => scaleNote(root + 12, degree));
-    const melodyShift = octaveShift(Math.max(...melodyNotes), MELODY_CEILING);
-    const sparkleNotes = phrase.map((degree) => scaleNote(root + 24, degree % PENTATONIC.length));
-    const sparkleShift = octaveShift(Math.max(...sparkleNotes), SPARKLE_CEILING);
+    // 音域用整段四小節去算，不是只看這一小節——否則四個小節會各自被移到不同的八度，
+    // 樂句就斷成四截了。
+    const allNotes = phraseForRealm(realm).map((degree) => scaleNote(root + 12, degree));
+    const melodyShift = octaveShift(Math.max(...allNotes), MELODY_CEILING);
+    const allSparkle = phraseForRealm(realm).map((degree) =>
+      scaleNote(root + 24, degree % PENTATONIC.length),
+    );
+    const sparkleShift = octaveShift(Math.max(...allSparkle), SPARKLE_CEILING);
 
     for (let beat = 0; beat < BEATS_PER_BAR; beat += 1) {
       const when = start + beat * BEAT_SECONDS;
-      const sounding = MELODY_BEATS[beat] ?? true;
+      const degree = bar.degrees[beat] ?? 0;
 
-      // 主旋律。衰減從 1.6 秒縮到 0.9：拖太長會把相鄰的音糊成一片持續音，
+      // 主旋律。衰減 0.9 秒：拖太長會把相鄰的音糊成一片持續音，
       // 聽起來像鋪底而不是旋律，快起來之後更明顯。
-      if (sounding) {
-        const frequency = noteFrequency((melodyNotes[beat] ?? 0) + melodyShift);
+      if (bar.rhythm[beat] === true) {
+        const frequency = noteFrequency(scaleNote(root + 12, degree) + melodyShift);
         this.emit(
           this.buffer(`music-${Math.round(frequency)}`, (c) => renderPluck(c, frequency, 0.9, 0.72)),
           this.musicBus,
-          { gain: beat === 0 || beat === 5 ? 0.52 : 0.36, when },
+          { gain: beat === 0 ? 0.52 : 0.36, when },
         );
       } else {
         // 休止的拍子改在半拍後點一個高八度的輕音。
         // 留白不等於空白——這一點是整段「活起來」的地方。
-        // 音級要先收進一個八度內：直接沿用旋律的音級會疊到第三個八度，
-        // 最高衝到 5kHz，那不叫明亮叫刺耳。
-        const sparkle = noteFrequency((sparkleNotes[beat] ?? 0) + sparkleShift);
+        const sparkle = noteFrequency(
+          scaleNote(root + 24, degree % PENTATONIC.length) + sparkleShift,
+        );
         this.emit(
           this.buffer(`music-hi-${Math.round(sparkle)}`, (c) => renderPluck(c, sparkle, 0.5, 0.9)),
           this.musicBus,
@@ -330,14 +339,24 @@ class AudioEngine {
         );
       }
 
-      // 低音：根音與五度交替，一小節四下，走出往前推的步伐。
+      // 低音跟著**當下的和弦**走，不是一直釘在主音上。
+      // 這是第一版最缺的一塊：沒有和聲進行，速度與節奏再怎麼調都只是原地打轉。
       const bassDegree = BASS_BEATS[beat] ?? null;
       if (bassDegree !== null) {
-        const bass = noteFrequency(scaleNote(root - 12, bassDegree));
+        const bass = noteFrequency(scaleNote(root - 12 + bar.chordRoot, bassDegree));
         this.emit(
           this.buffer(`music-bass-${Math.round(bass)}`, (c) => renderPluck(c, bass, 1.4, 0.28)),
           this.musicBus,
           { gain: beat % 4 === 0 ? 0.44 : 0.3, when },
+        );
+      }
+
+      // 鼓點：兩個正拍加一個切分。音量壓得很低，它是律動不是節拍器。
+      if (DRUM_BEATS.includes(beat)) {
+        this.emit(
+          this.buffer('music-drum', (c) => renderThud(c, 96, 44, 0.22)),
+          this.musicBus,
+          { gain: beat === 0 ? 0.3 : 0.19, when },
         );
       }
     }

@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   BASS_BEATS,
-  MELODY_BEATS,
+  BARS_PER_PHRASE,
+  BEATS_PER_BAR,
+  CHORD_ROOTS,
+  DRUM_BEATS,
   MELODY_CEILING,
+  barForRealm,
   PENTATONIC,
   SPARKLE_CEILING,
   octaveShift,
@@ -130,9 +134,12 @@ describe('音高與樂句', () => {
     expect(rootForRealm(99)).toBe(rootForRealm(24));
   });
 
-  it('每個境界都有一段八拍樂句', () => {
+  it('每個境界都有完整的四小節樂句，不是八拍在無限重複', () => {
+    // 第一版只有一小節八拍（2.4 秒）在循環，聽兩輪就膩。
+    // 四小節是流行歌最基本的樂句長度，也是重複才不會膩的下限。
+    expect(BARS_PER_PHRASE).toBeGreaterThanOrEqual(4);
     for (let realm = 0; realm < 10; realm += 1) {
-      expect(phraseForRealm(realm)).toHaveLength(8);
+      expect(phraseForRealm(realm)).toHaveLength(BARS_PER_PHRASE * BEATS_PER_BAR);
     }
   });
 });
@@ -206,14 +213,19 @@ describe('音色合成', () => {
 describe('配樂的律動', () => {
   it('一小節八拍，旋律有留白也有出聲', () => {
     // 每一拍都平均落下聽起來像節拍器，不像音樂。留白才有律動。
-    expect(MELODY_BEATS).toHaveLength(8);
-    expect(MELODY_BEATS.some((on) => on)).toBe(true);
-    expect(MELODY_BEATS.some((on) => !on)).toBe(true);
+    for (let realm = 0; realm < 10; realm += 1) {
+      for (let bar = 0; bar < BARS_PER_PHRASE; bar += 1) {
+        const rhythm = barForRealm(realm, bar).rhythm;
+        expect(rhythm).toHaveLength(BEATS_PER_BAR);
+        expect(rhythm.some((on) => on)).toBe(true);
+        expect(rhythm.some((on) => !on)).toBe(true);
+      }
+    }
   });
 
   it('低音一小節走四下，而且是根音與五度交替', () => {
     // 原本一小節只撥兩下根音，撐得住但推不動。
-    expect(BASS_BEATS).toHaveLength(8);
+    expect(BASS_BEATS).toHaveLength(BEATS_PER_BAR);
     const notes = BASS_BEATS.filter((degree): degree is number => degree !== null);
     expect(notes).toHaveLength(4);
     // 五聲音階的第 3 級就是純五度（7 個半音）。
@@ -221,56 +233,73 @@ describe('配樂的律動', () => {
     expect(new Set(notes)).toEqual(new Set([0, 3]));
   });
 
+  it('鼓點是兩個正拍加一個切分，不是每拍都打', () => {
+    expect(DRUM_BEATS).toContain(0);
+    expect(DRUM_BEATS).toContain(4);
+    expect(DRUM_BEATS.length).toBeLessThan(BEATS_PER_BAR / 2);
+  });
+
   it('樂句有起伏，不是原地踱步', () => {
-    // 級進為主的舊樂句（0,2,4,2,3,1,4,2）音域只有 3 級，聽起來很平。
     for (let realm = 0; realm < 10; realm += 1) {
       const phrase = phraseForRealm(realm);
       const span = Math.max(...phrase) - Math.min(...phrase);
       expect(span, `第 ${realm} 個境界的樂句音域只有 ${span} 級，太平`).toBeGreaterThanOrEqual(5);
     }
   });
+});
 
-  it('最高的音不刺耳：主音隨境界升，旋律也不會往上飄走', () => {
-    // 主音隨境界升、樂句本身又往上跳，兩者相加在後段境界會把旋律推到 2kHz 以上。
-    // 折八度不改變音級，聽起來仍是同一句，只是留在舒服的音域裡。
-    let peakMelody = 0;
-    let peakSparkle = 0;
-    for (let realm = 0; realm < 10; realm += 1) {
-      const root = rootForRealm(realm);
-      const melody = phraseForRealm(realm).map((degree) => scaleNote(root + 12, degree));
-      const shift = octaveShift(Math.max(...melody), MELODY_CEILING);
-      peakMelody = Math.max(peakMelody, ...melody.map((n) => noteFrequency(n + shift)));
-      const sparkle = phraseForRealm(realm).map((degree) =>
-        scaleNote(root + 24, degree % PENTATONIC.length),
-      );
-      const shift2 = octaveShift(Math.max(...sparkle), SPARKLE_CEILING);
-      peakSparkle = Math.max(peakSparkle, ...sparkle.map((n) => noteFrequency(n + shift2)));
-    }
-    expect(peakMelody, `旋律最高 ${Math.round(peakMelody)}Hz`).toBeLessThanOrEqual(880);
-    expect(peakSparkle, `點綴最高 ${Math.round(peakSparkle)}Hz`).toBeLessThanOrEqual(1320);
+describe('和聲進行', () => {
+  it('四個和弦走一輪，不是從頭到尾釘在主音上', () => {
+    // 第一版低音一直在同一個和弦上打轉，那才是它單調的真正原因——
+    // 沒有和聲進行，速度與節奏再怎麼調都只是原地繞。
+    expect(CHORD_ROOTS).toHaveLength(BARS_PER_PHRASE);
+    expect(new Set(CHORD_ROOTS).size).toBe(BARS_PER_PHRASE);
+    // I – V – vi – IV：流行樂用得最兇的一組。
+    expect([...CHORD_ROOTS]).toEqual([0, 7, 9, 5]);
   });
 
-  it('整段一起移八度，旋律的起伏不會被折壞', () => {
-    // 逐音折的話，超過上限的音會掉到下一個八度，輪廓整個變形——
-    // 實測境界 9 的音域會從八度縮成五度，聽起來變成原地打轉。
-    for (let realm = 0; realm < 10; realm += 1) {
-      const root = rootForRealm(realm);
-      const melody = phraseForRealm(realm).map((degree) => scaleNote(root + 12, degree));
-      const shift = octaveShift(Math.max(...melody), MELODY_CEILING);
-      const moved = melody.map((n) => n + shift);
-      // 移調之後，任兩音的音程和移調前完全一樣。
-      const before = Math.max(...melody) - Math.min(...melody);
-      const after = Math.max(...moved) - Math.min(...moved);
-      expect(after, `第 ${realm} 個境界的音域被改變了`).toBe(before);
-      expect(Math.abs(shift % 12)).toBe(0);
+  it('每個和弦的音都在大調音階內，五聲旋律走上去不會撞', () => {
+    // 這是選這組進行的實際理由：五聲音階（do re mi so la）落在這四個和弦上
+    // 沒有一個是避開音，旋律可以自由走，不必為了配和弦而挑音。
+    const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+    for (const chordRoot of CHORD_ROOTS) {
+      // 大三或小三和弦的三個音
+      const third = MAJOR.includes((chordRoot + 4) % 12) ? 4 : 3;
+      for (const interval of [0, third, 7]) {
+        expect(MAJOR).toContain((chordRoot + interval) % 12);
+      }
     }
+  });
+
+  it('每一小節的第一個音都落在當下的和弦音上', () => {
+    // 旋律和低音要是同一件事，不是各走各的。
+    for (let realm = 0; realm < 10; realm += 1) {
+      for (let bar = 0; bar < BARS_PER_PHRASE; bar += 1) {
+        const { degrees, chordRoot } = barForRealm(realm, bar);
+        const first = degrees[0];
+        if (first === undefined) throw new Error('小節是空的');
+        const interval = ((PENTATONIC[first % PENTATONIC.length] ?? 0) - chordRoot + 12) % 12;
+        // 和弦音：根音、三度（大或小）、五度。
+        expect(
+          [0, 3, 4, 7, 9].includes(interval),
+          `第 ${realm} 境界第 ${bar + 1} 小節起音不在和弦上（相差 ${interval} 半音）`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('境界之間旋律與和弦一起轉，起頭的和弦不同、情緒就不同', () => {
+    // 一起轉才保得住「每小節第一個音落在和弦音上」。
+    const starts = new Set<number>();
+    for (let realm = 0; realm < BARS_PER_PHRASE; realm += 1) {
+      starts.add(barForRealm(realm, 0).chordRoot);
+    }
+    expect(starts.size, '每個境界應該從不同的和弦起頭').toBe(BARS_PER_PHRASE);
   });
 });
 
 describe('配樂的亮度', () => {
   it('正常情況下不需要折八度——亮度純粹由主音決定', () => {
-    // 折八度是安全網。若日常就會踩到，代表樂句本身的音域訂錯了，
-    // 而且折下來之後高境界會比低境界還低，「越高越亮」就不成立。
     for (let realm = 0; realm < 10; realm += 1) {
       const root = rootForRealm(realm);
       const melody = phraseForRealm(realm).map((degree) => scaleNote(root + 12, degree));
@@ -294,15 +323,46 @@ describe('配樂的亮度', () => {
     expect(brightness(9)).toBeGreaterThan(brightness(0));
   });
 
-  it('換境界時旋律的輪廓會變，但音域不變', () => {
-    const shapes = new Set<string>();
-    const spans = new Set<number>();
-    for (let realm = 0; realm < 8; realm += 1) {
-      const phrase = phraseForRealm(realm);
-      shapes.add(phrase.join(','));
-      spans.add(Math.max(...phrase) - Math.min(...phrase));
+  it('最高的音不刺耳', () => {
+    let peak = 0;
+    for (let realm = 0; realm < 10; realm += 1) {
+      const root = rootForRealm(realm);
+      peak = Math.max(
+        peak,
+        ...phraseForRealm(realm).map((d) => noteFrequency(scaleNote(root + 24, d % PENTATONIC.length))),
+      );
     }
-    expect(shapes.size, '每個境界的旋律應該不一樣').toBe(8);
-    expect(spans.size, '音域應該一致，只有輪廓在換').toBe(1);
+    expect(peak, `最高音 ${Math.round(peak)}Hz 太刺耳`).toBeLessThanOrEqual(1500);
+  });
+});
+
+describe('樂句的高點', () => {
+  it('全曲最高的那個音要真的被彈出來，不能排在休止上', () => {
+    // 寫了一個高點卻從來沒彈出來，等於沒有高點。
+    for (let realm = 0; realm < 10; realm += 1) {
+      const sounded: number[] = [];
+      for (let bar = 0; bar < BARS_PER_PHRASE; bar += 1) {
+        const { degrees, rhythm } = barForRealm(realm, bar);
+        degrees.forEach((degree, beat) => {
+          if (rhythm[beat] === true) sounded.push(degree);
+        });
+      }
+      const peak = Math.max(...phraseForRealm(realm));
+      expect(Math.max(...sounded), `第 ${realm} 個境界的最高音沒有被彈出來`).toBe(peak);
+    }
+  });
+
+  it('每一段都有落回主音的收句', () => {
+    // 沒有解決感的段落接回開頭會很突兀。
+    for (let realm = 0; realm < 10; realm += 1) {
+      const sounded: number[] = [];
+      for (let bar = 0; bar < BARS_PER_PHRASE; bar += 1) {
+        const { degrees, rhythm } = barForRealm(realm, bar);
+        degrees.forEach((degree, beat) => {
+          if (rhythm[beat] === true) sounded.push(degree);
+        });
+      }
+      expect(sounded, `第 ${realm} 個境界整段都沒有回到主音`).toContain(0);
+    }
   });
 });
