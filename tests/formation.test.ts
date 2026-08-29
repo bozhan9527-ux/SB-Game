@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BALANCE } from '../src/data';
+import { BALANCE, CARDS } from '../src/data';
 import type { Card } from '../src/systems/deck';
 import { cardDps, fieldDps } from '../src/systems/deck';
 import {
@@ -133,6 +133,50 @@ describe('陣法', () => {
     const formed = field6([S(1), F(1), B(1)]);
     expect(activeFormations(plain)).toHaveLength(0);
     expect(fieldDps(formed, loadout)).toBeGreaterThan(fieldDps(plain, loadout) * 1.0);
+  });
+
+  it('3×3 最多只能同時成立七條陣，八條在數學上不可能', () => {
+    // 四個角落被六條線兩兩約束成互不相同（上下橫、左右縱、兩條斜），
+    // 因此四個角就用掉全部四種符；而中央同時在兩條斜線上，必須與四個角都不同——
+    // 沒有第五種符可用。所以只要符種只有四種，八條就永遠湊不齊。
+    // 這裡直接窮舉 4^9 種擺法把上限釘住：日後若新增第五種符，這條會失敗並提醒重算天花板。
+    const types = CARDS.map((card) => card.id);
+    expect(types.length, '符種數變了，陣法的天花板要重算').toBe(4);
+
+    let best = 0;
+    const grid: (Card | null)[] = new Array<Card | null>(9).fill(null);
+    const walk = (index: number): void => {
+      if (index === 9) {
+        best = Math.max(best, activeFormations(grid).length);
+        return;
+      }
+      for (const type of types) {
+        grid[index] = { type, tier: 1 };
+        walk(index + 1);
+      }
+    };
+    walk(0);
+    expect(best, '陣法上限變了').toBe(7);
+  });
+
+  it('排到最滿時全場的加成上限，仍在一階與兩階的成長之間', () => {
+    // 七條陣的最佳解之一（缺一條斜線）。1056 種擺法能達成，佔全部擺法的 0.4%，
+    // 而且要在合成不斷把符換掉的情況下維持住——這是技巧上限，不是隨手就有的。
+    const nine = field9([
+      S(1), F(1), B(1),
+      F(1), S(1), A(1),
+      A(1), B(1), S(1),
+    ]);
+    expect(activeFormations(nine)).toHaveLength(7);
+
+    const bonuses = bonusesForField(nine);
+    const average =
+      bonuses.reduce((sum, bonus) => sum + bonus.damage * bonus.fireRate, 0) / bonuses.length;
+    const peak = Math.max(...bonuses.map((bonus) => bonus.damage * bonus.fireRate));
+    const step = BALANCE.field.tierGrowth;
+    expect(average).toBeGreaterThan(step - 0.05);
+    expect(average).toBeLessThan(step * step);
+    expect(peak).toBeLessThan(step * step);
   });
 
   it('每種陣法都有名稱與效果說明，供畫面顯示', () => {
