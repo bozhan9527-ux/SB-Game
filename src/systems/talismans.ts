@@ -117,3 +117,71 @@ export function effectLines(def: CardDef): string[] {
 export function statLine(def: CardDef): string {
   return `一次 ${def.targets} 道　每 ${(def.intervalMs / 1000).toFixed(2)} 秒`;
 }
+
+/**
+ * 符籙的分類。
+ *
+ * 「帶哪四張」是這個遊戲裡唯一的 build 決策，而二十張符原本只能一張一張點開看說明——
+ * 記不住上一張寫什麼，就等於沒得比。分類與排序的存在理由只有一個：
+ * 讓玩家有辦法問出「哪幾張是同一類的」「哪一張最會打」，而不是靠記憶力。
+ *
+ * 分五類而不是照特效逐條分：類別要少到能一眼掃過，而且要對得上實際的取捨——
+ * 單體與多目標是溢傷的取捨，控場與增益是「自己打」與「讓別人打得更好」的取捨。
+ */
+export type TalismanCategory = 'all' | 'single' | 'multi' | 'control' | 'support';
+
+export const TALISMAN_CATEGORIES: readonly { id: TalismanCategory; name: string }[] = [
+  { id: 'all', name: '全部' },
+  { id: 'single', name: '單體' },
+  { id: 'multi', name: '多目標' },
+  { id: 'control', name: '控場' },
+  { id: 'support', name: '增益' },
+];
+
+export function matchesCategory(def: CardDef, category: TalismanCategory): boolean {
+  const e = def.effect;
+  if (category === 'all') return true;
+  if (category === 'single') return def.targets === 1;
+  if (category === 'multi') return def.targets >= 2;
+  if (category === 'control') {
+    return e.slowPercent > 0 || e.burnPercent > 0 || e.executeBelow > 0;
+  }
+  return (
+    e.auraDamage > 0 ||
+    e.auraFireRate > 0 ||
+    e.goldBonus > 0 ||
+    e.drawSpeedBonus > 0 ||
+    e.repairChance > 0 ||
+    e.formationMultiplier > 1
+  );
+}
+
+export type TalismanSort = 'unlock' | 'dps' | 'rate' | 'targets';
+
+export const TALISMAN_SORTS: readonly { id: TalismanSort; name: string }[] = [
+  { id: 'unlock', name: '解鎖順序' },
+  { id: 'dps', name: '每秒輸出' },
+  { id: 'rate', name: '出手快慢' },
+  { id: 'targets', name: '道數' },
+];
+
+/**
+ * 依某個順序排出二十張符。
+ *
+ * 排序**不改變 cards.json 的順序**，回傳的是一份新陣列——
+ * 那份順序同時是解鎖順序，動到它會讓「推到第幾關拿到什麼」整個錯位。
+ *
+ * dps 用第 1 階比較：階數成長對每一張符都是同一個倍率，
+ * 所以任何固定階數排出來的名次都一樣，而第 1 階的數字最好懂。
+ */
+export function sortTalismans(
+  defs: readonly CardDef[],
+  mode: TalismanSort,
+  dpsOf: (def: CardDef) => number,
+): CardDef[] {
+  const list = [...defs];
+  if (mode === 'unlock') return list;
+  if (mode === 'dps') return list.sort((a, b) => dpsOf(b) - dpsOf(a));
+  if (mode === 'rate') return list.sort((a, b) => a.intervalMs - b.intervalMs);
+  return list.sort((a, b) => b.targets - a.targets || dpsOf(b) - dpsOf(a));
+}

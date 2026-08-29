@@ -9,7 +9,10 @@ import { createDefenseState, tickCombat } from '../src/systems/defense';
 import { buildLoadoutFor } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
 import {
+  TALISMAN_CATEGORIES,
   TALISMAN_SLOTS,
+  matchesCategory,
+  sortTalismans,
   effectLines,
   isCompleteLoadout,
   isUnlocked,
@@ -314,5 +317,52 @@ describe('光環與陣法的疊法', () => {
       1 + rowDamage * def('grand').effect.formationMultiplier + aura,
       6,
     );
+  });
+});
+
+describe('符籙譜的分類與排序', () => {
+  it('分類把二十張分乾淨，而且「全部」真的是全部', () => {
+    expect(CARDS.every((def) => matchesCategory(def, 'all'))).toBe(true);
+    // 單體與多目標互斥且涵蓋全部：這兩類講的是溢傷的取捨，不能有漏網的。
+    for (const def of CARDS) {
+      const single = matchesCategory(def, 'single');
+      const multi = matchesCategory(def, 'multi');
+      expect(single).not.toBe(multi);
+    }
+    expect(TALISMAN_CATEGORIES.map((item) => item.id)).toContain('all');
+  });
+
+  it('控場與增益抓得到該抓的符', () => {
+    const control = CARDS.filter((def) => matchesCategory(def, 'control')).map((def) => def.id);
+    expect(control).toContain('frost');
+    expect(control).toContain('pyre');
+    expect(control).toContain('abyss');
+    const support = CARDS.filter((def) => matchesCategory(def, 'support')).map((def) => def.id);
+    expect(support).toContain('spirit');
+    expect(support).toContain('gale');
+    expect(support).toContain('grand');
+  });
+
+  it('排序不動 cards.json 本身的順序——那份順序同時是解鎖順序', () => {
+    const before = CARDS.map((def) => def.id);
+    sortTalismans(CARDS, 'dps', (def) => def.damage);
+    expect(CARDS.map((def) => def.id)).toEqual(before);
+    expect(sortTalismans(CARDS, 'unlock', () => 0).map((def) => def.id)).toEqual(before);
+  });
+
+  it('每一種排序都真的照那個鍵排', () => {
+    const dpsOf = (def: CardDef): number => (def.damage * def.targets * 1000) / def.intervalMs;
+    const byDps = sortTalismans(CARDS, 'dps', dpsOf);
+    for (let i = 1; i < byDps.length; i += 1) {
+      expect(dpsOf(byDps[i - 1] as CardDef)).toBeGreaterThanOrEqual(dpsOf(byDps[i] as CardDef));
+    }
+    const byRate = sortTalismans(CARDS, 'rate', dpsOf);
+    for (let i = 1; i < byRate.length; i += 1) {
+      expect((byRate[i - 1] as CardDef).intervalMs).toBeLessThanOrEqual((byRate[i] as CardDef).intervalMs);
+    }
+    const byTargets = sortTalismans(CARDS, 'targets', dpsOf);
+    for (let i = 1; i < byTargets.length; i += 1) {
+      expect((byTargets[i - 1] as CardDef).targets).toBeGreaterThanOrEqual((byTargets[i] as CardDef).targets);
+    }
   });
 });
