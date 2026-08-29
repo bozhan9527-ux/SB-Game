@@ -27,8 +27,10 @@ function pct(ratio: number): number {
 /**
  * 玩法說明。
  *
- * 新手教學教的是「怎麼動手」，這一頁補的是「為什麼這樣動手」——
- * 帶哪四張符、階數上限怎麼長、陣法怎麼成、耐久怎麼掉。教學只跑一次，這一頁隨時查得到。
+ * **這一頁是查閱用的，不是教學。** 教學拆成十課綁在關卡上講（見 data/lessons.json）——
+ * 一次攤開八個章節，新手一條都讀不進去，實測玩家的原話是「文字那麼多沒有人會看」。
+ * 兩者分工：課程負責「在用得到的當下教會一條」，這一頁負責「想查的時候查得到全部」。
+ * 教學和參考資料不該用同一份文件兼任，兼任的結果是對新手太長、對老手又不夠精確。
  *
  * 內容裡的數字一律從 data/*.json 讀，不另外抄一份：抄一份就一定會和實際數值走散。
  */
@@ -147,7 +149,7 @@ export class HelpScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     this.add.text(cx, 46, '玩法說明', textStyle({ size: 40, color: INK, bold: true })).setOrigin(0.5);
     this.add
-      .text(cx, 92, '拖符布陣，合成升階，鎮守山門', textStyle({ size: 18, color: INK_DIM }))
+      .text(cx, 92, '完整規則，隨時查閱（教學會在用得到的那一關自己出現）', textStyle({ size: 16, color: INK_DIM }))
       .setOrigin(0.5);
 
     const viewTop = 122;

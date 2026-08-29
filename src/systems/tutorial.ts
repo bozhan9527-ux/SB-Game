@@ -7,6 +7,8 @@
  * 隨機起手有可能三張都合不起來，那第二步「合成」就卡死了；
  * 教學只有一次機會，不能靠運氣。這組固定牌保證第一步放得下、第二步合得起來。
  */
+import { LESSONS } from '../data';
+import type { LessonDef } from '../data/types';
 import type { Card } from './deck';
 import type { SaveData } from '../save/types';
 
@@ -65,6 +67,36 @@ export function tutorialHand(slots: number, type: string): (Card | null)[] {
   const hand = new Array<Card | null>(Math.max(3, slots)).fill(null);
   for (let i = 0; i < 3; i += 1) hand[i] = { type, tier: 1 };
   return hand.slice(0, Math.max(3, slots));
+}
+
+/** 課程也走 hints 那套「看過就不再出現」，但加前綴避免和提示的 id 撞到。 */
+export function lessonHintId(lesson: LessonDef): string {
+  return `lesson:${lesson.id}`;
+}
+
+/**
+ * 這一場該上哪一課；沒有就回 null。
+ *
+ * **一場只上一課，而且照順序補。** 玩家可能一口氣連過好幾關（或是舊存檔直接跳到深處），
+ * 若「所有到期的課」一次全倒出來，就又變回一堵沒有人會看的文字牆——
+ * 那正是這套東西要取代的東西。所以永遠只回傳最早的那一條沒看過的。
+ */
+export function lessonForStage(save: SaveData, stage: number): LessonDef | null {
+  for (const lesson of LESSONS) {
+    if (lesson.stage > stage) break;
+    if (hasSeenHint(save, lessonHintId(lesson))) continue;
+    // 對應的觸發式提示已經講過了，就不再上這一課。
+    if (lesson.hint.length > 0 && hasSeenHint(save, lesson.hint)) continue;
+    return lesson;
+  }
+  return null;
+}
+
+/** 上完一課：把課程本身與它取代的那一則提示一起記成看過。回傳 true 代表需要存檔。 */
+export function markLessonSeen(save: SaveData, lesson: LessonDef): boolean {
+  let changed = markHintSeen(save, lessonHintId(lesson));
+  if (lesson.hint.length > 0 && markHintSeen(save, lesson.hint)) changed = true;
+  return changed;
 }
 
 export function hasSeenHint(save: SaveData, id: string): boolean {

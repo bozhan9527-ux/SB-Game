@@ -40,6 +40,8 @@ import {
   HINT_GATE_SIEGE,
   HINT_HAND_FULL,
   HINT_TUTORIAL,
+  lessonForStage,
+  markLessonSeen,
   advanceStep,
   markHintSeen,
   shouldRunTutorial,
@@ -1096,19 +1098,50 @@ export class RunScene extends Phaser.Scene {
       .text(GAME_WIDTH / 2, 434, realm.subtitle, textStyle({ size: 20, color: INK_DIM }))
       .setOrigin(0.5)
       .setDepth(80);
-    const hint = this.add
-      .text(GAME_WIDTH / 2, 492, '把符拖到陣位；同種同階疊起來可以合成', textStyle({ size: 20, color: INK }))
-      .setOrigin(0.5)
-      .setDepth(80);
+    // 開場這一格本來就會停一下讓玩家看境界名，把「這一關該學的那一條」掛在同一個位置：
+    // 規則在它第一次派上用場的當下講，比塞在一頁說明裡有效得多。
+    const lesson = this.step === 'done' ? lessonForStage(state(), this.run.stage) : null;
+    const parts: Phaser.GameObjects.GameObject[] = [title, sub];
+    let hold = 1100;
+
+    if (lesson === null) {
+      parts.push(
+        this.add
+          .text(GAME_WIDTH / 2, 492, '把符拖到陣位；同種同階疊起來可以合成', textStyle({ size: 20, color: INK }))
+          .setOrigin(0.5)
+          .setDepth(80),
+      );
+    } else {
+      const panel = this.add
+        .rectangle(GAME_WIDTH / 2, 528, GAME_WIDTH - 60, 132, BG_PANEL, 0.95)
+        .setStrokeStyle(2, hexToNumber(GOLD))
+        .setDepth(80);
+      const heading = this.add
+        .text(GAME_WIDTH / 2, 486, lesson.title, textStyle({ size: 24, color: GOLD, bold: true }))
+        .setOrigin(0.5)
+        .setDepth(81);
+      const body = this.add
+        .text(GAME_WIDTH / 2, 546, lesson.body, textStyle({ size: 18, color: INK }))
+        .setOrigin(0.5)
+        .setLineSpacing(8)
+        .setAlign('center')
+        .setDepth(81);
+      parts.push(panel, heading, body);
+      // 一課只上一次，開場就記起來——玩家中途退出也不該再被教一遍。
+      const save = state();
+      if (markLessonSeen(save, lesson)) persist();
+      // 兩行字要讀得完，停久一點。境界名那一段本來只停 1.1 秒，對一句話來說太短。
+      hold = 3400;
+      audio.play('ui');
+    }
+
     this.tweens.add({
-      targets: [title, sub, hint],
+      targets: parts,
       alpha: 0,
-      delay: 1100,
+      delay: hold,
       duration: 600,
       onComplete: () => {
-        title.destroy();
-        sub.destroy();
-        hint.destroy();
+        for (const part of parts) part.destroy();
       },
     });
   }

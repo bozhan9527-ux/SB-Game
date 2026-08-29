@@ -57,6 +57,12 @@ export function optNum(source: unknown, key: string, path: string, fallback: num
   return num(source, key, path);
 }
 
+export function optStr(source: unknown, key: string, path: string, fallback: string): string {
+  const value = asRecord(source, path)[key];
+  if (value === undefined) return fallback;
+  return str(source, key, path);
+}
+
 export function optBool(source: unknown, key: string, path: string, fallback: boolean): boolean {
   const value = asRecord(source, path)[key];
   if (value === undefined) return fallback;

@@ -11,6 +11,7 @@ import cardsJson from '../../data/cards.json';
 import upgradesJson from '../../data/upgrades.json';
 import enemiesJson from '../../data/enemies.json';
 import achievementsJson from '../../data/achievements.json';
+import lessonsJson from '../../data/lessons.json';
 
 import type {
   Achievement,
@@ -25,6 +26,7 @@ import type {
   MobArt,
   EnemyBook,
   MobDef,
+  LessonDef,
   Realm,
   Sect,
   SectArt,
@@ -40,6 +42,7 @@ import {
   oneOf,
   optBool,
   optNum,
+  optStr,
   str,
   DataError,
 } from './validate';
@@ -344,7 +347,31 @@ export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
 export const BALANCE: Balance = parseBalance(balanceJson);
 export const REALMS: readonly Realm[] = parseRealms(realmsJson);
 export const SECTS: readonly Sect[] = parseSects(sectsJson);
+export function parseLessons(raw: unknown, path = 'lessons.json'): LessonDef[] {
+  const lessons = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    stage: num(item, 'stage', p),
+    title: str(item, 'title', p),
+    body: str(item, 'body', p),
+    hint: optStr(item, 'hint', p, ''),
+  }));
+  assertUniqueIds(lessons, path);
+  let previous = 0;
+  for (const lesson of lessons) {
+    if (lesson.stage < 1) throw new DataError(path, `${lesson.id} 的 stage 至少為 1`);
+    // 依關卡遞增排列，才能「一場只上一課、而且照順序上」。
+    if (lesson.stage < previous) throw new DataError(path, `${lesson.id} 的 stage 沒有照關卡遞增`);
+    previous = lesson.stage;
+    // 兩行是硬性上限：這一頁的存在理由就是不讓文字多到沒人看。
+    if (lesson.body.split('\n').length > 2) {
+      throw new DataError(path, `${lesson.id} 的 body 超過兩行`);
+    }
+  }
+  return lessons;
+}
+
 export const CARDS: readonly CardDef[] = parseCards(cardsJson);
+export const LESSONS: readonly LessonDef[] = parseLessons(lessonsJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);
 export const ENEMIES: EnemyBook = parseEnemies(enemiesJson);
 export const ACHIEVEMENTS: readonly Achievement[] = parseAchievements(achievementsJson);
