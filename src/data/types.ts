@@ -89,8 +89,6 @@ export interface WaveBalance {
    * 代價跟著關卡長，這條線才只是「多一點容錯」而不是免死金牌。
    */
   leakCostGrowth: number;
-  /** 首領攻進山門的代價是一般妖魔的幾倍。 */
-  bossLeakMultiplier: number;
 }
 
 /** 山門的耐久（弟子數）。 */
@@ -103,8 +101,17 @@ export interface PowerBalance {
 export interface BossBalance {
   hpBase: number;
   hpGrowth: number;
-  /** 首領推進得慢，但撞進山門的代價高。 */
+  /** 首領推進得慢，但走到山門之後不會離開。 */
   speed: number;
+  /**
+   * 首領撞門一次的代價，是一般妖魔漏怪的幾倍。
+   *
+   * 首領走到山門不是「漏掉一隻」就結束——牠會停在那裡持續砸門，
+   * 直到被打死或山門破。這是「沒打死首領就不算通關」的結構性保證：
+   * 首領永遠不會自己離開場上，關卡也就不可能在牠還活著時判定通關。
+   */
+  gateHitMultiplier: number;
+  gateHitIntervalMs: number;
   timeLimitMs: number;
   /** 斬殺首領額外給幾倍的擊殺金幣。 */
   goldBonus: number;

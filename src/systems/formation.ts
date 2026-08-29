@@ -6,9 +6,15 @@
  * 為什麼需要它：沒有陣法的話，六個陣位彼此完全可以互換——那個格子只是「放東西的地方」，
  * 玩家沒有任何理由在意哪一張放哪一格，畫面上的網格等於在說謊。
  *
- * 為什麼是「同種符」而不是「同階」：同階的兩張本來就該合成，
- * 用同階當條件等於在懲罰合成；用同種當條件才會形成真正的取捨——
- * 合成會空出一格、把線打斷，所以「現在合，還是先讓這一列成陣」是每次都要做的決定。
+ * 為什麼條件是「一整條線都**不同種**」：
+ *
+ * 第一版寫成「同種連線」，結果全場鋪同一種符會同時吃到三橫、三縱、兩斜共八條陣，
+ * 而同種本來就最好合成——湊同色是純上位解，完全沒有取捨可言。
+ *
+ * 反過來要求「線上每一張都不同種」之後，兩件事直接對立：
+ * **合成需要湊同種，結陣需要湊不同種**。全場同色的陣法數是零。
+ * 玩家因此得決定哪幾格拿來排陣、哪幾格（與手牌）拿來養合成，這才是真的取捨。
+ * 設定上也說得通：陣法本就要五行俱全，清一色成不了陣。
  */
 import { BALANCE } from '../data';
 import type { Card } from './deck';
@@ -19,8 +25,6 @@ export interface FormationLine {
   kind: FormationKind;
   /** 構成這一條線的陣位索引。 */
   slots: number[];
-  /** 這一條線是哪一種符。 */
-  type: string;
 }
 
 export interface FormationBonus {
@@ -54,15 +58,16 @@ export function formationEffect(kind: FormationKind): string {
   return `傷害 +${Math.round(formation.diagonalDamage * 100)}%`;
 }
 
-/** 一整條線都放了符、而且是同一種符，才算成陣。 */
-function lineIsFormed(field: readonly (Card | null)[], slots: readonly number[]): string | null {
-  const first = field[slots[0] ?? -1];
-  if (first === undefined || first === null) return null;
+/** 一整條線都放了符、而且彼此都不同種，才算成陣。 */
+function lineIsFormed(field: readonly (Card | null)[], slots: readonly number[]): boolean {
+  const seen = new Set<string>();
   for (const slot of slots) {
     const card = field[slot];
-    if (card === undefined || card === null || card.type !== first.type) return null;
+    if (card === undefined || card === null) return false;
+    if (seen.has(card.type)) return false;
+    seen.add(card.type);
   }
-  return first.type;
+  return true;
 }
 
 /**
@@ -76,11 +81,11 @@ export function activeFormations(field: readonly (Card | null)[]): FormationLine
   const found: FormationLine[] = [];
 
   const push = (kind: FormationKind, slots: number[]): void => {
-    // 一格不成線；格位數不是欄數的整數倍時，最後一列會缺格，那一列也不成陣。
-    if (slots.length < 2) return;
+    // 一條線一律要滿 columns 格才算數：兩格的「不同種」太容易湊到，等於白送。
+    // 因此六格的場上只有兩條橫陣，要有縱陣與斜陣得先把陣法擴充買起來。
+    if (slots.length !== columns) return;
     if (slots.some((slot) => slot >= field.length)) return;
-    const type = lineIsFormed(field, slots);
-    if (type !== null) found.push({ kind, slots, type });
+    if (lineIsFormed(field, slots)) found.push({ kind, slots });
   };
 
   for (let row = 0; row < rows; row += 1) {
@@ -100,29 +105,29 @@ export function activeFormations(field: readonly (Card | null)[]): FormationLine
  * 單一陣位吃到的加成。同時落在橫陣與縱陣上時兩者相加（十字），這是排陣的最高獎勵。
  */
 export function bonusForSlot(field: readonly (Card | null)[], slot: number): FormationBonus {
-  const { formation } = BALANCE;
-  let damage = 1;
-  let fireRate = 1;
-  for (const line of activeFormations(field)) {
-    if (!line.slots.includes(slot)) continue;
-    if (line.kind === 'row') damage += formation.rowDamage;
-    else if (line.kind === 'column') fireRate += formation.columnFireRate;
-    else damage += formation.diagonalDamage;
-  }
-  return { damage, fireRate };
+  return bonusesForField(field)[slot] ?? { damage: 1, fireRate: 1 };
 }
 
-/** 一次算完整個場上的加成，讓每一拍只走一次 activeFormations。 */
+/**
+ * 一次算完整個場上的加成，讓每一拍只走一次 activeFormations。
+ *
+ * 每一格至多各吃一次橫、縱、斜。橫與縱本來就不會重複，但正中央那一格同時在兩條斜線上，
+ * 不去重的話它會拿到雙倍斜陣加成——單一格位的上限必須是可預期的。
+ */
 export function bonusesForField(field: readonly (Card | null)[]): FormationBonus[] {
   const { formation } = BALANCE;
   const bonuses: FormationBonus[] = field.map(() => ({ damage: 1, fireRate: 1 }));
+  const diagonalCounted = new Set<number>();
   for (const line of activeFormations(field)) {
     for (const slot of line.slots) {
       const bonus = bonuses[slot];
       if (bonus === undefined) continue;
       if (line.kind === 'row') bonus.damage += formation.rowDamage;
       else if (line.kind === 'column') bonus.fireRate += formation.columnFireRate;
-      else bonus.damage += formation.diagonalDamage;
+      else if (!diagonalCounted.has(slot)) {
+        diagonalCounted.add(slot);
+        bonus.damage += formation.diagonalDamage;
+      }
     }
   }
   return bonuses;

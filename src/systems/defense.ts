@@ -65,6 +65,18 @@ export interface DefenseState {
   elapsedMs: number;
   /** 首領出場的時間點，用於時限判定；還沒出場為 null。 */
   bossSpawnedAtMs: number | null;
+  /** 首領是否已經抵達山門，開始砸門。 */
+  bossAtGate: boolean;
+  /** 首領砸門的計時器。 */
+  bossGateAccum: number;
+  /**
+   * 首領是否已被斬殺。
+   *
+   * 通關的必要條件。沒有這個旗標的話，只要場上清空就算過關——
+   * 而首領走到山門「漏掉」之後也會離開場上，於是沒打死首領照樣判定通關。
+   * 那是實際發生過的 bug：81 關裡有 10–20 關是這樣過的。
+   */
+  bossKilled: boolean;
   leaks: number;
   leakImmunityUsed: number;
   kills: number;
@@ -91,6 +103,8 @@ export interface LeakEvent {
   loss: number;
   /** 體修被動擋下時為 true，此時 loss 為 0。 */
   immune: boolean;
+  /** 首領砸門（牠不會離開，會一直砸到死或山門破）。 */
+  boss: boolean;
 }
 
 export interface TickReport {
@@ -141,12 +155,12 @@ export function mobSpeed(stage: number): number {
 
 /** 一隻妖魔攻進山門的代價。隨關卡成長，讓「堆耐久」不會變成唯一解。 */
 export function leakCost(stage: number, boss: boolean): number {
-  const { wave } = BALANCE;
+  const { wave, boss: bossCfg } = BALANCE;
   const base = Math.max(
     1,
     Math.round(wave.leakCostBase * Math.pow(wave.leakCostGrowth, stage - 1)),
   );
-  return boss ? base * wave.bossLeakMultiplier : base;
+  return boss ? base * bossCfg.gateHitMultiplier : base;
 }
 
 export function bossHp(stage: number): number {
@@ -253,6 +267,9 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     drawTimer: field.drawIntervalMs / loadout.drawSpeedMultiplier,
     elapsedMs: 0,
     bossSpawnedAtMs: null,
+    bossAtGate: false,
+    bossGateAccum: 0,
+    bossKilled: false,
     leaks: 0,
     leakImmunityUsed: 0,
     kills: 0,
@@ -498,16 +515,26 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     const gold = killGold(state, enemy.boss);
     state.gold += gold;
     state.kills += 1;
+    if (enemy.boss) state.bossKilled = true;
     report.kills.push({ enemyId: enemy.id, boss: enemy.boss, gold });
   }
   state.enemies = survivors;
 
-  // 5. 推進與漏怪
+  // 5. 推進、砸門與漏怪
   const step = deltaMs / 1000;
   const stillOnTrack: ActiveEnemy[] = [];
+  state.bossAtGate = false;
   for (const enemy of state.enemies) {
     enemy.y += enemy.speed * step;
     if (enemy.y < waveCfg.trackPx) {
+      stillOnTrack.push(enemy);
+      continue;
+    }
+    // 首領走到山門不會離開，牠停在門口一直砸，直到被打死或山門破。
+    // 這就是「沒打死首領就不算通關」的結構性保證。
+    if (enemy.boss) {
+      enemy.y = waveCfg.trackPx;
+      state.bossAtGate = true;
       stillOnTrack.push(enemy);
       continue;
     }
@@ -515,19 +542,36 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     // 體修：每關前幾次漏怪由門人硬擋，山門不掉耐久。
     if (state.leakImmunityUsed < state.loadout.sect.leakImmunityCount) {
       state.leakImmunityUsed += 1;
-      report.leaks.push({ enemyId: enemy.id, loss: 0, immune: true });
+      report.leaks.push({ enemyId: enemy.id, loss: 0, immune: true, boss: false });
       continue;
     }
     const loss = leakCost(state.stage, enemy.boss);
     state.disciples = Math.max(0, state.disciples - loss);
-    report.leaks.push({ enemyId: enemy.id, loss, immune: false });
+    report.leaks.push({ enemyId: enemy.id, loss, immune: false, boss: false });
   }
   state.enemies = stillOnTrack;
+
+  // 5b. 首領砸門：以毫秒累積，掉幀時節奏不變。
+  if (state.bossAtGate) {
+    state.bossGateAccum += deltaMs;
+    const boss = state.enemies.find((enemy) => enemy.boss);
+    while (state.bossGateAccum >= BALANCE.boss.gateHitIntervalMs && boss !== undefined) {
+      state.bossGateAccum -= BALANCE.boss.gateHitIntervalMs;
+      state.leaks += 1;
+      const loss = leakCost(state.stage, true);
+      state.disciples = Math.max(0, state.disciples - loss);
+      report.leaks.push({ enemyId: boss.id, loss, immune: false, boss: true });
+    }
+  } else {
+    state.bossGateAccum = 0;
+  }
 
   // 6. 勝負
   if (state.disciples <= 0) {
     state.outcome = 'defeated';
-  } else if (state.queue.length === 0 && state.enemies.length === 0) {
+  } else if (state.queue.length === 0 && state.enemies.length === 0 && state.bossKilled) {
+    // 首領沒死就不算通關。首領不會自己離開場上，所以這個條件在實作上也是必然的，
+    // 但仍然明寫出來——這是規則，不是副作用。
     state.outcome = 'cleared';
   } else if (
     state.bossSpawnedAtMs !== null &&

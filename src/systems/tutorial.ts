@@ -18,6 +18,8 @@ export const HINT_HAND_FULL = 'handFull';
 export const HINT_BOSS = 'boss';
 /** 第一次排出陣法時說明一次。 */
 export const HINT_FORMATION = 'formation';
+/** 首領第一次砸門時說明一次。 */
+export const HINT_GATE_SIEGE = 'gateSiege';
 
 export type TutorialStep = 'deploy' | 'merge' | 'watch' | 'done';
 

@@ -209,10 +209,41 @@ describe('山門防守', () => {
     expect(discardHand(state, 0)).toBe(false);
   });
 
-  it('漏怪代價隨關卡成長，首領踏進山門更貴', () => {
+  it('漏怪代價隨關卡成長，首領砸門更貴', () => {
     expect(leakCost(1, false)).toBeGreaterThanOrEqual(1);
     expect(leakCost(60, false)).toBeGreaterThan(leakCost(1, false));
-    expect(leakCost(1, true)).toBe(leakCost(1, false) * BALANCE.wave.bossLeakMultiplier);
+    expect(leakCost(1, true)).toBe(leakCost(1, false) * BALANCE.boss.gateHitMultiplier);
+  });
+
+  it('首領走到山門不會離開，會停在門口一直砸', () => {
+    const state = stateFor('sword', 1, 21);
+    const rng = createRng(21);
+    state.queue = [];
+    state.enemies = [{
+      id: 1, name: '首領', art: 'demon' as const, bossArt: 'beast' as const, boss: true,
+      hp: 1e9, maxHp: 1e9, y: BALANCE.wave.trackPx, lane: 2, speed: BALANCE.boss.speed,
+    }];
+    const before = state.disciples;
+
+    // 砸門的間隔一到就扣耐久，而且首領還在場上。
+    const report = tickCombat(state, BALANCE.boss.gateHitIntervalMs, rng);
+    expect(report.leaks.some((leak) => leak.boss)).toBe(true);
+    expect(state.disciples).toBe(before - leakCost(state.stage, true));
+    expect(state.enemies).toHaveLength(1);
+    expect(state.outcome).toBe('running');
+  });
+
+  it('首領沒死就不算通關——場上清空也一樣', () => {
+    const state = stateFor('body', 1, 22);
+    state.queue = [];
+    state.enemies = [];
+    state.bossKilled = false;
+    tickCombat(state, 100, createRng(22));
+    expect(state.outcome).toBe('running');
+
+    state.bossKilled = true;
+    tickCombat(state, 100, createRng(22));
+    expect(state.outcome).toBe('cleared');
   });
 
   it('一波比一波多、一關比一關硬', () => {
@@ -308,6 +339,7 @@ describe('山門防守', () => {
     const rng = createRng(11);
     state.queue = [];
     state.enemies = [];
+    state.bossKilled = true;
     tickCombat(state, 100, rng);
     expect(state.outcome).toBe('cleared');
 

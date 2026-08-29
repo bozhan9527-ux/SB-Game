@@ -89,7 +89,6 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       trackPx: p(wave, 'trackPx', 'wave'),
       leakCostBase: p(wave, 'leakCostBase', 'wave'),
       leakCostGrowth: p(wave, 'leakCostGrowth', 'wave'),
-      bossLeakMultiplier: p(wave, 'bossLeakMultiplier', 'wave'),
     },
     power: {
       baseDisciples: p(power, 'baseDisciples', 'power'),
@@ -99,6 +98,8 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       hpBase: p(boss, 'hpBase', 'boss'),
       hpGrowth: p(boss, 'hpGrowth', 'boss'),
       speed: p(boss, 'speed', 'boss'),
+      gateHitMultiplier: p(boss, 'gateHitMultiplier', 'boss'),
+      gateHitIntervalMs: p(boss, 'gateHitIntervalMs', 'boss'),
       timeLimitMs: p(boss, 'timeLimitMs', 'boss'),
       goldBonus: p(boss, 'goldBonus', 'boss'),
     },

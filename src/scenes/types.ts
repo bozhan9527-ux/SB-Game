@@ -15,6 +15,10 @@ export interface RunResultData {
   peakTier: number;
   /** 本場合成次數。 */
   merges: number;
+  /** 關底首領是否被斬殺。沒斬掉就不算通關。 */
+  bossKilled: boolean;
+  /** 是否已經打到首領（首領出過場）。 */
+  bossFought: boolean;
   /** 關卡途中拾取的金幣。 */
   goldCollected: number;
   /** 通關／失敗獎勵金幣。 */

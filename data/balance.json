@@ -13,9 +13,9 @@
   },
   "formation": {
     "columns": 3,
-    "rowDamage": 0.22,
-    "columnFireRate": 0.25,
-    "diagonalDamage": 0.34
+    "rowDamage": 0.18,
+    "columnFireRate": 0.18,
+    "diagonalDamage": 0.25
   },
   "wave": {
     "wavesPerStage": 5,
@@ -26,25 +26,26 @@
     "countPerWave": 1.5,
     "countPerRealm": 1,
     "countMax": 22,
-    "hpBase": 120,
-    "hpGrowth": 1.15,
+    "hpBase": 200,
+    "hpGrowth": 1.148,
     "hpPerWave": 0.3,
     "speedBase": 46,
     "speedPerStage": 0.5,
     "speedMax": 105,
     "trackPx": 620,
     "leakCostBase": 1,
-    "leakCostGrowth": 1.02,
-    "bossLeakMultiplier": 6
+    "leakCostGrowth": 1.02
   },
   "power": {
     "baseDisciples": 20,
     "maxDisciples": 999
   },
   "boss": {
-    "hpBase": 7000,
-    "hpGrowth": 1.15,
-    "speed": 22,
+    "hpBase": 3000,
+    "hpGrowth": 1.148,
+    "speed": 30,
+    "gateHitMultiplier": 3,
+    "gateHitIntervalMs": 1800,
     "timeLimitMs": 60000,
     "goldBonus": 2
   },

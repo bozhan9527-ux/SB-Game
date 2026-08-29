@@ -36,6 +36,7 @@ import type { TutorialStep } from '../systems/tutorial';
 import {
   HINT_BOSS,
   HINT_FORMATION,
+  HINT_GATE_SIEGE,
   HINT_HAND_FULL,
   HINT_TUTORIAL,
   advanceStep,
@@ -110,6 +111,8 @@ export class RunScene extends Phaser.Scene {
 
   private drag: DragSource | null = null;
   private lastDrawWarnAt = -9999;
+  private lastSiegeWarnAt = -9999;
+  private siegeText!: Phaser.GameObjects.Text;
   private dragView!: CardView;
   private fieldHighlights: Phaser.GameObjects.Rectangle[] = [];
   private handHighlights: Phaser.GameObjects.Rectangle[] = [];
@@ -254,6 +257,12 @@ export class RunScene extends Phaser.Scene {
       .text(GAME_WIDTH / 2, 812, '手牌已滿，符流失了', textStyle({ size: 17, color: DANGER, bold: true }))
       .setOrigin(0.5)
       .setDepth(44)
+      .setAlpha(0);
+    this.siegeText = this.add
+      .text(GAME_WIDTH / 2, GATE_Y - 62, '首領正在砸門！', textStyle({ size: 26, color: DANGER, bold: true }))
+      .setOrigin(0.5)
+      .setStroke('#0b0f14', 7)
+      .setDepth(46)
       .setAlpha(0);
   }
 
@@ -500,7 +509,8 @@ export class RunScene extends Phaser.Scene {
     this.formationLayer.clear();
 
     for (const line of lines) {
-      const color = hexToNumber(CARDS.find((card) => card.id === line.type)?.color ?? INK);
+      // 陣法是一整條線的事、線上每張符都不同種，因此用中性的金色，不取任一張符的顏色。
+      const color = hexToNumber(GOLD);
       const points = line.slots.map((slot) => this.slotPosition({ where: 'field', index: slot }));
       const first = points[0];
       const last = points[points.length - 1];
@@ -517,9 +527,9 @@ export class RunScene extends Phaser.Scene {
     }
 
     // 剛成立的那一條才報，已經成立的不重複報。
-    const keys = new Set(lines.map((line) => `${line.kind}:${line.slots.join(',')}:${line.type}`));
+    const keys = new Set(lines.map((line) => `${line.kind}:${line.slots.join(',')}`));
     for (const line of lines) {
-      const key = `${line.kind}:${line.slots.join(',')}:${line.type}`;
+      const key = `${line.kind}:${line.slots.join(',')}`;
       if (this.formationKeys.has(key)) continue;
       this.announceFormation(line);
     }
@@ -533,7 +543,7 @@ export class RunScene extends Phaser.Scene {
     audio.play('gold');
     this.showHintOnce(
       HINT_FORMATION,
-      '同一種符連成一線就會成陣：橫排加傷害、直排加出手速度',
+      '一整條線都是不同種的符就會成陣：橫排加傷害、直排加出手速度',
       260,
     );
   }
@@ -602,9 +612,12 @@ export class RunScene extends Phaser.Scene {
     for (const leak of report.leaks) {
       const view = this.enemySprites.get(leak.enemyId);
       const x = view?.x ?? GAME_WIDTH / 2;
-      view?.destroy();
-      this.enemySprites.delete(leak.enemyId);
-      this.cameras.main.shake(200, 0.01);
+      // 首領砸門時牠還在場上，不能把牠的圖清掉——牠會一直砸到死或山門破。
+      if (!leak.boss) {
+        view?.destroy();
+        this.enemySprites.delete(leak.enemyId);
+      }
+      this.cameras.main.shake(leak.boss ? 320 : 200, leak.boss ? 0.016 : 0.01);
       audio.play('bossAttack');
       this.gateBar.setAlpha(1);
       this.tweens.add({ targets: this.gateBar, alpha: 0, duration: 420 });
@@ -613,8 +626,9 @@ export class RunScene extends Phaser.Scene {
         GATE_Y - 24,
         leak.immune ? '銅皮鐵骨' : `-${leak.loss}`,
         leak.immune ? JADE : DANGER,
-        leak.immune ? 22 : 34,
+        leak.immune ? 22 : leak.boss ? 40 : 34,
       );
+      if (leak.boss) this.warnGateSiege();
     }
 
     if (report.bossSpawned) {
@@ -634,6 +648,21 @@ export class RunScene extends Phaser.Scene {
       this.drawWarning.setAlpha(1);
       this.tweens.add({ targets: this.drawWarning, alpha: 0, delay: 1200, duration: 500 });
     }
+  }
+
+  /**
+   * 首領砸門的警告。
+   *
+   * 首領走到山門不會消失，牠會停在那裡一直砸——這一段是關底真正的張力所在，
+   * 必須讓玩家清楚知道「現在是在扣耐久，而且不打死牠不會停」。
+   */
+  private warnGateSiege(): void {
+    if (this.time.now - this.lastSiegeWarnAt < 1200) return;
+    this.lastSiegeWarnAt = this.time.now;
+    this.siegeText.setAlpha(1);
+    this.tweens.killTweensOf(this.siegeText);
+    this.tweens.add({ targets: this.siegeText, alpha: 0, delay: 700, duration: 500 });
+    this.showHintOnce(HINT_GATE_SIEGE, '首領不會自己離開——不斬掉牠，山門會一直掉耐久', 300);
   }
 
   private pulseHand(index: number): void {
@@ -906,6 +935,9 @@ export class RunScene extends Phaser.Scene {
     if (reason === 'timeout') {
       return '首領血太厚而輸出不夠——把符合到更高階，或提升淬鍊功法與御器訣';
     }
+    if (!this.run.bossKilled && this.run.bossSpawnedAtMs !== null) {
+      return '首領撐到了山門前，砸門的傷害比你的輸出快——關底需要更高階的符，別把符鋪散了';
+    }
     if (this.run.peakTier < cap - 1) {
       return `法寶只合到 ${this.run.peakTier} 階（上限 ${cap}）——與其鋪滿低階符，不如集中合成同一種`;
     }
@@ -931,6 +963,8 @@ export class RunScene extends Phaser.Scene {
       kills: this.run.kills,
       peakTier: this.run.peakTier,
       merges: this.run.merges,
+      bossKilled: this.run.bossKilled,
+      bossFought: this.run.bossSpawnedAtMs !== null,
       goldCollected: Math.round(this.run.gold),
       goldReward: victory ? clearReward(this.run) : defeatReward(this.run),
       defeatReason: reason,

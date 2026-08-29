@@ -172,7 +172,8 @@ export class ResultScene extends Phaser.Scene {
         : `斬殺 ${result.bossName}，山門尚存 ${formatNumber(result.survivors)}`;
     }
     if (result.defeatReason === 'abandon') return '半途收兵，來日再戰';
-    if (result.defeatReason === 'timeout') return `久攻不下，${result.bossName} 破陣而去`;
+    if (result.defeatReason === 'timeout') return `久攻不下，${result.bossName} 始終未死`;
+    if (!result.bossKilled && result.bossFought) return `${result.bossName} 砸開了山門`;
     return `妖魔攻破山門，${formatNumber(result.leaks)} 隻踏了進來`;
   }
 
@@ -181,6 +182,7 @@ export class ResultScene extends Phaser.Scene {
     const rows: [string, string, string][] = [
       ['山門殘存', `${formatNumber(result.survivors)} / ${formatNumber(result.maxDisciples)}`, INK],
       ['斬殺妖魔', `${formatNumber(result.kills)} 隻（漏 ${formatNumber(result.leaks)}）`, INK],
+      ['關底首領', result.bossKilled ? '已斬' : result.bossFought ? '未斬' : '未見', result.bossKilled ? JADE : DANGER],
       ['最高法寶', `${result.peakTier} 階（合成 ${result.merges} 次）`, INK],
       ['途中拾取', `${formatNumber(result.goldCollected)} 金`, GOLD],
       [result.victory ? '通關獎勵' : '殘存所得', `${formatNumber(result.goldReward)} 金`, GOLD],

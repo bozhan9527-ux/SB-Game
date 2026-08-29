@@ -114,6 +114,8 @@ interface RunOutcome {
   victory: boolean;
   survivors: number;
   leaks: number;
+  /** 首領砸門的次數。大於 0 代表這一場撐到了「首領已經在門口」的階段。 */
+  bossGateHits: number;
   peakTier: number;
   elapsedMs: number;
   gold: number;
@@ -131,12 +133,14 @@ function runOnce(
   const state = createDefenseState(buildLoadoutFor(sect, upgrades, stage), rng);
 
   let sinceDecision = 0;
+  let bossGateHits = 0;
   // 上限是「首領時限 + 所有波次的排程長度」，正常情況不會走到。
   const hardLimit =
     BALANCE.wave.wavesPerStage * BALANCE.wave.waveIntervalMs + BALANCE.boss.timeLimitMs + 30000;
 
   while (state.outcome === 'running' && state.elapsedMs < hardLimit) {
-    tickCombat(state, TICK_MS, rng);
+    const report = tickCombat(state, TICK_MS, rng);
+    bossGateHits += report.leaks.filter((leak) => leak.boss).length;
     sinceDecision += TICK_MS;
     while (sinceDecision >= DECISION_MS) {
       sinceDecision -= DECISION_MS;
@@ -149,6 +153,7 @@ function runOnce(
     victory,
     survivors: state.disciples,
     leaks: state.leaks,
+    bossGateHits,
     peakTier: state.peakTier,
     elapsedMs: state.elapsedMs,
     gold: Math.round(state.gold) + (victory ? clearReward(state) : defeatReward(state)),
@@ -177,6 +182,8 @@ interface Progress {
   stuckAt: number | null;
   durations: number[];
   leaks: number[];
+  /** 每一場通關時，首領砸了幾次門。 */
+  bossGateHits: number[];
 }
 
 const RETRY_LIMIT = 12;
@@ -186,6 +193,7 @@ function playThrough(sectId: string, maxStage: number): Progress {
   const levels: Record<string, number> = {};
   const durations: number[] = [];
   const leaks: number[] = [];
+  const bossGateHits: number[] = [];
   let gold = 0;
   let totalRuns = 0;
   let maxAttempts = 0;
@@ -200,15 +208,16 @@ function playThrough(sectId: string, maxStage: number): Progress {
       if (outcome.victory) {
         durations.push(outcome.elapsedMs);
         leaks.push(outcome.leaks);
+        bossGateHits.push(outcome.bossGateHits);
         break;
       }
       if (attempts >= RETRY_LIMIT) {
-        return { totalRuns, maxAttempts: attempts, stuckAt: stage, durations, leaks };
+        return { totalRuns, maxAttempts: attempts, stuckAt: stage, durations, leaks, bossGateHits };
       }
     }
     maxAttempts = Math.max(maxAttempts, attempts);
   }
-  return { totalRuns, maxAttempts, stuckAt: null, durations, leaks };
+  return { totalRuns, maxAttempts, stuckAt: null, durations, leaks, bossGateHits };
 }
 
 describe('數值平衡', () => {
@@ -236,11 +245,22 @@ describe('數值平衡', () => {
     }
   });
 
-  it('守得住不代表守得輕鬆：相當比例的關卡都會漏怪，山門不是擺著好看', () => {
-    // 零漏怪通關應該是「打得特別好的一場」，不是常態；否則山門的耐久等於裝飾。
+  it('守得住不代表守得輕鬆：即使是幾乎完美的打法，也會有關卡掉耐久', () => {
+    // 門檻曾經是 0.15，但那個數字是在一個 bug 底下訂的：當時首領走到山門會直接消失、
+    // 而且照樣判定通關，那些「首領跑掉」被算成了漏怪，把比例灌高了。
+    // 修掉之後這裡量的才是真的：模擬的 AI 反應零延遲又永遠選最優，
+    // 它都還會掉耐久的關卡，真人只會更多。
     const { leaks } = playThrough('body', STAGES);
     const withLeaks = leaks.filter((count) => count > 0).length;
-    expect(withLeaks / leaks.length, '幾乎每關都零漏怪，代表難度太低').toBeGreaterThan(0.15);
+    expect(withLeaks / leaks.length, '連一關都不掉耐久，代表難度太低').toBeGreaterThan(0.05);
+  });
+
+  it('首領會撐到山門前才被斬掉——關底的緊張感是真的存在的', () => {
+    // 首領走到山門不會消失，牠會停在門口一直砸。若這個數字是 0，
+    // 代表首領永遠在半路就死了，那條「撐住別讓牠進門」的張力等於不存在。
+    const { bossGateHits } = playThrough('body', STAGES);
+    const reachedGate = bossGateHits.filter((count) => count > 0).length;
+    expect(reachedGate, '首領從來沒摸到山門，關底完全沒有壓力').toBeGreaterThan(0);
   });
 
   it('不花金幣升級的話會在中後期卡死，升級才有意義', () => {
