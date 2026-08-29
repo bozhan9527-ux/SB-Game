@@ -12,6 +12,7 @@ import {
   mergedCard,
 } from '../src/systems/deck';
 import type { Card } from '../src/systems/deck';
+import type { ActiveEnemy } from '../src/systems/defense';
 import {
   bossHp,
   clearReward,
@@ -33,6 +34,7 @@ import {
 } from '../src/systems/defense';
 import { activeFormations } from '../src/systems/formation';
 import { buildLoadoutFor } from '../src/systems/loadout';
+import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
 
 function sect(id: string): Sect {
@@ -41,8 +43,39 @@ function sect(id: string): Sect {
   return found;
 }
 
-function stateFor(sectId: string, stage = 1, seed = 42, upgrades: Record<string, number> = {}) {
-  return createDefenseState(buildLoadoutFor(sect(sectId), upgrades, stage), createRng(seed));
+function stateFor(
+  sectId: string,
+  stage = 1,
+  seed = 42,
+  upgrades: Record<string, number> = {},
+  talismans?: string[],
+) {
+  const pool = talismans === undefined ? undefined : talismanDefs(talismans, 999);
+  return createDefenseState(
+    buildLoadoutFor(sect(sectId), upgrades, stage, pool),
+    createRng(seed),
+  );
+}
+
+/** 測試用的妖魔。減速與灼燒欄位一律從乾淨狀態起算。 */
+function mob(over: Partial<ActiveEnemy> = {}): ActiveEnemy {
+  return {
+    id: 1,
+    name: 'x',
+    art: 'bandit',
+    bossArt: null,
+    boss: false,
+    hp: 100,
+    maxHp: 100,
+    y: 0,
+    lane: 0,
+    speed: 0,
+    slowUntilMs: 0,
+    slowPercent: 0,
+    burnRemaining: 0,
+    burnPerMs: 0,
+    ...over,
+  };
 }
 
 describe('法寶符', () => {
@@ -73,7 +106,7 @@ describe('法寶符', () => {
   it('抽到的符落在上限以下若干階，不會直接抽到頂', () => {
     const rng = createRng(7);
     for (let i = 0; i < 200; i += 1) {
-      const card = drawCard(20, rng);
+      const card = drawCard(buildLoadoutFor(sect('body'), {}, 20), 20, rng);
       expect(card.tier).toBeLessThanOrEqual(maxTierForStage(20));
       expect(card.tier).toBeGreaterThanOrEqual(1);
       expect(CARDS.some((def) => def.id === card.type)).toBe(true);
@@ -219,10 +252,12 @@ describe('山門防守', () => {
     const state = stateFor('sword', 1, 21);
     const rng = createRng(21);
     state.queue = [];
-    state.enemies = [{
-      id: 1, name: '首領', art: 'demon' as const, bossArt: 'beast' as const, boss: true,
-      hp: 1e9, maxHp: 1e9, y: BALANCE.wave.trackPx, lane: 2, speed: BALANCE.boss.speed,
-    }];
+    state.enemies = [
+      mob({
+        name: '首領', art: 'demon', bossArt: 'beast', boss: true,
+        hp: 1e9, maxHp: 1e9, y: BALANCE.wave.trackPx, lane: 2, speed: BALANCE.boss.speed,
+      }),
+    ];
     const before = state.disciples;
 
     // 砸門的間隔一到就扣耐久，而且首領還在場上。
@@ -295,18 +330,7 @@ describe('山門防守', () => {
       const rng = createRng(9);
       state.field.fill(null);
       state.field[0] = { type, tier: 6 };
-      state.enemies = Array.from({ length: 8 }, (_, i) => ({
-        id: i + 1,
-        name: 'x',
-        art: 'bandit' as const,
-        bossArt: null,
-        boss: false,
-        hp: 30,
-        maxHp: 30,
-        y: 0,
-        lane: 0,
-        speed: 0,
-      }));
+      state.enemies = Array.from({ length: 8 }, (_, i) => mob({ id: i + 1, hp: 30, maxHp: 30 }));
       state.queue = [];
       let killed = 0;
       for (let i = 0; i < 40; i += 1) killed += tickCombat(state, 100, rng).kills.length;
@@ -321,10 +345,7 @@ describe('山門防守', () => {
       state.field.fill(null);
       state.field[0] = { type: 'sword', tier: 3 };
       state.queue = [];
-      state.enemies = [{
-        id: 1, name: 'x', art: 'bandit' as const, bossArt: null, boss: false,
-        hp: 1e9, maxHp: 1e9, y: 0, lane: 0, speed: 0,
-      }];
+      state.enemies = [mob({ hp: 1e9, maxHp: 1e9 })];
       return state;
     };
     const coarse = build();

@@ -12,7 +12,7 @@ import { BALANCE, CARDS } from '../data';
 import type { CardDef } from '../data/types';
 import type { Loadout } from './loadout';
 import type { Rng } from './rng';
-import { NO_BONUS, bonusesForField } from './formation';
+import { NO_SLOT_BONUS, boardBonuses } from './board';
 
 export interface Card {
   /** 對應 cards.json 的 id。 */
@@ -41,8 +41,15 @@ export function drawTierForStage(stage: number, rng: Rng): number {
   return Math.min(maxTierForStage(stage), base + bonus);
 }
 
-export function drawCard(stage: number, rng: Rng): Card {
-  const def = rng.pickWeighted(CARDS, (card) => card.weight);
+/**
+ * 抽一張符。**抽符池就是這一場帶的四張**，不是全部二十張。
+ *
+ * 這是符籙系統最要緊的一條：池子若含全部二十種，同一種要湊到第二張的機率剩二十分之一，
+ * 合成——遊戲唯一的指數成長來源——會直接停擺。帶四張既保住合成，
+ * 也正好對上 3×3 陣法天花板的推導前提。
+ */
+export function drawCard(loadout: Loadout, stage: number, rng: Rng): Card {
+  const def = rng.pickWeighted(loadout.talismans, (card) => card.weight);
   return { type: def.id, tier: drawTierForStage(stage, rng) };
 }
 
@@ -76,8 +83,10 @@ export function cardInterval(card: Card, loadout: Loadout): number {
 /**
  * 一張符的理論每秒傷害。
  *
- * 只用於顯示與比較：實戰中打小妖會有溢傷（天雷符一擊 40 打 20 血的妖會浪費一半），
- * 因此天雷符的實際效率會低於這個數字，而風刃符高於它。這正是四種符的取捨所在。
+ * 只用於顯示與比較，而且**刻意不把特效算進去**：溢傷、減速、灼燒、暴擊、
+ * 對首領加成這些東西的價值全看戰場長什麼樣，硬折成一個數字只會騙人
+ * （天雷符一擊 40 打 20 血的妖會浪費一半，這裡也看不出來）。
+ * 特效在選符畫面用文字列出，讓玩家自己判斷——那正是「帶哪四張」的樂趣所在。
  */
 export function cardDps(card: Card, loadout: Loadout): number {
   const def = cardDef(card.type);
@@ -91,12 +100,12 @@ export function cardDps(card: Card, loadout: Loadout): number {
  * 不然他不會知道剛剛那一下有沒有用。
  */
 export function fieldDps(field: readonly (Card | null)[], loadout: Loadout): number {
-  const bonuses = bonusesForField(field);
+  const bonuses = boardBonuses(field);
   let total = 0;
   for (let i = 0; i < field.length; i += 1) {
     const card = field[i];
     if (card === undefined || card === null) continue;
-    const bonus = bonuses[i] ?? NO_BONUS;
+    const bonus = bonuses[i] ?? NO_SLOT_BONUS;
     total += cardDps(card, loadout) * bonus.damage * bonus.fireRate;
   }
   return total;

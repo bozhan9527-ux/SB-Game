@@ -3,6 +3,7 @@ import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { sectById } from '../systems/loadout';
+import { TALISMAN_SLOTS, talismanDefs } from '../systems/talismans';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
@@ -60,42 +61,61 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 按鈕
+    // 帶哪四張符是每一場都值得改的決定，所以它和洞府一樣是主按鈕，不是塞在小按鈕列裡。
+    const talismans = talismanDefs(save.player.talismans, save.world.highestStage);
+    this.add
+      .text(
+        cx,
+        568,
+        `符籙 ${talismans.map((def) => def.name).join('・')}`,
+        textStyle({ size: 17, color: INK_DIM }),
+      )
+      .setOrigin(0.5);
+
     const hasSect = sect !== null;
-    createButton(this, cx, 640, {
+    createButton(this, cx, 628, {
       width: 340,
-      height: 76,
+      height: 74,
       label: hasSect ? '開始挑戰' : '選擇門派',
       fontSize: 30,
       strokeColor: 0x6f8b7a,
       onClick: () => this.scene.start(hasSect ? 'Run' : 'Sect'),
     });
 
-    createButton(this, cx, 736, {
+    createButton(this, cx, 710, {
       width: 340,
-      height: 66,
+      height: 62,
       label: '洞府 · 提升屬性',
-      fontSize: 26,
+      fontSize: 25,
       onClick: () => this.scene.start('Upgrade'),
     });
 
+    createButton(this, cx, 780, {
+      width: 340,
+      height: 62,
+      label: `符籙譜 · 帶 ${TALISMAN_SLOTS} 張入場`,
+      fontSize: 25,
+      onClick: () => this.scene.start('Talisman'),
+    });
+
     // 三顆並排：540 寬放得下 3×112 加間距，比擠成兩排省一列高度。
-    createButton(this, cx - 118, 812, {
+    createButton(this, cx - 118, 850, {
       width: 112,
-      height: 58,
+      height: 56,
       label: '玩法說明',
       fontSize: 20,
       onClick: () => this.scene.start('Help'),
     });
-    createButton(this, cx, 812, {
+    createButton(this, cx, 850, {
       width: 112,
-      height: 58,
+      height: 56,
       label: '仙途錄',
       fontSize: 20,
       onClick: () => this.scene.start('Achievements'),
     });
-    createButton(this, cx + 118, 812, {
+    createButton(this, cx + 118, 850, {
       width: 112,
-      height: 58,
+      height: 56,
       label: hasSect ? '換門派' : '門派',
       fontSize: 20,
       onClick: () => this.scene.start('Sect'),
@@ -120,7 +140,7 @@ export class TitleScene extends Phaser.Scene {
     this.add
       .text(
         cx,
-        GAME_HEIGHT - 46,
+        GAME_HEIGHT - 30,
         `最高境界 ${realmTitle(save.world.highestStage)} · 通關 ${save.world.clears} 次`,
         textStyle({ size: 18, color: INK_DIM }),
       )

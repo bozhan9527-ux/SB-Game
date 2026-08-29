@@ -149,6 +149,56 @@ describe('存檔（TECH_SPEC 第 4 節）', () => {
     expect(loadSave(empty).player.hints).toEqual([]);
   });
 
+  it('v5 舊存檔補上符籙配置：拿到的正是舊版本唯一存在的那四張', () => {
+    const storage = createMemoryStorage();
+    storage.write(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 5,
+        savedAt: 1,
+        player: {
+          sectId: 'body', wallet: { gold: 700 }, upgrades: { startAttack: 4 },
+          achievements: [], hints: ['tutorial'],
+          stats: { maxTier: 8, totalKills: 400, perfectClears: 1, totalGoldEarned: 9000, clearedSects: ['body'] },
+        },
+        world: { stage: 30, highestStage: 30, runs: 50, clears: 40 },
+        settings: { sound: true },
+      }),
+    );
+    const loaded = loadSave(storage);
+    expect(loaded.version).toBe(SAVE_VERSION);
+    // 老玩家的下一場要和他上一場玩到的完全一樣，不能因為改版突然變成另一個遊戲。
+    expect(loaded.player.talismans).toEqual(['sword', 'bolt', 'fan', 'flame']);
+    expect(loaded.world.stage).toBe(30);
+    expect(loaded.player.wallet.gold).toBe(700);
+    expect(loaded.player.upgrades['startAttack']).toBe(4);
+    expect(loaded.player.hints).toContain('tutorial');
+  });
+
+  it('存檔裡的符籙壞掉（改名、未解鎖、重複）不會擋住開場', () => {
+    const storage = createMemoryStorage();
+    storage.write(
+      SAVE_KEY,
+      JSON.stringify({
+        version: SAVE_VERSION,
+        savedAt: 1,
+        player: {
+          sectId: 'body', wallet: { gold: 0 }, upgrades: {}, achievements: [], hints: [],
+          talismans: ['沒這張', 'slayer', 'sword', 'sword'],
+          stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
+        },
+        // 最高只到第 3 關，誅仙符（第 53 關）此時還沒解鎖。
+        world: { stage: 3, highestStage: 3, runs: 1, clears: 0 },
+        settings: { sound: true },
+      }),
+    );
+    const loaded = loadSave(storage);
+    expect(loaded.player.talismans).toHaveLength(4);
+    expect(new Set(loaded.player.talismans).size).toBe(4);
+    expect(loaded.player.talismans).not.toContain('slayer');
+    expect(loaded.player.talismans).not.toContain('沒這張');
+  });
+
   it('音效關閉的設定會被存下來', () => {
     const storage = createMemoryStorage();
     const save = createDefaultSave(1);

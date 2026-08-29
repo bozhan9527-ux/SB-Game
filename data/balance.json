@@ -9,7 +9,8 @@
     "stagesPerTier": 3,
     "drawTierBelowMax": 4,
     "drawTierBonusChance": 0.28,
-    "drawIntervalMs": 2600
+    "drawIntervalMs": 2600,
+    "maxRepairChance": 0.25
   },
   "formation": {
     "columns": 3,

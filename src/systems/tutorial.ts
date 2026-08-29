@@ -52,14 +52,18 @@ export function tutorialCopy(step: TutorialStep): TutorialCopy {
  * 教學用的起手牌：場上全空，手上三張同種同階。
  *
  * 三張一樣是刻意的——不管玩家先放哪一張，剩下的都一定合得起來，第二步不會卡住。
+ * 隨機起手有可能三張都合不起來，第二步就死鎖了；教學只有一次機會，不能靠運氣。
+ *
+ * 符種取自玩家這一場帶的四張（預設是第一張），不寫死某一種：
+ * 教學教的那張符若不在他的抽符池裡，接下來整場都不會再出現，第一課就白教了。
  */
 export function tutorialField(slots: number): (Card | null)[] {
   return new Array<Card | null>(Math.max(1, slots)).fill(null);
 }
 
-export function tutorialHand(slots: number): (Card | null)[] {
+export function tutorialHand(slots: number, type: string): (Card | null)[] {
   const hand = new Array<Card | null>(Math.max(3, slots)).fill(null);
-  for (let i = 0; i < 3; i += 1) hand[i] = { type: 'flame', tier: 1 };
+  for (let i = 0; i < 3; i += 1) hand[i] = { type, tier: 1 };
   return hand.slice(0, Math.max(3, slots));
 }
 

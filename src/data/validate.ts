@@ -44,6 +44,34 @@ export function bool(source: unknown, key: string, path: string): boolean {
   return value;
 }
 
+/**
+ * 選填的數字欄位。
+ *
+ * 給符籙特效用：二十張符各自只用到一兩種特效，若每一張都要把十幾個欄位補零，
+ * 資料檔會被雜訊淹沒，真正生效的那一項反而看不出來。
+ * 缺欄位時回傳 fallback，但欄位存在卻不是數字仍然報錯——省略是允許的，寫錯不是。
+ */
+export function optNum(source: unknown, key: string, path: string, fallback: number): number {
+  const value = asRecord(source, path)[key];
+  if (value === undefined) return fallback;
+  return num(source, key, path);
+}
+
+export function optBool(source: unknown, key: string, path: string, fallback: boolean): boolean {
+  const value = asRecord(source, path)[key];
+  if (value === undefined) return fallback;
+  return bool(source, key, path);
+}
+
+/** 只允許出現在白名單裡的鍵。打錯特效名稱時要當場報錯，不能默默失效。 */
+export function assertKnownKeys(source: unknown, path: string, allowed: readonly string[]): void {
+  for (const key of Object.keys(asRecord(source, path))) {
+    if (!allowed.includes(key)) {
+      throw new DataError(`${path}.${key}`, `不認得的欄位（可用：${allowed.join(' / ')}）`);
+    }
+  }
+}
+
 export function oneOf<T extends string>(
   source: unknown,
   key: string,

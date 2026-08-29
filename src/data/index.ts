@@ -20,6 +20,7 @@ import type {
   BossArt,
   BossDef,
   CardDef,
+  CardEffect,
   FormationTierBalance,
   MobArt,
   EnemyBook,
@@ -29,7 +30,28 @@ import type {
   SectArt,
   UpgradeTrack,
 } from './types';
-import { assertUniqueIds, field, list, num, obj, oneOf, str, DataError } from './validate';
+import {
+  assertKnownKeys,
+  assertUniqueIds,
+  field,
+  list,
+  num,
+  obj,
+  oneOf,
+  optBool,
+  optNum,
+  str,
+  DataError,
+} from './validate';
+
+/**
+ * 一副符籙配置帶幾張。
+ *
+ * 四這個數字不是隨手挑的：3×3 的陣法天花板（八條、484 種解）是在「場上只有四種符」
+ * 這個前提下算出來的，帶超過四種會把那個推導整個推翻；帶少於四種則湊不出五行陣。
+ * 二十張符裡選四張，選擇本身就是玩法。
+ */
+export const TALISMAN_SLOTS = 4;
 
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 const SCENERIES: readonly Scenery[] = [
@@ -73,6 +95,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       drawTierBelowMax: p(field_, 'drawTierBelowMax', 'field'),
       drawTierBonusChance: p(field_, 'drawTierBonusChance', 'field'),
       drawIntervalMs: p(field_, 'drawIntervalMs', 'field'),
+      maxRepairChance: p(field_, 'maxRepairChance', 'field'),
     },
     formation: {
       columns: p(formation, 'columns', 'formation'),
@@ -177,6 +200,65 @@ export function parseSects(raw: unknown, path = 'sects.json'): Sect[] {
   return sects;
 }
 
+/**
+ * 符籙特效的預設值：全部等於「沒有這個特效」。
+ *
+ * 倍率類的預設是 1（乘上去不變），加成類的預設是 0。
+ * 資料檔裡只寫真正生效的那幾項，其餘留白。
+ */
+export const NO_EFFECT: CardEffect = {
+  slowPercent: 0,
+  slowMs: 0,
+  burnPercent: 0,
+  burnMs: 0,
+  executeBelow: 0,
+  carryOverkill: false,
+  critChance: 0,
+  critMultiplier: 1,
+  bossMultiplier: 1,
+  woundedMultiplier: 1,
+  freshMultiplier: 1,
+  rampPerShot: 0,
+  rampMax: 1,
+  auraDamage: 0,
+  auraFireRate: 0,
+  goldBonus: 0,
+  drawSpeedBonus: 0,
+  repairChance: 0,
+  formationMultiplier: 1,
+};
+
+const EFFECT_KEYS: readonly string[] = Object.keys(NO_EFFECT);
+
+function parseEffect(raw: unknown, path: string): CardEffect {
+  // 打錯特效名稱（例如 slowPercnet）會靜默失效，那種 bug 只有靠人玩才看得出來，
+  // 所以在載入階段就把不認得的鍵擋掉。
+  assertKnownKeys(raw, path, EFFECT_KEYS);
+  const n = (key: keyof CardEffect): number =>
+    optNum(raw, key, path, NO_EFFECT[key] as number);
+  return {
+    slowPercent: n('slowPercent'),
+    slowMs: n('slowMs'),
+    burnPercent: n('burnPercent'),
+    burnMs: n('burnMs'),
+    executeBelow: n('executeBelow'),
+    carryOverkill: optBool(raw, 'carryOverkill', path, false),
+    critChance: n('critChance'),
+    critMultiplier: n('critMultiplier'),
+    bossMultiplier: n('bossMultiplier'),
+    woundedMultiplier: n('woundedMultiplier'),
+    freshMultiplier: n('freshMultiplier'),
+    rampPerShot: n('rampPerShot'),
+    rampMax: n('rampMax'),
+    auraDamage: n('auraDamage'),
+    auraFireRate: n('auraFireRate'),
+    goldBonus: n('goldBonus'),
+    drawSpeedBonus: n('drawSpeedBonus'),
+    repairChance: n('repairChance'),
+    formationMultiplier: n('formationMultiplier'),
+  };
+}
+
 export function parseCards(raw: unknown, path = 'cards.json'): CardDef[] {
   const cards = list(raw, path, (item, p) => ({
     id: str(item, 'id', p),
@@ -188,12 +270,21 @@ export function parseCards(raw: unknown, path = 'cards.json'): CardDef[] {
     intervalMs: num(item, 'intervalMs', p),
     targets: num(item, 'targets', p),
     weight: num(item, 'weight', p),
+    unlockStage: num(item, 'unlockStage', p),
+    effect: parseEffect(obj(item, 'effect', p), `${p}.effect`),
   }));
   assertUniqueIds(cards, path);
   for (const card of cards) {
     if (card.weight <= 0) throw new DataError(path, `${card.id} 的 weight 必須大於 0`);
     if (card.intervalMs <= 0) throw new DataError(path, `${card.id} 的 intervalMs 必須大於 0`);
     if (card.targets < 1) throw new DataError(path, `${card.id} 的 targets 至少為 1`);
+    if (card.unlockStage < 1) throw new DataError(path, `${card.id} 的 unlockStage 至少為 1`);
+  }
+  // 一副符籙配置要選滿四張，所以開局（第 1 關）就必須有四張以上可選，
+  // 而且四種正好對上 3×3 陣法的天花板推導。
+  const starters = cards.filter((card) => card.unlockStage <= 1);
+  if (starters.length < TALISMAN_SLOTS) {
+    throw new DataError(path, `開局可用的符不足 ${TALISMAN_SLOTS} 張，湊不出一副符籙配置`);
   }
   return cards;
 }

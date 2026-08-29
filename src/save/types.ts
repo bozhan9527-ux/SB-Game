@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -43,6 +43,13 @@ export interface PlayerState {
    * 只存「看過什麼」，不存「現在教到第幾步」——教學進度是單場的事，不該進存檔。
    */
   hints: string[];
+  /**
+   * 帶進場的四張符（見 src/systems/talismans.ts）。
+   *
+   * 只存 id，不存那四張符的數值——數值全在 cards.json，改了平衡不該要求玩家重選。
+   * 存到的 id 可能已經失效（改版、手改存檔），讀取端一律走 sanitizeTalismans 修補。
+   */
+  talismans: string[];
   stats: StatsState;
 }
 

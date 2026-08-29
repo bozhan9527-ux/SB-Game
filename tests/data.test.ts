@@ -90,7 +90,10 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
     ).toThrow(/連續/);
     expect(() =>
       parseCards([
-        { id: 'x', name: 'N', desc: 'D', color: '#fff', art: 'a', damage: 1, intervalMs: 0, targets: 1, weight: 1 },
+        {
+          id: 'x', name: 'N', desc: 'D', color: '#fff', art: 'a',
+          damage: 1, intervalMs: 0, targets: 1, weight: 1, unlockStage: 1, effect: {},
+        },
       ]),
     ).toThrow(/intervalMs/);
     expect(() =>

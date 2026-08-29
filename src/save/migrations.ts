@@ -62,12 +62,29 @@ const addHints: Migration = (data) => {
   };
 };
 
+/**
+ * v5 → v6：加入符籙配置（二十張裡帶四張）。
+ *
+ * 舊存檔一律給開局那四張——那正是舊版本唯一存在的抽符池，
+ * 所以老玩家的下一場會和他上一場玩到的完全一樣，不會因為改版突然變成另一個遊戲。
+ * 這裡刻意寫死 id 而不是呼叫 starterTalismans()：遷移是對「歷史上的那一版存檔」
+ * 做的一次性轉換，它的正確性不該隨著日後 cards.json 怎麼改而改變。
+ */
+const addTalismans: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return {
+    ...data,
+    player: { ...player, talismans: ['sword', 'bolt', 'fan', 'flame'] },
+  };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
   toDefenseStats,
   addHints,
+  addTalismans,
 ];
 
 /**

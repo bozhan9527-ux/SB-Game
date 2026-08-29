@@ -448,7 +448,166 @@ def glyph_flame():
     ]
 
 
-GLYPHS = {'sword': glyph_sword, 'bolt': glyph_bolt, 'fan': glyph_fan, 'flame': glyph_flame}
+
+# ---------------------------------------------------------------- 符籙譜的其餘十六種
+# 牌面只有 34×42 的顯示尺寸，所以每個圖騰都必須靠「一個好認的輪廓」成立，
+# 細節在手機上一律看不見。因此全部畫成 2–4 個色塊，不用線稿。
+
+
+def glyph_frost():
+    arms = []
+    for i in range(3):
+        a = math.radians(i * 60)
+        dx, dy = math.cos(a) * 14, math.sin(a) * 14
+        arms.append(f'<path d="M{16 - dx:.1f} {20 - dy:.1f} L{16 + dx:.1f} {20 + dy:.1f}" '
+                    f'stroke="#bff0f8" stroke-width="3.4" stroke-linecap="round"/>')
+    return arms + ['<circle cx="16" cy="20" r="4.6" fill="#ffffff"/>']
+
+
+def glyph_pyre():
+    return [
+        '<path d="M16 2 C26 14 29 21 29 27 A13 13 0 0 1 3 27 C3 20 8 16 11 9 '
+        'C12 17 15 18 16 15 C17 11 15 7 16 2z" fill="#f0522d"/>',
+        '<path d="M16 14 C21 21 22 24 22 27 A6 6 0 0 1 10 27 C10 23 13 20 16 14z" fill="#ffd24d"/>',
+        '<circle cx="16" cy="28" r="2.8" fill="#fff3c4"/>',
+    ]
+
+
+def glyph_pierce():
+    return [
+        '<path d="M6 26 A7 7 0 0 1 8 13 A9 9 0 0 1 25 14 A6 6 0 0 1 25 26z" fill="#5b6a8f"/>',
+        '<path d="M2 20 L24 20" stroke="#dfe7ff" stroke-width="3.2" stroke-linecap="round"/>',
+        '<path d="M22 13 L31 20 L22 27z" fill="#ffffff"/>',
+    ]
+
+
+def glyph_fortune():
+    return [
+        '<circle cx="16" cy="20" r="13" fill="#f0c65a"/>',
+        '<circle cx="16" cy="20" r="10" fill="none" stroke="#8a6a1a" stroke-width="1.6"/>',
+        '<rect x="11.5" y="15.5" width="9" height="9" fill="#8a6a1a"/>',
+    ]
+
+
+def glyph_soul():
+    return [
+        '<path d="M16 4 C24 4 28 10 28 17 C28 26 22 31 16 36 C10 31 4 26 4 17 '
+        'C4 10 8 4 16 4z" fill="#b0509c"/>',
+        '<circle cx="11.5" cy="16" r="3.2" fill="#2a1030"/>',
+        '<circle cx="20.5" cy="16" r="3.2" fill="#2a1030"/>',
+        '<path d="M11 25 L21 25" stroke="#2a1030" stroke-width="2.4" stroke-linecap="round"/>',
+    ]
+
+
+def glyph_breaker():
+    return [
+        '<path d="M16 3 L28 8 V20 C28 28 22 33 16 37 C10 33 4 28 4 20 V8z" fill="#e8a06a"/>',
+        '<path d="M16 3 L20 14 L13 17 L18 26 L11 24 L16 37 L10 32 L4 20 V8z" fill="#7a4a24"/>',
+    ]
+
+
+def glyph_abyss():
+    return [
+        '<circle cx="16" cy="20" r="13" fill="#3a2f5c"/>',
+        '<circle cx="16" cy="20" r="13" fill="none" stroke="#b0a0e8" stroke-width="2"/>',
+        '<circle cx="16" cy="20" r="5.4" fill="#0d0a18"/>',
+    ]
+
+
+def glyph_spirit():
+    petals = []
+    for i in range(6):
+        a = math.radians(i * 60 - 90)
+        x, y = 16 + math.cos(a) * 10, 20 + math.sin(a) * 10
+        petals.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.8" fill="#7fd8c0"/>')
+    return petals + ['<circle cx="16" cy="20" r="5.6" fill="#eafff8"/>']
+
+
+def glyph_gale():
+    return [
+        '<path d="M4 12 H21 A5 5 0 1 0 16 7" stroke="#8fe0a8" stroke-width="3.2" '
+        'fill="none" stroke-linecap="round"/>',
+        '<path d="M4 20 H25 A5 5 0 1 1 20 25" stroke="#c8f5d8" stroke-width="3.2" '
+        'fill="none" stroke-linecap="round"/>',
+        '<path d="M4 29 H18" stroke="#8fe0a8" stroke-width="3.2" fill="none" stroke-linecap="round"/>',
+    ]
+
+
+def glyph_tempest():
+    return [
+        '<circle cx="16" cy="20" r="13.5" fill="#6a4a9c"/>',
+        '<path d="M19 6 L9 22 L15 22 L12 34 L24 18 L17.5 18z" fill="#ffe066"/>',
+    ]
+
+
+def glyph_bastion():
+    return [
+        '<path d="M2 30 L11 15 L17 24 L23 11 L31 30z" fill="#8a7a5a"/>',
+        '<rect x="2" y="30" width="28" height="7" fill="#c8b48a"/>',
+        '<rect x="6" y="26" width="4" height="4" fill="#c8b48a"/>',
+        '<rect x="14" y="26" width="4" height="4" fill="#c8b48a"/>',
+        '<rect x="22" y="26" width="4" height="4" fill="#c8b48a"/>',
+    ]
+
+
+def glyph_taiyi():
+    return [
+        '<circle cx="16" cy="20" r="13.5" fill="#f4ecd0"/>',
+        '<path d="M16 6.5 A13.5 13.5 0 0 1 16 33.5 A6.75 6.75 0 0 1 16 20 '
+        'A6.75 6.75 0 0 0 16 6.5z" fill="#3a3226"/>',
+        '<circle cx="16" cy="13.2" r="2.4" fill="#f4ecd0"/>',
+        '<circle cx="16" cy="26.8" r="2.4" fill="#3a3226"/>',
+    ]
+
+
+def glyph_slayer():
+    return [
+        '<path d="M16 2 L20 11 V29 L16 34 L12 29 V11z" fill="#ffd9d9"/>',
+        '<path d="M16 4 L18 11 V28 L16 31z" fill="#ffffff"/>',
+        '<path d="M4 24 L12 20 L12 27z" fill="#c94a4a"/>',
+        '<path d="M28 24 L20 20 L20 27z" fill="#c94a4a"/>',
+        '<rect x="14.4" y="33" width="3.2" height="6" rx="1.6" fill="#7a2a2a"/>',
+    ]
+
+
+def glyph_myriad():
+    blades = []
+    for i, angle in enumerate((-34, -17, 0, 17, 34)):
+        a = math.radians(angle - 90)
+        x2, y2 = 16 + math.cos(a) * 17, 33 + math.sin(a) * 17
+        blades.append(f'<path d="M16 33 L{x2:.1f} {y2:.1f}" stroke="#dfe9f2" '
+                      f'stroke-width="{3.2 if i % 2 else 4.0:.1f}" stroke-linecap="round"/>')
+    return blades + ['<circle cx="16" cy="34" r="3.4" fill="#c9a227"/>']
+
+
+def glyph_grand():
+    dots = []
+    for row in range(3):
+        for col in range(3):
+            fill = '#f0e0ff' if (row + col) % 2 == 0 else '#b48ad8'
+            dots.append(f'<rect x="{5 + col * 8}" y="{9 + row * 8}" width="6.4" height="6.4" '
+                        f'rx="1.4" fill="{fill}"/>')
+    return dots
+
+
+def glyph_seal():
+    return [
+        '<rect x="4" y="5" width="24" height="30" rx="2" fill="#c9a8e0"/>',
+        '<rect x="7" y="8" width="18" height="24" fill="#3a2a4a"/>',
+        '<path d="M16 11 V29" stroke="#f0d8ff" stroke-width="2.6" stroke-linecap="round"/>',
+        '<path d="M11 15 H21" stroke="#f0d8ff" stroke-width="2.4" stroke-linecap="round"/>',
+        '<path d="M11 22 H21" stroke="#f0d8ff" stroke-width="2.4" stroke-linecap="round"/>',
+        '<path d="M12 27 L20 27" stroke="#f0d8ff" stroke-width="2.4" stroke-linecap="round"/>',
+    ]
+
+
+GLYPHS = {
+    'sword': glyph_sword, 'bolt': glyph_bolt, 'fan': glyph_fan, 'flame': glyph_flame,
+    'frost': glyph_frost, 'pyre': glyph_pyre, 'pierce': glyph_pierce, 'fortune': glyph_fortune,
+    'soul': glyph_soul, 'breaker': glyph_breaker, 'abyss': glyph_abyss, 'spirit': glyph_spirit,
+    'gale': glyph_gale, 'tempest': glyph_tempest, 'bastion': glyph_bastion, 'taiyi': glyph_taiyi,
+    'slayer': glyph_slayer, 'myriad': glyph_myriad, 'grand': glyph_grand, 'seal': glyph_seal,
+}
 
 for name, fn in GLYPHS.items():
     write(f'glyph-{name}.svg', 32, 40, fn())

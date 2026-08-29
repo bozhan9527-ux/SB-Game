@@ -2,6 +2,7 @@
  * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
  */
 import { UPGRADES } from '../data';
+import { sanitizeTalismans, starterTalismans } from '../systems/talismans';
 import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
@@ -22,6 +23,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       upgrades,
       achievements: [],
       hints: [],
+      talismans: starterTalismans(),
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
@@ -48,6 +50,9 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const hints = Array.isArray(player['hints'])
     ? (player['hints'] as unknown[]).filter((id): id is string => typeof id === 'string')
     : [];
+  const savedTalismans = Array.isArray(player['talismans'])
+    ? (player['talismans'] as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
   const clearedSects = Array.isArray(stats['clearedSects'])
     ? (stats['clearedSects'] as unknown[]).filter((id): id is string => typeof id === 'string')
     : [];
@@ -59,6 +64,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
   }
 
   const stage = Math.max(1, Math.floor(asNumber(world['stage'], 1)));
+  const highestStage = Math.max(stage, Math.floor(asNumber(world['highestStage'], stage)));
   return {
     version: SAVE_VERSION,
     savedAt: asNumber(raw['savedAt'], now),
@@ -68,6 +74,8 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       upgrades: merged,
       achievements,
       hints,
+      // 存檔可能引用到已改名或尚未解鎖的符，一律修補成一份能直接開場的四張。
+      talismans: sanitizeTalismans(savedTalismans, highestStage),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),
@@ -78,7 +86,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
     },
     world: {
       stage,
-      highestStage: Math.max(stage, Math.floor(asNumber(world['highestStage'], stage))),
+      highestStage,
       runs: Math.max(0, Math.floor(asNumber(world['runs'], 0))),
       clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
     },

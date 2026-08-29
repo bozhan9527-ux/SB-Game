@@ -8,7 +8,9 @@
     "damage": 11,
     "intervalMs": 520,
     "targets": 1,
-    "weight": 3
+    "weight": 3,
+    "unlockStage": 1,
+    "effect": {}
   },
   {
     "id": "bolt",
@@ -19,7 +21,9 @@
     "damage": 40,
     "intervalMs": 1500,
     "targets": 1,
-    "weight": 1.6
+    "weight": 1.6,
+    "unlockStage": 1,
+    "effect": {}
   },
   {
     "id": "fan",
@@ -30,7 +34,9 @@
     "damage": 8,
     "intervalMs": 620,
     "targets": 3,
-    "weight": 2.4
+    "weight": 2.4,
+    "unlockStage": 1,
+    "effect": {}
   },
   {
     "id": "flame",
@@ -41,6 +47,254 @@
     "damage": 15,
     "intervalMs": 800,
     "targets": 2,
-    "weight": 2.4
+    "weight": 2.4,
+    "unlockStage": 1,
+    "effect": {}
+  },
+  {
+    "id": "frost",
+    "name": "寒冰符",
+    "desc": "打到的妖魔會慢下來。傷害不高，但整條路都多爭取了時間。",
+    "color": "#7fe0e8",
+    "art": "frost",
+    "damage": 8,
+    "intervalMs": 700,
+    "targets": 2,
+    "weight": 2.4,
+    "unlockStage": 4,
+    "effect": {
+      "slowPercent": 0.28,
+      "slowMs": 1400
+    }
+  },
+  {
+    "id": "pyre",
+    "name": "焚天符",
+    "desc": "命中後持續灼燒。灼燒不會溢傷，血越厚燒得越划算。",
+    "color": "#f06a4a",
+    "art": "pyre",
+    "damage": 12,
+    "intervalMs": 900,
+    "targets": 1,
+    "weight": 2.2,
+    "unlockStage": 7,
+    "effect": {
+      "burnPercent": 1,
+      "burnMs": 2500
+    }
+  },
+  {
+    "id": "pierce",
+    "name": "穿雲符",
+    "desc": "打死目標後，多出來的傷害會穿到下一隻身上——一點都不浪費。",
+    "color": "#a8b8ff",
+    "art": "pierce",
+    "damage": 18,
+    "intervalMs": 820,
+    "targets": 1,
+    "weight": 2,
+    "unlockStage": 10,
+    "effect": {
+      "carryOverkill": true
+    }
+  },
+  {
+    "id": "fortune",
+    "name": "招財符",
+    "desc": "放在場上就多進帳。輸出略低於同儕，換來的是洞府裡的升級速度。",
+    "color": "#f0c65a",
+    "art": "fortune",
+    "damage": 9,
+    "intervalMs": 850,
+    "targets": 2,
+    "weight": 2.2,
+    "unlockStage": 13,
+    "effect": {
+      "goldBonus": 0.3
+    }
+  },
+  {
+    "id": "soul",
+    "name": "追魂符",
+    "desc": "對血量過半以下的目標傷害大增。補刀最快，開場最鈍。",
+    "color": "#c86ab0",
+    "art": "soul",
+    "damage": 7,
+    "intervalMs": 560,
+    "targets": 2,
+    "weight": 2.4,
+    "unlockStage": 17,
+    "effect": {
+      "woundedMultiplier": 1.7
+    }
+  },
+  {
+    "id": "breaker",
+    "name": "破軍符",
+    "desc": "對剛出場的滿血目標傷害大增。負責在妖魔還沒走近前先削一層。",
+    "color": "#e8a06a",
+    "art": "breaker",
+    "damage": 11,
+    "intervalMs": 800,
+    "targets": 2,
+    "weight": 2.2,
+    "unlockStage": 21,
+    "effect": {
+      "freshMultiplier": 1.6
+    }
+  },
+  {
+    "id": "abyss",
+    "name": "玄冥符",
+    "desc": "殘血的妖魔直接收走，不必再補一刀。首領免疫。",
+    "color": "#8a7ad0",
+    "art": "abyss",
+    "damage": 20,
+    "intervalMs": 1100,
+    "targets": 1,
+    "weight": 1.8,
+    "unlockStage": 25,
+    "effect": {
+      "executeBelow": 0.14
+    }
+  },
+  {
+    "id": "spirit",
+    "name": "引靈符",
+    "desc": "自身很弱，但上下左右四格的符都變強。擺在正中央最划算。",
+    "color": "#9fe8d8",
+    "art": "spirit",
+    "damage": 8,
+    "intervalMs": 900,
+    "targets": 1,
+    "weight": 1.6,
+    "unlockStage": 29,
+    "effect": {
+      "auraDamage": 0.14
+    }
+  },
+  {
+    "id": "gale",
+    "name": "疾風符",
+    "desc": "讓相鄰的符出手更快，自己也把抽符節奏帶起來。",
+    "color": "#a8f0c0",
+    "art": "gale",
+    "damage": 5,
+    "intervalMs": 900,
+    "targets": 2,
+    "weight": 1.6,
+    "unlockStage": 33,
+    "effect": {
+      "auraFireRate": 0.14,
+      "drawSpeedBonus": 0.15
+    }
+  },
+  {
+    "id": "tempest",
+    "name": "驚雷符",
+    "desc": "四分之一的機率打出兩倍餘的暴擊。期望值中等，但會出現扭轉戰局的一發。",
+    "color": "#d0b0ff",
+    "art": "tempest",
+    "damage": 9,
+    "intervalMs": 850,
+    "targets": 2,
+    "weight": 2.2,
+    "unlockStage": 38,
+    "effect": {
+      "critChance": 0.25,
+      "critMultiplier": 2.4
+    }
+  },
+  {
+    "id": "bastion",
+    "name": "山河符",
+    "desc": "每次斬殺都有機會補回一名弟子。守不住的那幾關靠它續命。",
+    "color": "#c8b48a",
+    "art": "bastion",
+    "damage": 9,
+    "intervalMs": 950,
+    "targets": 2,
+    "weight": 2,
+    "unlockStage": 43,
+    "effect": {
+      "repairChance": 0.06
+    }
+  },
+  {
+    "id": "taiyi",
+    "name": "太乙符",
+    "desc": "連續出手會越打越重，最高一點八倍；場上一空就從頭累積。",
+    "color": "#f0e0a8",
+    "art": "taiyi",
+    "damage": 7,
+    "intervalMs": 420,
+    "targets": 1,
+    "weight": 2.4,
+    "unlockStage": 48,
+    "effect": {
+      "rampPerShot": 0.09,
+      "rampMax": 1.8
+    }
+  },
+  {
+    "id": "slayer",
+    "name": "誅仙符",
+    "desc": "對首領傷害近兩倍，對雜兵平平。整場都在等關底那一刻。",
+    "color": "#ff8f8f",
+    "art": "slayer",
+    "damage": 20,
+    "intervalMs": 1000,
+    "targets": 1,
+    "weight": 1.8,
+    "unlockStage": 53,
+    "effect": {
+      "bossMultiplier": 1.8
+    }
+  },
+  {
+    "id": "myriad",
+    "name": "萬劍歸宗符",
+    "desc": "一次五道。妖魔滿場時無人能及，場上不到三隻反而比不上風刃符。",
+    "color": "#9fd0ff",
+    "art": "myriad",
+    "damage": 6,
+    "intervalMs": 750,
+    "targets": 5,
+    "weight": 2,
+    "unlockStage": 59,
+    "effect": {}
+  },
+  {
+    "id": "grand",
+    "name": "大衍符",
+    "desc": "自己吃到的陣法加成再放大六成。排得好的人拿最多。",
+    "color": "#e8d0ff",
+    "art": "grand",
+    "damage": 9,
+    "intervalMs": 800,
+    "targets": 2,
+    "weight": 2,
+    "unlockStage": 65,
+    "effect": {
+      "formationMultiplier": 1.6
+    }
+  },
+  {
+    "id": "seal",
+    "name": "鎮魔符",
+    "desc": "三道齊發、又減速又灼燒，但出手極慢。適合守最後那幾波。",
+    "color": "#b08ad0",
+    "art": "seal",
+    "damage": 11,
+    "intervalMs": 1300,
+    "targets": 3,
+    "weight": 1.6,
+    "unlockStage": 72,
+    "effect": {
+      "slowPercent": 0.2,
+      "slowMs": 1200,
+      "burnPercent": 0.5,
+      "burnMs": 2000
+    }
   }
 ]

@@ -3,6 +3,13 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
 import { state } from '../state';
 import { realmForStage } from '../systems/realms';
+import {
+  TALISMAN_SLOTS,
+  effectLines,
+  statLine,
+  talismanDefs,
+  unlockedTalismans,
+} from '../systems/talismans';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, GOLD, INK, INK_DIM, JADE, LINE, hexToNumber, textStyle, wrapText } from '../ui/theme';
@@ -21,7 +28,7 @@ function pct(ratio: number): number {
  * 玩法說明。
  *
  * 新手教學教的是「怎麼動手」，這一頁補的是「為什麼這樣動手」——
- * 四種符的取捨、階數上限怎麼長、耐久怎麼掉。教學只跑一次，這一頁隨時查得到。
+ * 帶哪四張符、階數上限怎麼長、陣法怎麼成、耐久怎麼掉。教學只跑一次，這一頁隨時查得到。
  *
  * 內容裡的數字一律從 data/*.json 讀，不另外抄一份：抄一份就一定會和實際數值走散。
  */
@@ -32,10 +39,18 @@ export class HelpScene extends Phaser.Scene {
 
   private sections(): Section[] {
     const { field, formation, wave } = BALANCE;
-    const cards = CARDS.map(
+    const save = state();
+    const unlocked = unlockedTalismans(save.world.highestStage);
+    const pool = talismanDefs(save.player.talismans, save.world.highestStage);
+    // 只列玩家帶的四張。二十張全列出來是一份查不完的表，而他這一場遇得到的只有四張。
+    const cards = pool.map(
       (card) =>
         `・${card.name}：一次打 ${card.targets} 個、每 ${(card.intervalMs / 1000).toFixed(2)} 秒出手一次`,
     );
+    const mine = pool.flatMap((card) => [
+      `・${card.name}　${statLine(card)}`,
+      ...effectLines(card).map((line) => `　　◆ ${line}`),
+    ]);
     return [
       {
         title: '目標',
@@ -81,11 +96,27 @@ export class HelpScene extends Phaser.Scene {
         ],
       },
       {
-        title: '四種符的取捨',
+        title: `符籙譜：${CARDS.length} 張裡帶 ${TALISMAN_SLOTS} 張`,
         lines: [
-          '傷害是逐目標結算的，超出的部分直接浪費：',
+          `每次入場只能帶 ${TALISMAN_SLOTS} 張符，這四張就是整個抽符池。`,
+          '池子小，同一種才湊得到第二張——合成是唯一的指數成長，它必須湊得到。',
+          '而四種正好對上 3×3 的陣法：多帶會湊不成五行陣，少帶排不出變化。',
+          '',
+          '你目前帶的是：',
+          ...mine,
+          '',
+          `符籙靠推關解鎖，目前已參悟 ${unlocked.length} / ${CARDS.length} 張。`,
+          '後解鎖的不是更強的符，是條件不同的符：誅仙符對首領近兩倍、對雜兵平平；',
+          '引靈符自己幾乎不輸出，靠的是把相鄰四格撐起來。',
+        ],
+      },
+      {
+        title: '傷害是逐目標結算的',
+        lines: [
+          '每一道各自結算，超出目標血量的部分直接浪費：',
           ...cards,
           '所以天雷符打小妖會浪費一半，打首領最狠；風刃符正好相反。',
+          '穿雲符則把溢出的傷害轉給下一隻，正好補上這個洞。',
         ],
       },
       {

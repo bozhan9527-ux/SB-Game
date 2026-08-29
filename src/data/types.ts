@@ -30,6 +30,13 @@ export interface FieldBalance {
   /** 抽到高一階的機率。 */
   drawTierBonusChance: number;
   drawIntervalMs: number;
+  /**
+   * 山河符回耐久的機率上限（整場加總後）。
+   *
+   * 沒有上限的話，鋪滿回耐久的符會變成「怎麼漏都不會死」，
+   * 整個漏怪代價系統直接失效——那是一條規則，不是一個數值。
+   */
+  maxRepairChance: number;
 }
 
 /**
@@ -209,6 +216,59 @@ export interface Sect {
   mergeRefundChance: number;
 }
 
+/**
+ * 符籙特效。
+ *
+ * 二十張符全部共用這一組欄位，每一張只用到一兩項，其餘留在預設值（等於沒有）。
+ * 用「一組固定欄位 + 預設值」而不是「每張符一段自訂邏輯」的理由：
+ * 特效要能在 tickCombat 裡一次結算完，而且平衡模擬跑的必須是同一份實作。
+ * 若每張符各寫各的，模擬就得複製一份規則，兩邊立刻走散（見 PROGRESS 的 L-04）。
+ *
+ * 分成兩類：**逐發結算**的在開火迴圈裡生效，**在場被動**只要符還在陣位上就持續生效。
+ */
+export interface CardEffect {
+  // ── 逐發結算 ────────────────────────────────────────────────
+  /** 命中時把目標的速度降低這個比例。 */
+  slowPercent: number;
+  /** 減速持續多久（ms）。同一隻身上取較強的一次，不疊加。 */
+  slowMs: number;
+  /** 命中時附加灼燒，總量為該次傷害的這個比例。 */
+  burnPercent: number;
+  /** 灼燒攤在多久內燒完（ms）。 */
+  burnMs: number;
+  /** 目標血量低於這個比例時直接斬殺。首領免疫——否則關底變成一發定生死。 */
+  executeBelow: number;
+  /** 打死目標後把溢出的傷害轉給下一隻，而不是浪費掉。 */
+  carryOverkill: boolean;
+  /** 暴擊機率與倍率。 */
+  critChance: number;
+  critMultiplier: number;
+  /** 對首領的額外傷害倍率。 */
+  bossMultiplier: number;
+  /** 對血量已低於一半的目標的額外倍率。 */
+  woundedMultiplier: number;
+  /** 對血量仍在八成以上的目標的額外倍率。 */
+  freshMultiplier: number;
+  /** 連續出手時每一發累加的傷害比例；場上沒有敵人時歸零。 */
+  rampPerShot: number;
+  /** 累加的上限倍率。 */
+  rampMax: number;
+
+  // ── 在場被動 ────────────────────────────────────────────────
+  /** 上下左右相鄰陣位的傷害加成。 */
+  auraDamage: number;
+  /** 上下左右相鄰陣位的出手速度加成。 */
+  auraFireRate: number;
+  /** 在場上時的全場金幣加成。 */
+  goldBonus: number;
+  /** 在場上時的全場抽符加速。 */
+  drawSpeedBonus: number;
+  /** 每次斬殺回復一名弟子的機率。 */
+  repairChance: number;
+  /** 這張符自己吃到的陣法加成放大幾倍。 */
+  formationMultiplier: number;
+}
+
 /** 法寶符的種類。實際出現的階數由 src/systems/deck.ts 依境界決定。 */
 export interface CardDef {
   id: string;
@@ -222,8 +282,11 @@ export interface CardDef {
   intervalMs: number;
   /** 一次同時打幾個目標。 */
   targets: number;
-  /** 抽符時的權重。 */
+  /** 抽符時的權重。只在同一副符籙配置（四張）之內比較。 */
   weight: number;
+  /** 歷史最高關卡到達這一關才解鎖。前四張是 1，開局就有。 */
+  unlockStage: number;
+  effect: CardEffect;
 }
 
 /** 六條金幣升級線。 */

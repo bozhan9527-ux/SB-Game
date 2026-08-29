@@ -14,6 +14,7 @@ import {
   tickCombat,
 } from '../src/systems/defense';
 import { buildLoadoutFor } from '../src/systems/loadout';
+import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
 import { trackById, upgradeCost } from '../src/systems/upgrades';
 
@@ -126,11 +127,13 @@ function runOnce(
   upgrades: Record<string, number>,
   sectId: string,
   seed: number,
+  talismans?: readonly string[],
 ): RunOutcome {
   const sect = SECTS.find((item) => item.id === sectId);
   if (sect === undefined) throw new Error(`測試用門派不存在：${sectId}`);
   const rng = createRng(seed);
-  const state = createDefenseState(buildLoadoutFor(sect, upgrades, stage), rng);
+  const pool = talismans === undefined ? undefined : talismanDefs(talismans, 999);
+  const state = createDefenseState(buildLoadoutFor(sect, upgrades, stage, pool), rng);
 
   let sinceDecision = 0;
   let bossGateHits = 0;
@@ -189,7 +192,7 @@ interface Progress {
 const RETRY_LIMIT = 12;
 const STAGES = 81;
 
-function playThrough(sectId: string, maxStage: number): Progress {
+function playThrough(sectId: string, maxStage: number, talismans?: readonly string[]): Progress {
   const levels: Record<string, number> = {};
   const durations: number[] = [];
   const leaks: number[] = [];
@@ -201,7 +204,7 @@ function playThrough(sectId: string, maxStage: number): Progress {
   for (let stage = 1; stage <= maxStage; stage += 1) {
     let attempts = 0;
     for (;;) {
-      const outcome = runOnce(stage, levels, sectId, stage * 7919 + attempts * 104729);
+      const outcome = runOnce(stage, levels, sectId, stage * 7919 + attempts * 104729, talismans);
       totalRuns += 1;
       attempts += 1;
       gold = spendGold(levels, gold + outcome.gold);
@@ -261,6 +264,35 @@ describe('數值平衡', () => {
     const { bossGateHits } = playThrough('body', STAGES);
     const reachedGate = bossGateHits.filter((count) => count > 0).length;
     expect(reachedGate, '首領從來沒摸到山門，關底完全沒有壓力').toBeGreaterThan(0);
+  });
+
+  it('每一種符籙配置都推得完 81 關——沒有一副牌是死路', () => {
+    // 二十張裡帶四張，組合上千種，不可能全跑。這裡挑的是「各走極端」的幾副：
+    // 純輸出、純控場、純關底、以及最極端的全輔助（幾乎不輸出）。
+    // 全輔助那一副本來就該很難打，但**難不等於不可能**——若它推不完，
+    // 就代表某幾張符是陷阱，玩家選了會卡死，那是設計缺陷而不是難度。
+    const builds: Record<string, string[]> = {
+      起手四符: ['sword', 'bolt', 'fan', 'flame'],
+      控場流: ['frost', 'pyre', 'pierce', 'flame'],
+      關底流: ['slayer', 'myriad', 'grand', 'seal'],
+      斬殺流: ['tempest', 'abyss', 'soul', 'breaker'],
+      全輔助: ['spirit', 'gale', 'bastion', 'fortune'],
+    };
+    for (const [name, pool] of Object.entries(builds)) {
+      const progress = playThrough('body', STAGES, pool);
+      expect(progress.stuckAt, `${name} 卡在第 ${progress.stuckAt} 關`).toBeNull();
+    }
+  });
+
+  it('模擬的 AI 完全看不懂特效，卻仍推得完——真人只會更輕鬆', () => {
+    // AI 挑牌只看 cardDps，而 cardDps 刻意不含特效（見 deck.ts）。
+    // 也就是說它會把引靈符當成廢牌、不知道要把寒冰符留著。
+    // 這條在意的不是分數，是「這份模擬對真人是保守的」這個前提還成立。
+    const supportOnly = playThrough('body', STAGES, ['spirit', 'gale', 'bastion', 'fortune']);
+    const starters = playThrough('body', STAGES, ['sword', 'bolt', 'fan', 'flame']);
+    expect(supportOnly.stuckAt).toBeNull();
+    // 幾乎不輸出的那一副理應打得比較辛苦，否則特效就等於白給。
+    expect(supportOnly.totalRuns).toBeGreaterThan(starters.totalRuns);
   });
 
   it('不花金幣升級的話會在中後期卡死，升級才有意義', () => {

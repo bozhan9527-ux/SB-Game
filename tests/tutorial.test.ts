@@ -29,7 +29,7 @@ describe('新手教學', () => {
 
   it('教學起手牌保證第一步放得下、第二步合得起來', () => {
     const field = tutorialField(BALANCE.field.fieldSlots);
-    const hand = tutorialHand(BALANCE.field.handSlots);
+    const hand = tutorialHand(BALANCE.field.handSlots, 'flame');
 
     // 場上全空，所以「拖到空格」一定成立。
     expect(field.length).toBe(BALANCE.field.fieldSlots);

@@ -171,7 +171,7 @@ export class RunScene extends Phaser.Scene {
     this.step = shouldRunTutorial(save) ? 'deploy' : 'done';
     if (this.step !== 'done') {
       this.run.field = tutorialField(this.run.field.length);
-      this.run.hand = tutorialHand(this.run.hand.length);
+      this.run.hand = tutorialHand(this.run.hand.length, this.run.loadout.talismans[0]?.id ?? 'flame');
       this.run.cooldowns = this.run.cooldowns.map(() => 0);
     }
 
@@ -700,6 +700,14 @@ export class RunScene extends Phaser.Scene {
       container.setData('bar', bar);
     }
 
+    // 減速與灼燒的標記。特效若看不見，玩家就沒有理由相信寒冰符真的有用——
+    // 一個沒有回饋的機制等於不存在。
+    const frost = this.add.circle(0, -6, 30, 0x7fe0e8, 0.22).setVisible(false);
+    const ember = this.add.circle(0, -6, 24, 0xf06a4a, 0.26).setVisible(false);
+    container.add([frost, ember]);
+    container.setData('frost', frost);
+    container.setData('ember', ember);
+
     this.enemySprites.set(enemy.id, container);
   }
 
@@ -710,6 +718,10 @@ export class RunScene extends Phaser.Scene {
       view.y = ARENA_TOP + enemy.y;
       const bar = view.getData('bar') as Phaser.GameObjects.Rectangle | undefined;
       bar?.setDisplaySize(Math.max(0, 46 * (enemy.hp / enemy.maxHp)), 5);
+      const frost = view.getData('frost') as Phaser.GameObjects.Arc | undefined;
+      const ember = view.getData('ember') as Phaser.GameObjects.Arc | undefined;
+      frost?.setVisible(enemy.slowUntilMs > this.run.elapsedMs);
+      ember?.setVisible(enemy.burnRemaining > 0);
       if (enemy.boss) this.refreshBossPanel(enemy);
     }
   }

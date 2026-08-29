@@ -14,6 +14,9 @@
  * 混在一起（兩同一異）什麼都不算——這是唯一「白放」的情況，
  * 所以擺放仍然要想，但兩種自然的打法都有回報，不會逼玩家只能走一條路。
  *
+ * 這一檔只回答「哪些線成陣、算哪一階」。實際每一格拿到多少倍率由 board.ts 合成，
+ * 因為那裡還要加上光環與大衍符的放大——加成只能有一個地方算，否則畫面顯示的與實戰用的會走散。
+ *
  * 走過的兩個極端都不好：
  * 只認同種時，同色是純上位解（好排又好合），取捨消失；
  * 只認異種時，走同色流的玩家一條陣都吃不到，後期硬得過頭。
@@ -33,15 +36,6 @@ export interface FormationLine {
   /** 構成這一條線的陣位索引。 */
   slots: number[];
 }
-
-export interface FormationBonus {
-  /** 傷害倍率，1 為無加成。 */
-  damage: number;
-  /** 出手速度倍率，1 為無加成。 */
-  fireRate: number;
-}
-
-export const NO_BONUS: FormationBonus = { damage: 1, fireRate: 1 };
 
 export function formationColumns(): number {
   return Math.max(1, Math.round(BALANCE.formation.columns));
@@ -122,37 +116,4 @@ export function activeFormations(field: readonly (Card | null)[]): FormationLine
     push('diagonal', Array.from({ length: rows }, (_, i) => i * columns + (columns - 1 - i)));
   }
   return found;
-}
-
-/**
- * 單一陣位吃到的加成。同時落在橫陣與縱陣上時兩者相加（十字），這是排陣的最高獎勵。
- */
-export function bonusForSlot(field: readonly (Card | null)[], slot: number): FormationBonus {
-  return bonusesForField(field)[slot] ?? { damage: 1, fireRate: 1 };
-}
-
-/**
- * 一次算完整個場上的加成，讓每一拍只走一次 activeFormations。
- *
- * 每一格至多各吃一次橫、縱、斜。橫與縱本來就不會重複，但正中央那一格同時在兩條斜線上，
- * 不去重的話它會拿到雙倍斜陣加成——單一格位的上限必須是可預期的。
- */
-export function bonusesForField(field: readonly (Card | null)[]): FormationBonus[] {
-  const { formation } = BALANCE;
-  const bonuses: FormationBonus[] = field.map(() => ({ damage: 1, fireRate: 1 }));
-  const diagonalCounted = new Set<number>();
-  for (const line of activeFormations(field)) {
-    const tier = line.pattern === 'same' ? formation.same : formation.distinct;
-    for (const slot of line.slots) {
-      const bonus = bonuses[slot];
-      if (bonus === undefined) continue;
-      if (line.kind === 'row') bonus.damage += tier.rowDamage;
-      else if (line.kind === 'column') bonus.fireRate += tier.columnFireRate;
-      else if (!diagonalCounted.has(slot)) {
-        diagonalCounted.add(slot);
-        bonus.damage += tier.diagonalDamage;
-      }
-    }
-  }
-  return bonuses;
 }

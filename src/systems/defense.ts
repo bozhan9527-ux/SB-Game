@@ -12,7 +12,7 @@ import { BALANCE, ENEMIES } from '../data';
 import type { BossArt, BossDef, MobArt } from '../data/types';
 import type { Card } from './deck';
 import { cardDamage, cardDef, cardInterval, drawCard, maxTierForStage } from './deck';
-import { NO_BONUS, bonusesForField } from './formation';
+import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from './board';
 import type { Loadout } from './loadout';
 import { realmForStage, realmIndexForStage } from './realms';
 import type { Rng } from './rng';
@@ -29,7 +29,14 @@ export interface ActiveEnemy {
   /** 已推進的距離（px）。0 為剛出場，達到 trackPx 就攻進山門。 */
   y: number;
   lane: number;
+  /** 未受減速時的速度。 */
   speed: number;
+  /** 減速的到期時間（elapsedMs）與強度。同一隻身上取較強的一次，不疊加。 */
+  slowUntilMs: number;
+  slowPercent: number;
+  /** 尚未燒完的灼燒總量，以及每毫秒燒多少。 */
+  burnRemaining: number;
+  burnPerMs: number;
 }
 
 interface SpawnEntry {
@@ -57,6 +64,13 @@ export interface DefenseState {
   field: (Card | null)[];
   /** 每個場上格位的出手倒數（ms）。 */
   cooldowns: number[];
+  /**
+   * 每個格位「連續出手」累積的傷害倍率（太乙符）。
+   *
+   * 場上一沒有敵人就整排歸零：這條特效換來的是「持續有得打」的獎勵，
+   * 若空場也保留，它就退化成一個無條件的傷害加成。
+   */
+  ramps: number[];
   enemies: ActiveEnemy[];
   queue: SpawnEntry[];
   bossDef: BossDef;
@@ -245,10 +259,10 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
   // 場上格位數受「陣法擴充」影響，因此看 loadout 而不是直接看 balance。
   const slots: (Card | null)[] = new Array<Card | null>(loadout.fieldSlots).fill(null);
   for (let i = 0; i < field.startingField && i < slots.length; i += 1) {
-    slots[i] = drawCard(loadout.stage, rng);
+    slots[i] = drawCard(loadout, loadout.stage, rng);
   }
   for (let i = 0; i < field.startingHand && i < hand.length; i += 1) {
-    hand[i] = drawCard(loadout.stage, rng);
+    hand[i] = drawCard(loadout, loadout.stage, rng);
   }
 
   const state: DefenseState = {
@@ -260,6 +274,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     hand,
     field: slots,
     cooldowns: new Array<number>(loadout.fieldSlots).fill(0),
+    ramps: new Array<number>(loadout.fieldSlots).fill(0),
     enemies: [],
     queue,
     bossDef: boss,
@@ -307,7 +322,12 @@ export function cardAt(state: DefenseState, slot: CardSlot): Card | null {
 
 function place(state: DefenseState, slot: CardSlot, card: Card | null): void {
   listOf(state, slot.where)[slot.index] = card;
-  if (slot.where === 'field') state.cooldowns[slot.index] = 0;
+  // 換符就重置這一格的出手倒數與連射累積：累積屬於「那一張符一直在打」，
+  // 不屬於格子本身，否則把太乙符搬進一個熱格會直接繼承別人的成果。
+  if (slot.where === 'field') {
+    state.cooldowns[slot.index] = 0;
+    state.ramps[slot.index] = 0;
+  }
   if (card !== null) state.peakTier = Math.max(state.peakTier, card.tier);
 }
 
@@ -406,7 +426,10 @@ export function mergeInto(
   into[target.index] = { type: onto.type, tier: onto.tier + 1 };
   const refunded = rng.next() < state.loadout.sect.mergeRefundChance;
   if (!refunded) from[source.index] = null;
-  if (target.where === 'field') state.cooldowns[target.index] = 0;
+  if (target.where === 'field') {
+    state.cooldowns[target.index] = 0;
+    state.ramps[target.index] = 0;
+  }
   state.merges += 1;
   state.peakTier = Math.max(state.peakTier, onto.tier + 1);
   return true;
@@ -424,6 +447,121 @@ function frontMost(state: DefenseState, count: number): ActiveEnemy[] {
 }
 
 /**
+ * 一張符出手一次，把所有逐發特效結算完。
+ *
+ * 結算順序是有意義的，不是隨手排的：
+ *
+ * 1. **條件倍率**（對首領／對殘血／對滿血）先乘，因為它們看的是「打之前」的血量。
+ *    若放在傷害之後判定，一發把敵人打到半血的攻擊會自己觸發自己的殘血加成。
+ * 2. **連射累積**接著乘，它與目標無關，一次出手裡每一道都吃同樣的倍率。
+ * 3. **暴擊**最後擲骰，每一道各擲一次——三道齊發的符不會三道一起暴。
+ * 4. 扣血之後才判 **斬殺**，再把 **溢傷** 帶給下一個目標。
+ *    先扣血再斬殺，是為了讓斬殺只負責「收掉打不死的殘血」而不是取代傷害。
+ * 5. **減速與灼燒**掛在還活著的目標身上；已經死的不掛，免得在收屍前多算一拍。
+ */
+function fireOnce(
+  state: DefenseState,
+  slot: number,
+  card: Card,
+  damageBonus: number,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const def = cardDef(card.type);
+  const { effect } = def;
+  const base = cardDamage(card, state.loadout) * damageBonus;
+
+  // 太乙符：這一次出手用的是「出手前」累積到的倍率，累積本身在出手後才 +1。
+  let ramp = 1;
+  if (effect.rampPerShot > 0) {
+    ramp = Math.min(effect.rampMax, 1 + (state.ramps[slot] ?? 0) * effect.rampPerShot);
+    state.ramps[slot] = (state.ramps[slot] ?? 0) + 1;
+  }
+
+  // 穿雲符：上一個目標溢出的傷害帶到下一個。
+  // 因此它掃描的隊伍比自己的道數長——「穿」的意思就是打穿了還往後走，
+  // 只是後面那幾隻吃到的純粹是溢出來的部分，不是再打一發。
+  let carried = 0;
+  const reach = effect.carryOverkill ? state.enemies.length : def.targets;
+
+  const queue = frontMost(state, reach);
+  for (let index = 0; index < queue.length; index += 1) {
+    const target = queue[index];
+    if (target === undefined || target.hp <= 0) continue;
+    const beyondTargets = index >= def.targets;
+    if (beyondTargets && carried <= 0) break;
+
+    const ratio = target.maxHp > 0 ? target.hp / target.maxHp : 1;
+
+    let damage = beyondTargets ? 0 : base * ramp;
+    if (!beyondTargets) {
+      if (target.boss) damage *= state.loadout.bossDamageMultiplier * effect.bossMultiplier;
+      if (ratio <= 0.5) damage *= effect.woundedMultiplier;
+      if (ratio >= 0.8) damage *= effect.freshMultiplier;
+      if (effect.critChance > 0 && rng.next() < effect.critChance) damage *= effect.critMultiplier;
+    }
+    damage += carried;
+    carried = 0;
+
+    target.hp -= damage;
+
+    // 玄冥符：殘血直接收走。首領免疫——否則關底會變成一發定生死。
+    if (
+      target.hp > 0 &&
+      !target.boss &&
+      effect.executeBelow > 0 &&
+      target.hp < effect.executeBelow * target.maxHp
+    ) {
+      damage += target.hp;
+      target.hp = 0;
+    }
+
+    // 穿雲符：打死了就把多出來的傷害留給下一隻，不浪費。
+    if (effect.carryOverkill && target.hp < 0) {
+      carried = -target.hp;
+      damage += target.hp;
+    }
+
+    if (target.hp > 0) {
+      if (effect.slowPercent > 0) applySlow(state, target, effect.slowPercent, effect.slowMs);
+      if (effect.burnPercent > 0 && effect.burnMs > 0) {
+        applyBurn(target, damage * effect.burnPercent, effect.burnMs);
+      }
+    }
+
+    report.shots.push({ slot, enemyId: target.id, damage, killed: target.hp <= 0 });
+  }
+}
+
+/** 減速不疊加，取「還沒過期的那一段」與新的一段之中較強的。 */
+function applySlow(
+  state: DefenseState,
+  enemy: ActiveEnemy,
+  percent: number,
+  durationMs: number,
+): void {
+  const active = enemy.slowUntilMs > state.elapsedMs;
+  if (!active || percent >= enemy.slowPercent) {
+    enemy.slowPercent = percent;
+    enemy.slowUntilMs = state.elapsedMs + durationMs;
+  } else {
+    enemy.slowUntilMs = Math.max(enemy.slowUntilMs, state.elapsedMs + durationMs);
+  }
+}
+
+/**
+ * 灼燒累加總量，燒速取較快的一次。
+ *
+ * 用「剩餘總量 + 每毫秒燒多少」而不是一疊獨立的層數：層數會在密集命中時無限成長，
+ * 每一拍都要走一遍全部層數；這個寫法只有兩個數字，而且總傷害完全一樣。
+ */
+function applyBurn(enemy: ActiveEnemy, amount: number, durationMs: number): void {
+  if (amount <= 0) return;
+  enemy.burnRemaining += amount;
+  enemy.burnPerMs = Math.max(enemy.burnPerMs, amount / durationMs);
+}
+
+/**
  * 推進一拍。場景與平衡模擬都呼叫這一支。
  *
  * 順序刻意是「開火 → 移動 → 判定漏怪」：這一拍打得死的妖魔就不會先攻進山門，
@@ -437,15 +575,18 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
   state.elapsedMs += deltaMs;
 
   // 1. 抽符
+  // 在場被動每一拍重算：玩家隨時可能把招財符或疾風符搬下場。
+  const passives = fieldPassives(state.field);
+  const drawSpeed = state.loadout.drawSpeedMultiplier * passives.drawSpeedMultiplier;
   state.drawTimer -= deltaMs;
   while (state.drawTimer <= 0) {
-    state.drawTimer += fieldCfg.drawIntervalMs / state.loadout.drawSpeedMultiplier;
+    state.drawTimer += fieldCfg.drawIntervalMs / drawSpeed;
     const slot = state.hand.indexOf(null);
     if (slot < 0) {
       report.drawLost = true;
       continue;
     }
-    state.hand[slot] = drawCard(state.stage, rng);
+    state.hand[slot] = drawCard(state.loadout, state.stage, rng);
     report.drawnSlot = slot;
   }
 
@@ -465,6 +606,10 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       y: 0,
       lane: next.lane,
       speed: next.speed,
+      slowUntilMs: 0,
+      slowPercent: 0,
+      burnRemaining: 0,
+      burnPerMs: 0,
     };
     state.nextId += 1;
     state.enemies.push(enemy);
@@ -475,12 +620,20 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     }
   }
 
-  // 3. 法寶開火。陣法加成每一拍重算一次——玩家隨時可能把符搬到別格。
-  const bonuses = bonusesForField(state.field);
+  // 3. 灼燒。放在開火之前，好讓這一拍燒死的妖魔和被打死的走同一條收屍路徑。
+  for (const enemy of state.enemies) {
+    if (enemy.burnRemaining <= 0 || enemy.hp <= 0) continue;
+    const tick = Math.min(enemy.burnRemaining, enemy.burnPerMs * deltaMs);
+    enemy.burnRemaining -= tick;
+    enemy.hp -= tick;
+  }
+
+  // 4. 法寶開火。陣法與光環每一拍重算一次——玩家隨時可能把符搬到別格。
+  const bonuses = boardBonuses(state.field);
   for (let slot = 0; slot < state.field.length; slot += 1) {
     const card = state.field[slot];
     if (card === undefined || card === null) continue;
-    const bonus = bonuses[slot] ?? NO_BONUS;
+    const bonus = bonuses[slot] ?? NO_SLOT_BONUS;
     const interval = cardInterval(card, state.loadout) / bonus.fireRate;
     const cooling = state.cooldowns[slot] ?? 0;
     let remaining = cooling - deltaMs;
@@ -489,43 +642,42 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       remaining += interval;
       if (state.enemies.length === 0) {
         remaining = 0;
+        // 場上一空，連射累積就歸零：太乙符換來的是「持續有得打」的獎勵。
+        state.ramps[slot] = 0;
         break;
       }
-      const def = cardDef(card.type);
-      for (const target of frontMost(state, def.targets)) {
-        if (target.hp <= 0) continue;
-        const damage =
-          cardDamage(card, state.loadout) *
-          bonus.damage *
-          (target.boss ? state.loadout.bossDamageMultiplier : 1);
-        target.hp -= damage;
-        report.shots.push({ slot, enemyId: target.id, damage, killed: target.hp <= 0 });
-      }
+      fireOnce(state, slot, card, bonus.damage, rng, report);
     }
     state.cooldowns[slot] = remaining;
   }
 
-  // 4. 收屍與發金幣
+  // 5. 收屍與發金幣
   const survivors: ActiveEnemy[] = [];
   for (const enemy of state.enemies) {
     if (enemy.hp > 0) {
       survivors.push(enemy);
       continue;
     }
-    const gold = killGold(state, enemy.boss);
+    const gold = killGold(state, enemy.boss) * passives.goldMultiplier;
     state.gold += gold;
     state.kills += 1;
     if (enemy.boss) state.bossKilled = true;
+    // 山河符：斬殺有機率補回一名弟子，但補不過起始上限——它是續命，不是無敵。
+    if (passives.repairChance > 0 && rng.next() < passives.repairChance) {
+      state.disciples = Math.min(state.maxDisciples, state.disciples + 1);
+    }
     report.kills.push({ enemyId: enemy.id, boss: enemy.boss, gold });
   }
   state.enemies = survivors;
 
-  // 5. 推進、砸門與漏怪
+  // 6. 推進、砸門與漏怪
   const step = deltaMs / 1000;
   const stillOnTrack: ActiveEnemy[] = [];
   state.bossAtGate = false;
   for (const enemy of state.enemies) {
-    enemy.y += enemy.speed * step;
+    // 減速只影響推進，不影響血量或砸門節奏——寒冰符買的是時間，不是傷害。
+    const slowed = enemy.slowUntilMs > state.elapsedMs ? 1 - enemy.slowPercent : 1;
+    enemy.y += enemy.speed * slowed * step;
     if (enemy.y < waveCfg.trackPx) {
       stillOnTrack.push(enemy);
       continue;
@@ -566,7 +718,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     state.bossGateAccum = 0;
   }
 
-  // 6. 勝負
+  // 7. 勝負
   if (state.disciples <= 0) {
     state.outcome = 'defeated';
   } else if (state.queue.length === 0 && state.enemies.length === 0 && state.bossKilled) {

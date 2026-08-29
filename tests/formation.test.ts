@@ -4,14 +4,14 @@ import type { Card } from '../src/systems/deck';
 import { fieldDps } from '../src/systems/deck';
 import {
   activeFormations,
-  bonusForSlot,
-  bonusesForField,
   formationEffect,
   formationName,
   formationRows,
 } from '../src/systems/formation';
+import { bonusForSlot, boardBonuses } from '../src/systems/board';
 import type { FormationKind, FormationPattern } from '../src/systems/formation';
 import { buildLoadoutFor } from '../src/systems/loadout';
+import { TALISMAN_SLOTS } from '../src/systems/talismans';
 import { SECTS } from '../src/data';
 
 const sect = SECTS.find((item) => item.id === 'body');
@@ -33,7 +33,7 @@ function field9(cards: (Card | null)[]): (Card | null)[] {
 
 /** 整個場的平均加成（傷害×出手），用來比較不同排法的強弱。 */
 function averageBonus(field: (Card | null)[]): number {
-  const bonuses = bonusesForField(field);
+  const bonuses = boardBonuses(field);
   return bonuses.reduce((sum, bonus) => sum + bonus.damage * bonus.fireRate, 0) / bonuses.length;
 }
 
@@ -118,14 +118,14 @@ describe('陣法', () => {
 
   it('同時落在橫陣與縱陣上的那一格，兩種加成相加', () => {
     const { formation } = BALANCE;
-    const bonus = bonusesForField(LATIN)[1];
+    const bonus = boardBonuses(LATIN)[1];
     expect(bonus?.damage).toBeCloseTo(1 + formation.distinct.rowDamage, 6);
     expect(bonus?.fireRate).toBeCloseTo(1 + formation.distinct.columnFireRate, 6);
   });
 
   it('橫同心、縱五行可以並存於同一格——不強迫玩家選一條路', () => {
     const { formation } = BALANCE;
-    const bonus = bonusesForField(STRIPED)[1];
+    const bonus = boardBonuses(STRIPED)[1];
     expect(bonus?.damage).toBeCloseTo(1 + formation.same.rowDamage, 6);
     expect(bonus?.fireRate).toBeCloseTo(1 + formation.distinct.columnFireRate, 6);
   });
@@ -140,7 +140,7 @@ describe('陣法', () => {
     ]);
     const lines = activeFormations(nine).filter((line) => line.kind === 'diagonal');
     expect(lines).toHaveLength(2);
-    const centre = bonusesForField(nine)[4];
+    const centre = boardBonuses(nine)[4];
     expect(centre?.damage).toBeCloseTo(1 + formation.distinct.diagonalDamage, 6);
   });
 
@@ -165,7 +165,7 @@ describe('陣法', () => {
     const best = (1 + tier.rowDamage + tier.diagonalDamage) * (1 + tier.columnFireRate);
     expect(best).toBeLessThan(Math.pow(field.tierGrowth, 2));
     // 實際擺得出來的最高單格，也要在這條線以下。
-    const peak = Math.max(...bonusesForField(LATIN).map((b) => b.damage * b.fireRate));
+    const peak = Math.max(...boardBonuses(LATIN).map((b) => b.damage * b.fireRate));
     expect(peak).toBeLessThanOrEqual(best);
   });
 
@@ -177,10 +177,11 @@ describe('陣法', () => {
   });
 
   it('3×3 八條陣湊得到，但只有 0.18% 的擺法做得到', () => {
-    // 四種符、兩種成陣方式（全同種／全不同種）下的天花板，直接窮舉 4^9 釘住。
-    // 日後改動符種數或成陣規則時，這條會失敗並提醒重算天花板。
-    const types = CARDS.map((card) => card.id);
-    expect(types.length, '符種數變了，陣法的天花板要重算').toBe(4);
+    // 天花板是在「場上只有四種符」的前提下算的——那正是一副符籙配置帶的張數，
+    // 不是符籙譜的總數（二十張）。窮舉 4^9 把上限釘住。
+    // 日後改動 TALISMAN_SLOTS 或成陣規則時，這條會失敗並提醒重算天花板。
+    expect(TALISMAN_SLOTS, '一場帶的符數變了，陣法的天花板要重算').toBe(4);
+    const types = CARDS.slice(0, TALISMAN_SLOTS).map((card) => card.id);
 
     let best = 0;
     let perfect = 0;
@@ -201,7 +202,7 @@ describe('陣法', () => {
     };
     walk(0);
     expect(best, '陣法上限變了').toBe(8);
-    expect(total).toBe(4 ** 9);
+    expect(total).toBe(TALISMAN_SLOTS ** 9);
     expect(perfect, '滿陣的擺法數變了').toBe(484);
     expect(perfect / total).toBeLessThan(0.002);
   });
@@ -210,7 +211,7 @@ describe('陣法', () => {
     const step = BALANCE.field.tierGrowth;
     // 拉丁方是八條陣裡最強的排法，而且要在合成不斷把符換掉的情況下維持住——
     // 這是技巧上限，不是隨手就有的。
-    const bonuses = bonusesForField(LATIN);
+    const bonuses = boardBonuses(LATIN);
     const average =
       bonuses.reduce((sum, bonus) => sum + bonus.damage * bonus.fireRate, 0) / bonuses.length;
     const peak = Math.max(...bonuses.map((bonus) => bonus.damage * bonus.fireRate));

@@ -5,6 +5,7 @@
  * 用 SVG 的理由：檔案小、可任意縮放、可以用 setTint 依門派／境界換色，
  * 不需要為每個配色各存一張圖。
  */
+import { CARDS } from './data';
 import type { BossArt, MobArt, SectArt } from './data/types';
 
 export const ART = {
@@ -17,7 +18,13 @@ export function glyphTexture(art: string): string {
   return `glyph-${art}`;
 }
 
-const GLYPH_ARTS = ['sword', 'bolt', 'fan', 'flame'] as const;
+/**
+ * 要預載哪些圖騰，直接從 cards.json 推得。
+ *
+ * 手抄一份清單的話，新增一張符卻忘了補這裡，牌面會變成一片空白——
+ * 而那種錯誤只有在那張符被抽到時才看得出來。讓資料自己說。
+ */
+const GLYPH_ARTS: readonly string[] = [...new Set(CARDS.map((card) => card.art))];
 
 /** 人物圖以兩倍尺寸點陣化再縮小，避免在高解析度手機上糊掉。 */
 export const DISCIPLE_SOURCE_HEIGHT = 112;

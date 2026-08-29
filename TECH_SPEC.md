@@ -31,7 +31,7 @@
 ├─ data/                          # 遊戲資料（JSON）— 見第 3 節
 │   ├─ balance.json              # 全域數值常數（手牌與陣位、階數曲線、波次、首領、金幣）
 │   ├─ realms.json               # 境界：關卡區間、配色、境界壓制、地貌
-│   ├─ cards.json                # 四種法寶符：傷害、出手間隔、目標數、抽取權重
+│   ├─ cards.json                # 二十張符：傷害、出手間隔、目標數、權重、解鎖關卡、特效
 │   ├─ sects.json                # 門派：乘區與被動
 │   ├─ upgrades.json             # 六條金幣升級線
 │   └─ enemies.json              # 各境界的妖魔與首領
@@ -39,8 +39,8 @@
 │   ├─ main.ts                    # 進入點
 │   ├─ art.ts                     # 美術資源載入
 │   ├─ state.ts                   # 執行期的存檔單例
-│   ├─ scenes/                    # Boot / Title / Sect / Run / Result / Upgrade / Achievement / Help
-│   ├─ systems/                   # 法寶符 / 防守戰 / 境界 / 升級 / 成就 / 教學 / 開局配置
+│   ├─ scenes/                    # Boot / Title / Sect / Talisman / Run / Result / Upgrade / Achievement / Help
+│   ├─ systems/                   # 法寶符 / 符籙譜 / 陣法 / 場上加成 / 防守戰 / 境界 / 升級 / 成就 / 教學 / 開局配置
 │   ├─ audio/                     # 音高、合成、播放與配樂排程
 │   ├─ data/                      # JSON 讀取與型別定義
 │   ├─ save/                      # 存檔、遷移
