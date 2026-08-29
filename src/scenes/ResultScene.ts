@@ -58,7 +58,7 @@ export class ResultScene extends Phaser.Scene {
     // 失敗診斷：告訴玩家這場輸在哪、下次該補什麼，而不是只丟一句「道消」。
     if (result.diagnosis !== null) {
       this.add
-        .text(cx, 286, wrapText(result.diagnosis, GAME_WIDTH - 90, 19), textStyle({ size: 19, color: GOLD }))
+        .text(cx, 286, wrapText(result.diagnosis, GAME_WIDTH - 52, 19), textStyle({ size: 19, color: GOLD }))
         .setOrigin(0.5)
         .setAlign('center')
         .setLineSpacing(6);

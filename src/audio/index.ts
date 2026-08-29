@@ -17,8 +17,10 @@ export type SfxName =
   | 'gateTrap'
   | 'gold'
   | 'mob'
+  | 'hit'
   | 'bossHit'
   | 'bossAttack'
+  | 'bossRoar'
   | 'victory'
   | 'defeat'
   | 'breakthrough';
@@ -183,6 +185,27 @@ class AudioEngine {
           filter: { from: 2600, to: 420 },
         });
         this.emit(this.buffer('thud-mob', (c) => renderThud(c, 140, 48, 0.4)), this.sfxBus, { gain: 0.45 });
+        break;
+      // 一般命中。這個聲音一秒會響好幾次，所以刻意做得又短又輕——
+      // 它的作用是「有打到」的觸感，不是提示，音量一大就變成噪音。
+      case 'hit':
+        this.emit(this.buffer('noise-hit-lite', (c) => renderNoise(c, 0.07, 5)), this.sfxBus, {
+          gain: 0.16,
+          filter: { from: 2800, to: 1200 },
+        });
+        break;
+      // 首領登場：低頻長鳴壓在鑼聲底下，比單獨一聲鑼更像「有東西來了」。
+      case 'bossRoar':
+        this.emit(this.buffer('gong-roar', (c) => renderGong(c, 62, 2.6)), this.sfxBus, { gain: 0.8 });
+        this.emit(this.buffer('thud-roar', (c) => renderThud(c, 90, 26, 1.5)), this.sfxBus, {
+          gain: 0.8,
+          when: now + 0.06,
+        });
+        this.emit(this.buffer('noise-roar', (c) => renderNoise(c, 1.1, 0.8)), this.sfxBus, {
+          gain: 0.26,
+          filter: { from: 900, to: 180 },
+          when: now + 0.04,
+        });
         break;
       case 'bossHit':
         this.emit(this.buffer('noise-hit', (c) => renderNoise(c, 0.16, 3)), this.sfxBus, {

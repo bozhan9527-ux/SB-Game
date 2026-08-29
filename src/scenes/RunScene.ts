@@ -98,6 +98,8 @@ const MERGE_SLACK = 26;
 
 /** 一幀最多畫幾道靈光。掉幀時寧可少畫幾道，也不要為了補畫而更卡。 */
 const MAX_TRACERS_PER_FRAME = 5;
+/** 傷害數字累積多久吐一次。太短會變成一片閃爍，太長又跟不上戰況。 */
+const DAMAGE_FLUSH_MS = 320;
 
 type DragSource = CardSlot;
 
@@ -157,6 +159,13 @@ export class RunScene extends Phaser.Scene {
   private formationLayer!: Phaser.GameObjects.Graphics;
   /** 上一次的成陣狀態，用來判斷「剛剛新成了一陣」。 */
   private formationKeys = new Set<string>();
+  private gateBase?: Phaser.GameObjects.Rectangle;
+  private gateCracks?: Phaser.GameObjects.Graphics;
+  private gateLabel?: Phaser.GameObjects.Text;
+  private gateStage = -1;
+  /** 每隻妖魔累積中的傷害，湊夠一段時間才吐一個數字。 */
+  private pendingDamage = new Map<number, { total: number; since: number }>();
+  private lastHitSoundAt = 0;
 
   constructor() {
     super('Run');
@@ -198,6 +207,9 @@ export class RunScene extends Phaser.Scene {
     this.buildDragLayer();
     this.formationLayer = this.add.graphics().setDepth(24);
     this.formationKeys = new Set<string>();
+    this.pendingDamage = new Map<number, { total: number; since: number }>();
+    this.lastHitSoundAt = 0;
+    this.gateStage = -1;
     this.buildCoach();
     this.refreshCards();
     this.updateHud();
@@ -231,11 +243,18 @@ export class RunScene extends Phaser.Scene {
     }
 
     // 山門：妖魔碰到這條線就算攻進來。
-    this.add.rectangle(GAME_WIDTH / 2, GATE_Y + 6, GAME_WIDTH, 12, accent, 0.5).setDepth(28);
+    this.gateBase = this.add
+      .rectangle(GAME_WIDTH / 2, GATE_Y + 6, GAME_WIDTH, 12, accent, 0.5)
+      .setDepth(28);
     this.gateBar = this.add
       .rectangle(GAME_WIDTH / 2, GATE_Y + 6, GAME_WIDTH, 12, hexToNumber(DANGER), 0)
       .setDepth(29);
-    this.add
+    // 裂痕：耐久掉到一定程度才畫出來，一段比一段多。
+    // 沒有這個的話，山門從滿血到快破在畫面上長得一模一樣，玩家只能盯左上角那個數字。
+    // 深度壓在門條之上：裂痕是「把門切開的縫」，用背景色畫上去才看得出來。
+    // 第一版用和門條同色去畫，等於在金色上畫金色，什麼都看不到。
+    this.gateCracks = this.add.graphics().setDepth(30);
+    this.gateLabel = this.add
       .text(GAME_WIDTH / 2, GATE_Y + 26, '山　門', textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(0.5)
       .setDepth(29);
@@ -608,6 +627,64 @@ export class RunScene extends Phaser.Scene {
     return (merging ?? nearest).slot;
   }
 
+  /**
+   * 山門的破損程度。分四階：完好／有裂痕／裂開／快破。
+   *
+   * 只在跨階的那一刻重畫，不是每幀都畫——耐久每掉一點就重畫一次 Graphics
+   * 是白工，而且裂痕的位置會一直跳。
+   */
+  private refreshGateDamage(): void {
+    const ratio = this.run.disciples / Math.max(1, this.run.maxDisciples);
+    const stage = ratio > 0.75 ? 0 : ratio > 0.45 ? 1 : ratio > 0.2 ? 2 : 3;
+    if (stage === this.gateStage) return;
+    this.gateStage = stage;
+
+    const cracks = this.gateCracks;
+    if (cracks === undefined) return;
+    cracks.clear();
+
+    // 顏色隨破損加深，門楣的字也跟著變。
+    const tint = [hexToNumber(JADE), 0xc9a227, hexToNumber(DANGER), hexToNumber(DANGER)][stage] ?? 0xffffff;
+    this.gateBase?.setFillStyle(tint, [0.5, 0.55, 0.6, 0.75][stage] ?? 0.5);
+    this.gateLabel?.setColor([INK_DIM, INK_DIM, DANGER, DANGER][stage] ?? INK_DIM);
+    if (stage >= 2) {
+      this.tweens.killTweensOf(this.gateLabel as Phaser.GameObjects.Text);
+      this.gateLabel?.setAlpha(1);
+      this.tweens.add({
+        targets: this.gateLabel,
+        alpha: 0.45,
+        duration: stage === 3 ? 380 : 720,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
+    if (stage === 0) return;
+
+    // 裂痕：用背景色把門條切開。階段越高越多、越寬。
+    // 位置由序號算出來、不用亂數——每次重畫要長得一樣，會跳動的裂痕看起來像雜訊。
+    const count = [0, 4, 8, 13][stage] ?? 0;
+    const top = GATE_Y;
+    const bottom = GATE_Y + 12;
+    for (let i = 0; i < count; i += 1) {
+      const x = ((i + 0.5) / count) * GAME_WIDTH + (((i * 37) % 23) - 11);
+      const lean = i % 2 === 0 ? 4 : -4;
+      cracks.lineStyle(stage === 3 ? 4 : 3, 0x0b0f14, 1);
+      cracks.beginPath();
+      cracks.moveTo(x, top - 1);
+      cracks.lineTo(x + lean, (top + bottom) / 2);
+      cracks.lineTo(x - lean * 0.5, bottom + 1);
+      cracks.strokePath();
+      // 快破的時候再往戰場裡崩一小段，看得出「門要撐不住了」。
+      if (stage === 3) {
+        cracks.lineStyle(2, hexToNumber(DANGER), 0.75);
+        cracks.beginPath();
+        cracks.moveTo(x, top - 1);
+        cracks.lineTo(x + lean * 1.6, top - 9 - ((i * 11) % 7));
+        cracks.strokePath();
+      }
+    }
+  }
+
   private pulseSlot(slot: CardSlot, color: string): void {
     const view = slot.where === 'hand' ? this.handViews[slot.index] : this.fieldViews[slot.index];
     if (view === undefined) return;
@@ -757,10 +834,17 @@ export class RunScene extends Phaser.Scene {
         hitThisFrame.add(shot.enemyId);
         this.flashEnemy(view, shot.killed);
       }
+      this.accrueDamage(shot.enemyId, shot.damage);
       if (drawn >= MAX_TRACERS_PER_FRAME) continue;
       this.tracer(slot.container.x, slot.container.y - 40, view.x, view.y, shot.slot);
       drawn += 1;
     }
+    // 命中音一秒可能響幾十次，節流成最多每 90ms 一次，而且只在真的有打到時才響。
+    if (hitThisFrame.size > 0 && this.time.now - this.lastHitSoundAt > 90) {
+      this.lastHitSoundAt = this.time.now;
+      audio.play('hit');
+    }
+    this.flushDamageNumbers();
 
     for (const kill of report.kills) {
       const view = this.enemySprites.get(kill.enemyId);
@@ -912,8 +996,60 @@ export class RunScene extends Phaser.Scene {
     this.bossText = this.add.text(cx, 160, '', textStyle({ size: 15, color: INK, bold: true })).setOrigin(0.5);
     this.bossPanel = this.add.container(0, 0, [name, bg, this.bossBar, this.bossText]).setDepth(48);
 
-    this.floatText(cx, 300, `「${boss.taunt}」`, INK, 22);
-    audio.play('defeat');
+    // 登場演出。原本只有一行台詞加一聲鑼，關底最該有份量的那一刻反而最平——
+    // 面板一出現就直接進入戰鬥，玩家常常沒發現首領已經來了。
+    this.bossPanel.setAlpha(0);
+    this.tweens.add({ targets: this.bossPanel, alpha: 1, duration: 420, delay: 520 });
+
+    // 一道紅光壓過整個戰場。
+    const flash = this.add
+      .rectangle(cx, (ARENA_TOP + GATE_Y) / 2, GAME_WIDTH, GATE_Y - ARENA_TOP, hexToNumber(DANGER), 0)
+      .setDepth(46);
+    this.tweens.add({
+      targets: flash,
+      alpha: { from: 0, to: 0.34 },
+      duration: 170,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => flash.destroy(),
+    });
+
+    // 上下兩道黑帶收進來又打開，做出「鏡頭讓位」的感覺。
+    const bandHeight = 74;
+    const bands = [-1, 1].map((side) =>
+      this.add
+        .rectangle(cx, (ARENA_TOP + GATE_Y) / 2 + side * 150, GAME_WIDTH, 0, 0x0b0f14, 0.86)
+        .setDepth(47),
+    );
+    this.tweens.add({
+      targets: bands,
+      displayHeight: bandHeight,
+      duration: 220,
+      yoyo: true,
+      hold: 900,
+      ease: 'Quad.easeOut',
+      onComplete: () => bands.forEach((band) => band.destroy()),
+    });
+
+    const title = this.add
+      .text(cx, (ARENA_TOP + GATE_Y) / 2 - 26, boss.name, textStyle({ size: 44, color: DANGER, bold: true }))
+      .setOrigin(0.5)
+      .setStroke('#0b0f14', 8)
+      .setDepth(48)
+      .setScale(1.6)
+      .setAlpha(0);
+    this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
+    this.tweens.add({
+      targets: title,
+      alpha: 0,
+      delay: 1100,
+      duration: 320,
+      onComplete: () => title.destroy(),
+    });
+
+    this.floatText(cx, (ARENA_TOP + GATE_Y) / 2 + 30, `「${boss.taunt}」`, INK, 22, 900);
+    this.cameras.main.shake(420, 0.011);
+    audio.play('bossRoar');
   }
 
   private refreshBossPanel(enemy: ActiveEnemy): void {
@@ -954,6 +1090,41 @@ export class RunScene extends Phaser.Scene {
     this.tweens.killTweensOf(view);
     view.setScale(1.14);
     this.tweens.add({ targets: view, scale: 1, duration: 130, ease: 'Quad.easeOut' });
+  }
+
+  /**
+   * 累積傷害數字，不是每一發都跳一個。
+   *
+   * 後期一秒有幾十次命中，逐發跳數字會變成一片閃爍的噪音，反而看不出打了多少。
+   * 每隻累積 DAMAGE_FLUSH_MS 再吐一個總數，數字就大得起來也讀得到。
+   */
+  private accrueDamage(enemyId: number, damage: number): void {
+    const entry = this.pendingDamage.get(enemyId);
+    if (entry === undefined) {
+      this.pendingDamage.set(enemyId, { total: damage, since: this.time.now });
+      return;
+    }
+    entry.total += damage;
+  }
+
+  private flushDamageNumbers(): void {
+    for (const [enemyId, entry] of this.pendingDamage) {
+      if (this.time.now - entry.since < DAMAGE_FLUSH_MS) continue;
+      this.pendingDamage.delete(enemyId);
+      const view = this.enemySprites.get(enemyId);
+      if (view === undefined || entry.total <= 0) continue;
+      // 數字大小隨傷害佔比走：一發打掉大半血的那種，字要明顯比刮痧大。
+      const enemy = this.run.enemies.find((item) => item.id === enemyId);
+      const share = enemy === undefined ? 0.2 : entry.total / Math.max(1, enemy.maxHp);
+      const heavy = share > 0.25;
+      this.floatText(
+        view.x + Phaser.Math.Between(-14, 14),
+        view.y - 34,
+        formatNumber(Math.round(entry.total)),
+        heavy ? GOLD : INK,
+        heavy ? 24 : 18,
+      );
+    }
   }
 
   private burst(x: number, y: number, color: string, count: number): void {
@@ -1150,6 +1321,7 @@ export class RunScene extends Phaser.Scene {
     const run = this.run;
     this.hudLives.setText(`山門 ${run.disciples}`);
     this.hudLives.setColor(run.disciples <= run.maxDisciples * 0.3 ? DANGER : JADE);
+    this.refreshGateDamage();
     this.hudPower.setText(`道行 ${formatNumber(fieldDps(run.field, run.loadout))}`);
     this.hudTier.setText(`階數上限 ${maxTierForStage(run.stage)}`);
     this.hudGold.setText(`金幣 ${formatNumber(run.gold)}`);
