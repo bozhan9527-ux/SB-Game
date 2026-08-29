@@ -31,6 +31,7 @@ import {
 } from '../systems/defense';
 import type { FormationLine } from '../systems/formation';
 import { activeFormations, formationEffect, formationName } from '../systems/formation';
+import { boardBonuses } from '../systems/board';
 import { buildLoadout } from '../systems/loadout';
 import type { TutorialStep } from '../systems/tutorial';
 import {
@@ -83,6 +84,15 @@ const FIELD_ROW_GAP = 96;
 /** 手牌：畫面最下方一排。 */
 const HAND_Y = 872;
 const HAND_STEP = 100;
+/**
+ * 放開手指時，離格位中心多遠還算落在那一格。
+ *
+ * 陣位的間距是 100（橫）與 96（縱），所以 62 大約是「到最近的一格為止」，
+ * 而不會大到讓對角線的格子也搶得到。
+ */
+const SNAP_RADIUS = 62;
+/** 距離差在這個範圍內時，優先選合得起來的那一格。 */
+const MERGE_SLACK = 26;
 
 /** 一幀最多畫幾道靈光。掉幀時寧可少畫幾道，也不要為了補畫而更卡。 */
 const MAX_TRACERS_PER_FRAME = 5;
@@ -114,6 +124,7 @@ export class RunScene extends Phaser.Scene {
   private lastSiegeWarnAt = -9999;
   private siegeText!: Phaser.GameObjects.Text;
   private dragView!: CardView;
+  private dropLabel?: Phaser.GameObjects.Text;
   private fieldHighlights: Phaser.GameObjects.Rectangle[] = [];
   private handHighlights: Phaser.GameObjects.Rectangle[] = [];
 
@@ -122,6 +133,9 @@ export class RunScene extends Phaser.Scene {
   private hudGold!: Phaser.GameObjects.Text;
   private hudWave!: Phaser.GameObjects.Text;
   private hudTier!: Phaser.GameObjects.Text;
+  private hudFormation!: Phaser.GameObjects.Text;
+  /** 每個陣位右上角的倍率標籤，例如「×1.70」。 */
+  private fieldBonusLabels: Phaser.GameObjects.Text[] = [];
   private waveBar!: Phaser.GameObjects.Rectangle;
   private gateBar!: Phaser.GameObjects.Rectangle;
   private bossPanel: Phaser.GameObjects.Container | null = null;
@@ -284,6 +298,14 @@ export class RunScene extends Phaser.Scene {
       .setDepth(51);
     this.hudPower = this.add.text(20, 84, '', textStyle({ size: 17, color: INK_DIM })).setDepth(51);
     this.hudTier = this.add.text(190, 84, '', textStyle({ size: 17, color: INK_DIM })).setDepth(51);
+    // 陣法是持續生效的狀態，卻只有成立那一瞬間有提示——玩家回報「效果一閃即逝沒看清楚」。
+    // 常駐一行，隨時看得到現在有幾條、平均加了多少。
+    // 放在「山門」那一列的右側：第二列（道行／階數上限／波次）已經排滿，
+    // 硬塞進去三段字會互相壓到。
+    this.hudFormation = this.add
+      .text(GAME_WIDTH - 20, 52, '', textStyle({ size: 18, color: GOLD, bold: true }))
+      .setOrigin(1, 0)
+      .setDepth(51);
     this.hudWave = this.add
       .text(GAME_WIDTH - 20, 84, '', textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(1, 0)
@@ -317,6 +339,17 @@ export class RunScene extends Phaser.Scene {
       view.container.setDepth(26).setScale(0.82);
       this.fieldSlotY.push(y);
       this.fieldViews.push(view);
+
+      // 每一格自己吃到多少，寫在那一格上。陣法的加成是逐格不同的
+      // （四角與正中吃三條線、邊中點只吃兩條），只報「成陣了」看不出這件事。
+      this.fieldBonusLabels.push(
+        this.add
+          .text(x + 32, y - 40, '', textStyle({ size: 14, color: GOLD, bold: true }))
+          .setOrigin(1, 0)
+          .setDepth(30)
+          .setStroke('#0b0f14', 4)
+          .setVisible(false),
+      );
 
       const hit = this.add
         .rectangle(x, y, CARD_WIDTH, CARD_HEIGHT, 0xffffff, 0)
@@ -361,9 +394,19 @@ export class RunScene extends Phaser.Scene {
     this.dragView = createCardView(this, 0, 0);
     this.dragView.container.setDepth(90).setVisible(false).setScale(1.06);
 
+    // 拖曳中會不會落在哪一格、落上去會發生什麼，都要在放手**之前**看得到。
+    // 玩家回報「合成常常變成取代到別的卡片」有一半是這個：他到放開的那一刻才知道結果。
+    this.dropLabel = this.add
+      .text(0, 0, '', textStyle({ size: 17, color: INK, bold: true }))
+      .setOrigin(0.5)
+      .setDepth(92)
+      .setStroke('#0b0f14', 5)
+      .setVisible(false);
+
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (this.drag === null) return;
       this.dragView.container.setPosition(pointer.x, pointer.y - 44);
+      this.showDropPreview(pointer);
     });
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => this.endDrag(pointer));
     this.input.on('pointerupoutside', (pointer: Phaser.Input.Pointer) => this.endDrag(pointer));
@@ -415,6 +458,51 @@ export class RunScene extends Phaser.Scene {
     for (const glow of [...this.fieldHighlights, ...this.handHighlights]) {
       glow.setStrokeStyle(3, hexToNumber(JADE), 0);
     }
+    this.dropLabel?.setVisible(false);
+  }
+
+  /**
+   * 拖曳中即時顯示「現在放手會發生什麼」：合成／交換／放置。
+   *
+   * 這三件事在規則上是同一個手勢（dropOn 一條路徑判定），但對玩家來說結果差很多——
+   * 合成不可逆，交換可以再拖回來。差別必須在放手之前就看得到。
+   */
+  private showDropPreview(pointer: Phaser.Input.Pointer): void {
+    const source = this.drag;
+    const label = this.dropLabel;
+    if (source === null || label === undefined) return;
+    const card = this.cardAt(source);
+    const target = this.slotAt(pointer.x, pointer.y, card);
+
+    // 先把所有格位還原成一般的合成提示，再單獨標出這一格。
+    if (card !== null) this.showMergeHints(card, source);
+
+    if (target === null) {
+      const discarding = source.where === 'hand' && pointer.y > 930;
+      label.setVisible(discarding).setText(discarding ? '棄符' : '').setColor(DANGER);
+      label.setPosition(pointer.x, pointer.y - 108);
+      return;
+    }
+
+    const glow =
+      target.where === 'field' ? this.fieldHighlights[target.index] : this.handHighlights[target.index];
+    const existing = cardAt(this.run, target);
+    const same = target.where === source.where && target.index === source.index;
+    const merges =
+      !same &&
+      card !== null &&
+      existing !== null &&
+      existing.type === card.type &&
+      existing.tier === card.tier &&
+      existing.tier < maxTierForStage(this.run.stage);
+
+    const text = same ? '' : merges ? '合成' : existing === null ? '放置' : '交換';
+    const color = merges ? JADE : existing === null ? GOLD : INK_DIM;
+    glow?.setStrokeStyle(4, hexToNumber(color), same ? 0 : 1);
+
+    const pos = this.slotPosition(target);
+    label.setVisible(text.length > 0).setText(text).setColor(color);
+    label.setPosition(pos.x, pos.y - CARD_HEIGHT / 2 - 16);
   }
 
   private endDrag(pointer: Phaser.Input.Pointer): void {
@@ -425,7 +513,7 @@ export class RunScene extends Phaser.Scene {
     this.clearMergeHints();
     if (source === null || this.over) return;
 
-    const target = this.slotAt(pointer.x, pointer.y);
+    const target = this.slotAt(pointer.x, pointer.y, this.cardAt(source));
     if (target !== null) {
       this.applyDrop(source, target);
     } else if (source.where === 'hand' && pointer.y > 930) {
@@ -466,26 +554,50 @@ export class RunScene extends Phaser.Scene {
     return { x: view?.container.x ?? GAME_WIDTH / 2, y: this.fieldSlotY[slot.index] ?? 0 };
   }
 
-  /** 手指放開的位置落在哪個格位上。手牌與陣位共用一套判定，拖曳才只有一種手勢。 */
-  private slotAt(x: number, y: number): CardSlot | null {
+  /**
+   * 手指放開的位置落在哪個格位上。手牌與陣位共用一套判定，拖曳才只有一種手勢。
+   *
+   * **取最近的一格，不是取第一個命中的。** 舊版用「軸向容差 + 依索引先到先得」，
+   * 而陣位的列距是 96px、縱向容差卻是 ±60px——相鄰兩列的判定區重疊 24px，
+   * 放在兩列之間會靜默落到上面那一列。玩家回報的「合成常常變成取代到別的卡片」就是這個。
+   *
+   * 另外在**距離相當**時優先選合得起來的那一格（MERGE_SLACK 之內）。
+   * 合成是這個遊戲的核心動作，手指差幾個像素不該把它變成一次交換——
+   * 交換可以再拖回來，合成錯過的那一張已經被覆蓋掉了。
+   */
+  private slotAt(x: number, y: number, dragged: Card | null = null): CardSlot | null {
+    const cap = maxTierForStage(this.run.stage);
+    const candidates: { slot: CardSlot; distance: number; merges: boolean }[] = [];
+
+    const consider = (slot: CardSlot, cx: number, cy: number, target: Card | null): void => {
+      const distance = Math.hypot(x - cx, y - cy);
+      if (distance > SNAP_RADIUS) return;
+      const merges =
+        dragged !== null &&
+        target !== null &&
+        target.type === dragged.type &&
+        target.tier === dragged.tier &&
+        target.tier < cap;
+      candidates.push({ slot, distance, merges });
+    };
+
     for (let i = 0; i < this.fieldViews.length; i += 1) {
       const view = this.fieldViews[i];
       if (view === undefined) continue;
-      if (
-        Math.abs(x - view.container.x) <= CARD_WIDTH * 0.6 &&
-        Math.abs(y - (this.fieldSlotY[i] ?? 0)) <= CARD_HEIGHT * 0.6
-      ) {
-        return { where: 'field', index: i };
-      }
+      consider({ where: 'field', index: i }, view.container.x, this.fieldSlotY[i] ?? 0, this.run.field[i] ?? null);
     }
     for (let i = 0; i < this.handViews.length; i += 1) {
       const view = this.handViews[i];
       if (view === undefined) continue;
-      if (Math.abs(x - view.container.x) <= HAND_STEP / 2 && Math.abs(y - HAND_Y) <= CARD_HEIGHT * 0.7) {
-        return { where: 'hand', index: i };
-      }
+      consider({ where: 'hand', index: i }, view.container.x, HAND_Y, this.run.hand[i] ?? null);
     }
-    return null;
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => a.distance - b.distance);
+    const nearest = candidates[0];
+    if (nearest === undefined) return null;
+    const merging = candidates.find((c) => c.merges && c.distance <= nearest.distance + MERGE_SLACK);
+    return (merging ?? nearest).slot;
   }
 
   private pulseSlot(slot: CardSlot, color: string): void {
@@ -509,14 +621,15 @@ export class RunScene extends Phaser.Scene {
     this.formationLayer.clear();
 
     for (const line of lines) {
-      // 陣法是一整條線的事、線上每張符都不同種，因此用中性的金色，不取任一張符的顏色。
-      const color = hexToNumber(GOLD);
+      // 兩種陣式給的量不同，所以顏色也要不同——同一個金色會讓玩家以為只有一種規則。
+      // 玩家回報「只知道湊不同的圖案成一條線會有 buff」，正是因為同色那條路看起來一樣。
+      const color = hexToNumber(line.pattern === 'distinct' ? JADE : GOLD);
       const points = line.slots.map((slot) => this.slotPosition({ where: 'field', index: slot }));
       const first = points[0];
       const last = points[points.length - 1];
       if (first === undefined || last === undefined) continue;
       // 外粗內細兩道：外面那道是光暈，裡面那道才是線本身。
-      this.formationLayer.lineStyle(10, color, 0.16);
+      this.formationLayer.lineStyle(10, color, 0.18);
       this.formationLayer.lineBetween(first.x, first.y, last.x, last.y);
       this.formationLayer.lineStyle(3, color, 0.85);
       this.formationLayer.lineBetween(first.x, first.y, last.x, last.y);
@@ -526,25 +639,65 @@ export class RunScene extends Phaser.Scene {
       }
     }
 
-    // 剛成立的那一條才報，已經成立的不重複報。
+    // 每一格吃到的總倍率，常駐寫在該格右上角。
+    const bonuses = boardBonuses(this.run.field);
+    for (let i = 0; i < this.fieldBonusLabels.length; i += 1) {
+      const label = this.fieldBonusLabels[i];
+      const bonus = bonuses[i];
+      if (label === undefined) continue;
+      const total = bonus === undefined ? 1 : bonus.damage * bonus.fireRate;
+      const show = this.run.field[i] != null && total > 1.005;
+      label.setVisible(show).setText(show ? `×${total.toFixed(2)}` : '');
+    }
+
+    // 常駐的總覽：幾條、哪一種、全場平均加成。
+    if (lines.length === 0) {
+      this.hudFormation.setText('');
+    } else {
+      const distinct = lines.filter((line) => line.pattern === 'distinct').length;
+      const filled = bonuses.filter((_bonus, i) => this.run.field[i] != null);
+      const average =
+        filled.length === 0
+          ? 1
+          : filled.reduce((sum, b) => sum + b.damage * b.fireRate, 0) / filled.length;
+      // 只在全部同一種時標種類；混著成的時候標了反而更難讀，線的顏色已經說了。
+      const kinds = distinct === lines.length ? '五行 ' : distinct === 0 ? '同心 ' : '';
+      this.hudFormation
+        .setText(`陣法 ${kinds}${lines.length} 條　+${Math.round((average - 1) * 100)}%`)
+        .setColor(distinct === 0 ? GOLD : JADE);
+    }
+
+    // 剛成立的那些才報，已經成立的不重複報。
     // 鍵含 pattern：同一條線從同心變五行是不同的陣，要重報一次。
     const keys = new Set(lines.map((line) => `${line.kind}:${line.pattern}:${line.slots.join(',')}`));
-    for (const line of lines) {
-      const key = `${line.kind}:${line.pattern}:${line.slots.join(',')}`;
-      if (this.formationKeys.has(key)) continue;
-      this.announceFormation(line);
-    }
+    const fresh = lines.filter(
+      (line) => !this.formationKeys.has(`${line.kind}:${line.pattern}:${line.slots.join(',')}`),
+    );
     this.formationKeys = keys;
+    if (fresh.length > 0) this.announceFormations(fresh);
   }
 
-  private announceFormation(line: FormationLine): void {
-    const slot = line.slots[Math.floor(line.slots.length / 2)] ?? 0;
+  /**
+   * 報新成立的陣。
+   *
+   * 一次成好幾條時只報一則總結，不是每條各飄一行——同時三行字疊在一起等於都沒看到。
+   */
+  private announceFormations(fresh: FormationLine[]): void {
+    const first = fresh[0];
+    if (first === undefined) return;
+    const slot = first.slots[Math.floor(first.slots.length / 2)] ?? 0;
     const pos = this.slotPosition({ where: 'field', index: slot });
-    this.floatText(pos.x, pos.y - 56, `${formationName(line)}成　${formationEffect(line)}`, GOLD, 22);
+    const color = first.pattern === 'distinct' ? JADE : GOLD;
+    const text =
+      fresh.length === 1
+        ? `${formationName(first)}成　${formationEffect(first)}`
+        : `一口氣成 ${fresh.length} 條陣`;
+    // 停住 1.1 秒再淡出，中文讀得完。
+    this.floatText(pos.x, pos.y - 58, text, color, 22, 1100);
     audio.play('gold');
     this.showHintOnce(
       HINT_FORMATION,
-      '一整條線全同種或全不同種都會成陣：橫排加傷害、直排加出手速度',
+      '一整條線全同種（金線）或全不同種（綠線）都會成陣：橫排加傷害、直排加出手速度',
       260,
     );
   }
@@ -584,11 +737,19 @@ export class RunScene extends Phaser.Scene {
 
     // 靈光只是演出：傷害在 tickCombat 已經結算完，這裡畫的是「剛剛打到誰」。
     let drawn = 0;
+    const hitThisFrame = new Set<number>();
     for (const shot of report.shots) {
-      if (drawn >= MAX_TRACERS_PER_FRAME) break;
       const view = this.enemySprites.get(shot.enemyId);
       const slot = this.fieldViews[shot.slot];
       if (view === undefined || slot === undefined) continue;
+      // 命中要有反應。原本只畫一條彈道，妖魔身上什麼都沒發生——
+      // 玩家看不出「有沒有打到」，打擊感就是這樣掉的。
+      // 一幀之內同一隻只閃一次，密集開火時才不會抖成一團。
+      if (!hitThisFrame.has(shot.enemyId)) {
+        hitThisFrame.add(shot.enemyId);
+        this.flashEnemy(view, shot.killed);
+      }
+      if (drawn >= MAX_TRACERS_PER_FRAME) continue;
       this.tracer(slot.container.x, slot.container.y - 40, view.x, view.y, shot.slot);
       drawn += 1;
     }
@@ -775,6 +936,18 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * 命中反饋：整隻往後一縮再彈回，同時亮一下。
+   *
+   * 用 scale 的縮放而不是位移，是因為位移會和推進的座標打架（每一拍都在寫 y）。
+   */
+  private flashEnemy(view: Phaser.GameObjects.Container, killed: boolean): void {
+    if (killed) return; // 死亡有自己的爆散，不必再閃一次
+    this.tweens.killTweensOf(view);
+    view.setScale(1.14);
+    this.tweens.add({ targets: view, scale: 1, duration: 130, ease: 'Quad.easeOut' });
+  }
+
   private burst(x: number, y: number, color: string, count: number): void {
     const emitter = this.add.particles(x, y, 'spark', {
       speed: { min: 60, max: 200 },
@@ -790,7 +963,20 @@ export class RunScene extends Phaser.Scene {
     this.time.delayedCall(700, () => emitter.destroy());
   }
 
-  private floatText(x: number, y: number, text: string, color: string, size: number): void {
+  /**
+   * 飄字。holdMs 是「先停住讓人讀完」的時間，之後才開始上飄淡出。
+   *
+   * 傷害與金幣那種一眼就懂的可以不停（預設 0），但帶文字說明的必須停——
+   * 700ms 的淡出對一句十來個字的中文根本讀不完，那正是玩家說的「一閃即逝」。
+   */
+  private floatText(
+    x: number,
+    y: number,
+    text: string,
+    color: string,
+    size: number,
+    holdMs = 0,
+  ): void {
     const label = this.add
       .text(x, y, text, textStyle({ size, color, bold: true }))
       .setOrigin(0.5)
@@ -800,6 +986,7 @@ export class RunScene extends Phaser.Scene {
       targets: label,
       y: y - 46,
       alpha: 0,
+      delay: holdMs,
       duration: 700,
       ease: 'Quad.easeOut',
       onComplete: () => label.destroy(),
