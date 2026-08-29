@@ -29,7 +29,7 @@
     "wavesPerStage": 5,
     "waveIntervalMs": 9000,
     "waveSpread": 0.85,
-    "minSpawnGapMs": 260,
+    "minSpawnGapMs": 700,
     "countBase": 3,
     "countPerWave": 1.5,
     "countPerRealm": 1,
@@ -39,7 +39,7 @@
     "hpPerWave": 0.3,
     "speedBase": 46,
     "speedPerStage": 0.5,
-    "speedMax": 105,
+    "speedMax": 74,
     "trackPx": 620,
     "leakCostBase": 1,
     "leakCostGrowth": 1.02

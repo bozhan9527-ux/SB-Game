@@ -290,6 +290,34 @@ describe('山門防守', () => {
     expect(mobSpeed(9999)).toBeLessThanOrEqual(BALANCE.wave.speedMax);
   });
 
+  it('反應窗口有下限：妖魔走完全程的時間不會被無限壓縮', () => {
+    // 這是 PROGRESS L-18：製作人在第 97 關回報「出怪太快，符陣來不及排」。
+    // 走完全程的時間就是玩家從看到妖魔到它砸門之間能做事的全部時間，
+    // 而排一次陣需要的拖曳次數是固定的。這個窗口若隨關卡單調縮短，
+    // 「肯花時間排陣」在後期就變成純懲罰——和陣法的設計意圖完全相反。
+    const crossingMs = (stage: number): number => (BALANCE.wave.trackPx / mobSpeed(stage)) * 1000;
+
+    // 前期仍然要越來越快，壓力感是真的。
+    expect(crossingMs(1)).toBeGreaterThan(crossingMs(40));
+    // 但有地板，而且地板不能低於「把一列三格排好」所需的時間。
+    // 8 秒是實測值：低於這個數字，慢慢排陣的玩家在第 97 關的勝率會掉到三成以下。
+    const floorMs = crossingMs(99999);
+    expect(floorMs, '反應窗口的下限太短，後期排陣會變成懲罰').toBeGreaterThanOrEqual(8000);
+    for (const stage of [82, 97, 120, 500, 9999]) {
+      expect(crossingMs(stage)).toBeCloseTo(floorMs, 6);
+    }
+  });
+
+  it('飛升境（第 82 關之後）只長血量，不再加速也不再加量', () => {
+    // 無限模式從來沒被模擬過，這正是 L-18 的根本原因：測試只跑到第 81 關。
+    // 難度的指數來源是血量（hpGrowth），那條可以無限長；
+    // 速度與密度是「玩家的操作預算」，它們不能無限被吃掉。
+    expect(mobSpeed(97)).toBe(mobSpeed(200));
+    expect(waveCount(97, 5)).toBe(waveCount(200, 5));
+    expect(waveHp(200, 5)).toBeGreaterThan(waveHp(97, 5));
+    expect(bossHp(200)).toBeGreaterThan(bossHp(97));
+  });
+
   it('妖魔走到山門就扣耐久，扣到零即失守', () => {
     const state = stateFor('sword', 1, 5);
     const rng = createRng(5);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BALANCE, SECTS, UPGRADES } from '../src/data';
-import { cardDps, maxTierForStage } from '../src/systems/deck';
+import { cardDps, fieldDps, maxTierForStage } from '../src/systems/deck';
 import type { Card } from '../src/systems/deck';
 import type { CardSlot, DefenseState } from '../src/systems/defense';
 import {
@@ -11,6 +11,7 @@ import {
   discardHand,
   mergeInto,
   swapCards,
+  swapSlots,
   tickCombat,
 } from '../src/systems/defense';
 import { buildLoadoutFor } from '../src/systems/loadout';
@@ -26,8 +27,22 @@ import { trackById, upgradeCost } from '../src/systems/upgrades';
  * 用來擋住「某一關突然守不住」或「首領被秒殺」這種只有實際玩才會發現的失衡。
  */
 
-/** 模擬玩家每 250ms 做一個決定——大約是人在手機上能反應的速度。 */
+/**
+ * 模擬玩家每 250ms 做一個決定。
+ *
+ * 這個數字對「數值夠不夠」是合理的，但對「來不來得及操作」是**嚴重高估**：
+ * 它等於一場做將近兩百次零延遲的拖曳。真人一次拖放約 0.6–1.5 秒。
+ * 因此凡是牽涉「玩家有沒有時間做完」的問題，一律要用 HUMAN_DECISION_MS 另外驗
+ * （見下方「飛升境」那一段與 PROGRESS 的 L-18）。
+ */
 const DECISION_MS = 250;
+/**
+ * 真人一次拖放的耗時。用來驗「操作預算」而不是「數值」。
+ *
+ * 1500ms 是「肯花時間把陣排好」的玩家——他正是上一版被懲罰的那一種：
+ * 排得越慢死得越快，而陣法本來就是設計來獎勵他的。
+ */
+const HUMAN_DECISION_MS = 1500;
 const TICK_MS = 100;
 
 function dpsOf(card: Card | null, state: DefenseState): number {
@@ -111,6 +126,41 @@ function playOneAction(state: DefenseState, rng: ReturnType<typeof createRng>): 
   }
 }
 
+/**
+ * 「會排陣」的玩家：在 playOneAction 之上多一步——把場上兩格對調，只要總輸出更高就換。
+ *
+ * 為什麼要另外寫一支，而不是把它加進 playOneAction：
+ * 上面所有測試的難度門檻都是在「不排陣的 AI」之下校準的，動它等於重訂全部門檻。
+ * 而且這兩種玩家本來就該分開量——**會排陣的那一種，正是上一版被懲罰的那一種**
+ * （排得越慢死得越快）。不排陣的 AI 對這件事完全不敏感，用它來守這條規則等於沒守。
+ */
+function playOneArrangingAction(state: DefenseState, rng: ReturnType<typeof createRng>): void {
+  const before = fieldDps(state.field, state.loadout);
+  let gain = 0;
+  let move: [number, number] | null = null;
+  for (let i = 0; i < state.field.length; i += 1) {
+    for (let j = i + 1; j < state.field.length; j += 1) {
+      const copy = [...state.field];
+      const a = copy[i] ?? null;
+      const b = copy[j] ?? null;
+      copy[i] = b;
+      copy[j] = a;
+      const delta = fieldDps(copy, state.loadout) - before;
+      if (delta > gain + 1e-9) {
+        gain = delta;
+        move = [i, j];
+      }
+    }
+  }
+  // 合成與補位優先；沒有更好的擺法時才動手排陣。排陣和其他動作一樣要花一次操作。
+  if (move === null) {
+    playOneAction(state, rng);
+    return;
+  }
+  const [i, j] = move;
+  swapSlots(state, { where: 'field', index: i }, { where: 'field', index: j });
+}
+
 interface RunOutcome {
   victory: boolean;
   survivors: number;
@@ -128,6 +178,8 @@ function runOnce(
   sectId: string,
   seed: number,
   talismans?: readonly string[],
+  decisionMs: number = DECISION_MS,
+  arranging = false,
 ): RunOutcome {
   const sect = SECTS.find((item) => item.id === sectId);
   if (sect === undefined) throw new Error(`測試用門派不存在：${sectId}`);
@@ -145,9 +197,10 @@ function runOnce(
     const report = tickCombat(state, TICK_MS, rng);
     bossGateHits += report.leaks.filter((leak) => leak.boss).length;
     sinceDecision += TICK_MS;
-    while (sinceDecision >= DECISION_MS) {
-      sinceDecision -= DECISION_MS;
-      playOneAction(state, rng);
+    while (sinceDecision >= decisionMs) {
+      sinceDecision -= decisionMs;
+      if (arranging) playOneArrangingAction(state, rng);
+      else playOneAction(state, rng);
     }
   }
 
@@ -293,6 +346,30 @@ describe('數值平衡', () => {
     expect(supportOnly.stuckAt).toBeNull();
     // 幾乎不輸出的那一副理應打得比較辛苦，否則特效就等於白給。
     expect(supportOnly.totalRuns).toBeGreaterThan(starters.totalRuns);
+  });
+
+  it('飛升境（第 82 關之後）在真人操作速度下仍然守得住', () => {
+    // PROGRESS L-18：製作人在第 97 關回報「出怪太快，符陣來不及排好就被淹沒」。
+    // 上面所有測試都跑 250ms 決策——那等於一場做將近兩百次零延遲的拖曳，
+    // 於是「來不來得及操作」這一整類問題在模擬裡完全隱形，而且 STAGES 只到 81，
+    // 無限模式從來沒被跑過。這條測試補的正是這兩個洞。
+    const maxed: Record<string, number> = {};
+    for (const track of UPGRADES) maxed[track.id] = track.maxLevel;
+
+    for (const stage of [90, 97]) {
+      let wins = 0;
+      const samples = 8;
+      for (let i = 0; i < samples; i += 1) {
+        const outcome = runOnce(
+          stage, maxed, 'body', stage * 7919 + i * 104729, undefined, HUMAN_DECISION_MS, true,
+        );
+        if (outcome.victory) wins += 1;
+      }
+      expect(
+        wins / samples,
+        `第 ${stage} 關，肯花時間排陣的玩家只有 ${Math.round((wins / samples) * 100)}% 勝率`,
+      ).toBeGreaterThanOrEqual(0.6);
+    }
   });
 
   it('不花金幣升級的話會在中後期卡死，升級才有意義', () => {
