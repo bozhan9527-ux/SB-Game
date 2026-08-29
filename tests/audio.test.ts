@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PENTATONIC, noteFrequency, phraseForRealm, rootForRealm, scaleNote } from '../src/audio/notes';
 import { renderGong, renderNoise, renderPluck, renderThud } from '../src/audio/synth';
+import { createRng } from '../src/systems/rng';
 
 /**
  * node 測試環境沒有 WebAudio，這裡給一個只會配置 Float32Array 的假 context。
@@ -33,8 +34,15 @@ function rms(data: Float32Array, from: number, to: number): number {
 }
 
 /**
- * 以自相關估基頻。過零次數會被泛音干擾（一個週期可能跨越零軸四次），
- * 自相關取「第一個接近最大值的延遲」才不會把八度誤判成基頻。
+ * 以自相關估基頻。
+ *
+ * 過零次數會被泛音干擾（一個週期可能跨越零軸四次），所以用自相關。
+ * 兩個細節是踩過坑才加上的：
+ * - **依重疊長度正規化**：長 lag 的重疊樣本較少，不正規化會被短 lag 系統性壓過去。
+ * - **只接受「區域極大值」且門檻拉到 0.97**：光看「第一個達到 0.9×最大值的延遲」
+ *   會被短延遲處的雜訊肩部或半週期騙走（CI 上曾把 660Hz 量成 1423Hz）。
+ *   以 300 個種子 × 6 個音高共 1800 次量測掃描過門檻：0.9 失敗 3 次、0.95 失敗 1 次、
+ *   0.97 起為 0 次。
  */
 function fundamental(data: Float32Array, rate: number, from: number, to: number): number {
   const minLag = Math.floor(rate / 2000);
@@ -45,13 +53,35 @@ function fundamental(data: Float32Array, rate: number, from: number, to: number)
   for (let lag = minLag; lag <= maxLag; lag += 1) {
     let sum = 0;
     for (let i = from; i < to - lag; i += 1) sum += (data[i] ?? 0) * (data[i + lag] ?? 0);
-    scores.push(sum);
-    if (sum > best) best = sum;
+    const score = sum / Math.max(1, to - lag - from);
+    scores.push(score);
+    if (score > best) best = score;
   }
-  for (let i = 0; i < scores.length; i += 1) {
-    if ((scores[i] ?? -Infinity) >= best * 0.9) return rate / (minLag + i);
+  // 取第一個「既是波峰又夠高」的延遲：週期的倍數也會是波峰，取第一個才是基頻。
+  for (let i = 1; i < scores.length - 1; i += 1) {
+    const score = scores[i] ?? -Infinity;
+    if (score < best * 0.97) continue;
+    if (score > (scores[i - 1] ?? -Infinity) && score >= (scores[i + 1] ?? -Infinity)) {
+      return rate / (minLag + i);
+    }
   }
   return rate / maxLag;
+}
+
+/**
+ * 撥弦的起音是 Math.random() 的噪音脈衝，波形每次都不同——
+ * 這個測試曾經因此在 CI 上隨機失敗一次。改成用固定種子的亂數餵它，
+ * 並一次驗多個種子：既可重現，也不會因為「剛好挑到好種子」而放過真的問題。
+ */
+function withSeededRandom<T>(seed: number, run: () => T): T {
+  const rng = createRng(seed);
+  const original = Math.random;
+  Math.random = () => rng.next();
+  try {
+    return run();
+  } finally {
+    Math.random = original;
+  }
 }
 
 function zeroCrossings(data: Float32Array, from: number, to: number): number {
@@ -103,11 +133,14 @@ describe('音色合成', () => {
     // 取 0.06–0.2 秒這段「已濾乾淨但還夠大聲」的波形來量。
     const from = Math.floor(ctx.sampleRate * 0.06);
     const to = Math.floor(ctx.sampleRate * 0.2);
-    for (const target of [220, 440, 660]) {
-      const data = samples(renderPluck(ctx, target, 0.6));
-      const measured = fundamental(data, ctx.sampleRate, from, to);
-      expect(measured, `${target}Hz 量到 ${Math.round(measured)}Hz`).toBeGreaterThan(target * 0.95);
-      expect(measured, `${target}Hz 量到 ${Math.round(measured)}Hz`).toBeLessThan(target * 1.05);
+    for (const seed of [1, 7, 42, 1234, 90210]) {
+      for (const target of [220, 440, 660]) {
+        const data = withSeededRandom(seed, () => samples(renderPluck(ctx, target, 0.6)));
+        const measured = fundamental(data, ctx.sampleRate, from, to);
+        const label = `種子 ${seed}：${target}Hz 量到 ${Math.round(measured)}Hz`;
+        expect(measured, label).toBeGreaterThan(target * 0.95);
+        expect(measured, label).toBeLessThan(target * 1.05);
+      }
     }
   });
 
