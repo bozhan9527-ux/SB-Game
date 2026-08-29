@@ -33,11 +33,11 @@ export interface TutorialCopy {
 const COPY: Record<TutorialStep, TutorialCopy> = {
   deploy: {
     title: '把符放上陣位',
-    body: '按住下方的一張符，拖到中間的空格放開。\n放上去的符會自動朝上出手。',
+    body: '點一下下方的符，再點中間的空格；用拖的也可以。\n放上去的符會自動朝上出手。',
   },
   merge: {
     title: '同種同階可以合成',
-    body: '把手上剩下的符，拖到剛剛那張符上面。\n兩張合成一張高一階的——傷害翻倍。',
+    body: '把手上剩下的符，放到剛剛那張符上面。\n兩張合成一張高一階的——傷害翻倍。',
   },
   watch: {
     title: '守住山門',

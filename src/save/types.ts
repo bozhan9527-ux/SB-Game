@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -66,6 +66,13 @@ export interface WorldState {
 /** 玩家偏好。不是權威數值，純本機設定。 */
 export interface SettingsState {
   sound: boolean;
+  /**
+   * 遊戲速度倍率（1／2／3）。
+   *
+   * 記在存檔而不是每場重設：玩家一旦決定用 2×，就是決定了整個遊玩節奏，
+   * 每一關都要他重按一次是在懲罰他做過的選擇。
+   */
+  speed: number;
 }
 
 export interface SaveData {

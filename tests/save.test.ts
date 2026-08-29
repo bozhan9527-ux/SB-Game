@@ -83,6 +83,8 @@ describe('存檔（TECH_SPEC 第 4 節）', () => {
     const loaded = loadSave(storage);
     expect(loaded.version).toBe(SAVE_VERSION);
     expect(loaded.settings.sound).toBe(true);
+    // 舊存檔沒有速度設定，補成 1×——不能是 undefined，RunScene 會直接拿它去乘 delta。
+    expect(loaded.settings.speed).toBe(1);
     expect(loaded.world.stage).toBe(9);
     expect(loaded.player.wallet.gold).toBe(320);
     expect(loaded.player.upgrades['startAttack']).toBe(3);
@@ -265,5 +267,15 @@ describe('關卡進度', () => {
     expect(save.world.clears).toBe(0);
     expect(save.world.runs).toBe(1);
     expect(save.player.wallet.gold).toBe(30);
+  });
+
+  it('壞掉的速度設定夾回合法檔位', () => {
+    const storage = createMemoryStorage();
+    const base = createDefaultSave(1);
+    storage.write(SAVE_KEY, JSON.stringify({ ...base, settings: { sound: true, speed: 9 } }));
+    // 速度會直接乘進 tickCombat 的 delta，放行一個 9× 等於讓存檔決定遊戲難度。
+    expect(loadSave(storage).settings.speed).toBe(1);
+    storage.write(SAVE_KEY, JSON.stringify({ ...base, settings: { sound: true, speed: 2 } }));
+    expect(loadSave(storage).settings.speed).toBe(2);
   });
 });

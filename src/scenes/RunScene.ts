@@ -13,7 +13,7 @@ import {
   enemyTexture,
   enemyWalkKey,
 } from '../art';
-import { GAME_WIDTH } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
 import { persist, state } from '../state';
 import type { Card } from '../systems/deck';
@@ -53,6 +53,7 @@ import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms
 import { createRng } from '../systems/rng';
 import { drawBackdrop } from '../ui/backdrop';
 import { createButton } from '../ui/button';
+import type { Button } from '../ui/button';
 import { CARD_HEIGHT, CARD_WIDTH, createCardView } from '../ui/card';
 import type { CardView } from '../ui/card';
 import {
@@ -95,6 +96,15 @@ const HAND_STEP = 100;
 const SNAP_RADIUS = 62;
 /** 距離差在這個範圍內時，優先選合得起來的那一格。 */
 const MERGE_SLACK = 26;
+
+/**
+ * 手指從按下到放開移動不到這麼多像素，就當作「點一下」而不是「拖曳」。
+ *
+ * 這個數字要比手指自然的抖動大（實測 8px 上下），又要比一次有意義的拖曳小。
+ */
+const TAP_SLOP = 14;
+/** 可選的遊戲速度。三檔就夠：正常、快、更快；再多只是讓按鈕要按更多次。 */
+const SPEED_STEPS = [1, 2, 3] as const;
 
 /** 一幀最多畫幾道靈光。掉幀時寧可少畫幾道，也不要為了補畫而更卡。 */
 const MAX_TRACERS_PER_FRAME = 5;
@@ -159,6 +169,24 @@ export class RunScene extends Phaser.Scene {
   private formationLayer!: Phaser.GameObjects.Graphics;
   /** 上一次的成陣狀態，用來判斷「剛剛新成了一陣」。 */
   private formationKeys = new Set<string>();
+  /** 暫停中。手機一定會被電話與訊息打斷，沒有暫停就只能按「放棄」。 */
+  private paused = false;
+  /** 遊戲速度倍率。可選 1／2／3，記在存檔的設定裡，下一場沿用。 */
+  private speed = 1;
+  /** 剩餘的凍格時間（ms）。重擊時停住幾毫秒，重量感最便宜的來源。 */
+  private freezeMs = 0;
+  private pauseOverlay: Phaser.GameObjects.Container | undefined;
+  private speedButton: Button | undefined;
+  /**
+   * 點選模式下已經選起來的那一格。
+   *
+   * 拖曳在手機上有個結構性的問題：手指會擋住自己要放的位置，而且一路拖過去的途中
+   * 任何一次抖動都可能改變落點。點兩下沒有這個問題——選起來、看清楚、再點目標。
+   * 兩種操作共存，玩家用哪一種都行。
+   */
+  private selected: DragSource | null = null;
+  /** 這次按下的起點，放開時用來判斷剛剛那是拖曳還是點擊。 */
+  private dragFrom = { x: 0, y: 0 };
   private gateBase?: Phaser.GameObjects.Rectangle;
   private gateCracks?: Phaser.GameObjects.Graphics;
   private gateLabel?: Phaser.GameObjects.Text;
@@ -185,6 +213,12 @@ export class RunScene extends Phaser.Scene {
     this.run = createDefenseState(loadout, this.rng);
     this.over = false;
     this.enemySprites.clear();
+    // Phaser 重用 Scene 實例，這幾個單場狀態不清就會帶進下一關。
+    this.paused = false;
+    this.freezeMs = 0;
+    this.selected = null;
+    this.pauseOverlay = undefined;
+    this.speed = SPEED_STEPS.includes(save.settings.speed as 1 | 2 | 3) ? save.settings.speed : 1;
 
     const realm = realmForStage(stage);
     createWalkAnimations(this);
@@ -210,6 +244,7 @@ export class RunScene extends Phaser.Scene {
     this.pendingDamage = new Map<number, { total: number; since: number }>();
     this.lastHitSoundAt = 0;
     this.gateStage = -1;
+    this.buildPauseOverlay();
     this.buildCoach();
     this.refreshCards();
     this.updateHud();
@@ -301,6 +336,17 @@ export class RunScene extends Phaser.Scene {
       .setAlpha(0);
   }
 
+  /**
+   * 頂端資訊列。
+   *
+   * 排版依「輸了會怎樣」分三級，不是把六個數字平均攤開：
+   * 第一級是山門耐久（唯一會讓你輸的東西，最大的字）、
+   * 第二級是陣法與金幣（你剛剛做對了什麼、能買什麼）、
+   * 第三級是每秒輸出／階數上限／波次（要細看才有用的參考值，一律小字暗色）。
+   *
+   * 右上角留給「暫停」與「速度」——手機一定會被電話與訊息打斷，
+   * 而原本那裡放的是「放棄」：被打斷時唯一能按的鍵是放棄整場，這是設計上的失誤。
+   */
   private buildHud(accentHex: string): void {
     this.add.rectangle(GAME_WIDTH / 2, 55, GAME_WIDTH, 110, BG_PANEL, 1).setDepth(50);
     this.add.rectangle(GAME_WIDTH / 2, 110, GAME_WIDTH, 2, LINE, 0.8).setDepth(50);
@@ -309,7 +355,7 @@ export class RunScene extends Phaser.Scene {
       .text(20, 14, realmTitle(this.run.stage), textStyle({ size: 22, color: accentHex, bold: true }))
       .setDepth(51);
     this.hudGold = this.add
-      .text(GAME_WIDTH - 110, 16, '', textStyle({ size: 17, color: GOLD }))
+      .text(396, 16, '', textStyle({ size: 17, color: GOLD }))
       .setOrigin(1, 0)
       .setDepth(51);
 
@@ -317,15 +363,14 @@ export class RunScene extends Phaser.Scene {
     this.hudLives = this.add
       .text(20, 42, '', textStyle({ size: 34, color: JADE, bold: true }))
       .setDepth(51);
+    // 「道行」是修仙的說法，但它其實是每秒輸出——新玩家看不懂這個數字在講什麼，
+    // 也就無從判斷自己的排法有沒有變強。名字直接寫成它的意思。
     this.hudPower = this.add.text(20, 84, '', textStyle({ size: 17, color: INK_DIM })).setDepth(51);
-    this.hudTier = this.add.text(190, 84, '', textStyle({ size: 17, color: INK_DIM })).setDepth(51);
+    this.hudTier = this.add.text(220, 84, '', textStyle({ size: 17, color: INK_DIM })).setDepth(51);
     // 陣法是持續生效的狀態，卻只有成立那一瞬間有提示——玩家回報「效果一閃即逝沒看清楚」。
     // 常駐一行，隨時看得到現在有幾條、平均加了多少。
-    // 放在「山門」那一列的右側：第二列（道行／階數上限／波次）已經排滿，
-    // 硬塞進去三段字會互相壓到。
     this.hudFormation = this.add
-      .text(GAME_WIDTH - 20, 52, '', textStyle({ size: 18, color: GOLD, bold: true }))
-      .setOrigin(1, 0)
+      .text(200, 52, '', textStyle({ size: 18, color: GOLD, bold: true }))
       .setDepth(51);
     this.hudWave = this.add
       .text(GAME_WIDTH - 20, 84, '', textStyle({ size: 17, color: INK_DIM }))
@@ -338,13 +383,108 @@ export class RunScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setDepth(52);
 
-    createButton(this, GAME_WIDTH - 56, 30, {
-      width: 80,
-      height: 40,
-      label: '放棄',
-      fontSize: 17,
-      onClick: () => this.finish(false, 'abandon'),
+    this.speedButton = createButton(this, 436, 26, {
+      width: 56,
+      height: 44,
+      label: `${this.speed}×`,
+      fontSize: 19,
+      onClick: () => this.cycleSpeed(),
+    });
+    this.speedButton.container.setDepth(52);
+
+    createButton(this, 500, 26, {
+      width: 56,
+      height: 44,
+      label: '‖',
+      fontSize: 22,
+      onClick: () => this.setPaused(true),
     }).container.setDepth(52);
+  }
+
+  /**
+   * 速度切換：1× → 2× → 3× → 1×。
+   *
+   * 只是把餵給 tickCombat 的 delta 乘上去。模擬本來就是 delta 驅動、
+   * 而且用 while 迴圈補齊出手間隔，所以乘上去不會漏掉輸出，只是同一段真實時間裡多算幾拍。
+   * 選擇記進存檔——玩家決定用 2× 是決定了整個遊玩節奏，不該每關重按一次。
+   */
+  private cycleSpeed(): void {
+    const index = SPEED_STEPS.indexOf(this.speed as 1 | 2 | 3);
+    this.speed = SPEED_STEPS[(index + 1) % SPEED_STEPS.length] ?? 1;
+    this.speedButton?.setLabel(`${this.speed}×`);
+    const save = state();
+    save.settings.speed = this.speed;
+    persist();
+  }
+
+  /**
+   * 暫停畫面。
+   *
+   * 「放棄」搬到這裡面來：它是一場裡最不可逆的一個動作，不該和常用鍵放在同一排，
+   * 手指滑一下就按到。要放棄得先暫停，多一步是刻意的。
+   */
+  private buildPauseOverlay(): void {
+    const cx = GAME_WIDTH / 2;
+    // 這層要吃掉輸入，否則點在暫停畫面的空白處會穿透到底下的陣位。
+    const veil = this.add
+      .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
+      .setInteractive();
+    const panel = this.add
+      .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH - 96, 320, BG_PANEL, 0.98)
+      .setStrokeStyle(2, hexToNumber(GOLD));
+    const title = this.add
+      .text(cx, GAME_HEIGHT / 2 - 118, '暫停', textStyle({ size: 30, color: GOLD, bold: true }))
+      .setOrigin(0.5);
+
+    const resume = createButton(this, cx, GAME_HEIGHT / 2 - 46, {
+      width: 260,
+      height: 56,
+      label: '繼續',
+      onClick: () => this.setPaused(false),
+    });
+
+    const save = state();
+    const soundLabel = (): string => (save.settings.sound ? '音效 開' : '音效 關');
+    const sound = createButton(this, cx, GAME_HEIGHT / 2 + 24, {
+      width: 260,
+      height: 56,
+      label: soundLabel(),
+      fontSize: 22,
+      onClick: () => {
+        save.settings.sound = !save.settings.sound;
+        audio.setEnabled(save.settings.sound);
+        if (save.settings.sound) audio.playMusic(realmIndexForStage(this.run.stage));
+        persist();
+        sound.setLabel(soundLabel());
+      },
+    });
+
+    const abandon = createButton(this, cx, GAME_HEIGHT / 2 + 100, {
+      width: 260,
+      height: 56,
+      label: '放棄本場',
+      fontSize: 22,
+      textColor: DANGER,
+      onClick: () => this.finish(false, 'abandon'),
+    });
+
+    this.pauseOverlay = this.add
+      .container(0, 0, [veil, panel, title, resume.container, sound.container, abandon.container])
+      .setDepth(95)
+      .setVisible(false);
+  }
+
+  private setPaused(value: boolean): void {
+    if (this.over) return;
+    this.paused = value;
+    this.pauseOverlay?.setVisible(value);
+    if (value) {
+      // 暫停時把手上正在拖／選的動作取消掉：恢復之後手指早就不在原處了。
+      this.drag = null;
+      this.dragView.container.setVisible(false);
+      this.clearSelection();
+      this.refreshCards();
+    }
   }
 
   private buildFieldSlots(): void {
@@ -447,17 +587,64 @@ export class RunScene extends Phaser.Scene {
   }
 
   private beginDrag(source: DragSource): void {
-    if (this.over) return;
+    if (this.over || this.paused) return;
+
+    // 已經有選起來的符：這一下是「點目標格」，不是要開始新的拖曳。
+    const chosen = this.selected;
+    if (chosen !== null) {
+      this.clearSelection();
+      const sameSlot = chosen.where === source.where && chosen.index === source.index;
+      if (!sameSlot) this.applyDrop(chosen, source);
+      this.refreshCards();
+      this.updateHud();
+      return;
+    }
+
     const card = this.cardAt(source);
     if (card === null) return;
     this.drag = source;
     this.dragView.refresh(card);
     this.dragView.container.setVisible(true);
     const pointer = this.input.activePointer;
+    this.dragFrom = { x: pointer.x, y: pointer.y };
     this.dragView.container.setPosition(pointer.x, pointer.y - 44);
     this.discardZone.setVisible(source.where === 'hand');
     this.showMergeHints(card, source);
     this.refreshCards();
+  }
+
+  /**
+   * 把一格選起來（點選模式的第一段）。
+   *
+   * 選起來之後合得起來的格位一樣會亮，和拖曳中看到的是同一套提示——
+   * 兩種操作學到的東西要能互通，不然等於是兩個遊戲。
+   */
+  private select(source: DragSource): void {
+    const card = this.cardAt(source);
+    if (card === null) {
+      this.clearSelection();
+      return;
+    }
+    this.selected = source;
+    this.discardZone.setVisible(source.where === 'hand');
+    this.showMergeHints(card, source);
+    const glow =
+      source.where === 'field' ? this.fieldHighlights[source.index] : this.handHighlights[source.index];
+    glow?.setStrokeStyle(4, hexToNumber(GOLD), 1);
+    const pos = this.slotPosition(source);
+    this.dropLabel
+      ?.setVisible(true)
+      .setText('再點一格放置')
+      .setColor(GOLD)
+      .setPosition(pos.x, pos.y - CARD_HEIGHT / 2 - 16);
+    this.refreshCards();
+  }
+
+  private clearSelection(): void {
+    if (this.selected === null) return;
+    this.selected = null;
+    this.discardZone.setVisible(false);
+    this.clearMergeHints();
   }
 
   /**
@@ -536,9 +723,30 @@ export class RunScene extends Phaser.Scene {
     const source = this.drag;
     this.drag = null;
     this.dragView.container.setVisible(false);
+
+    // 沒有在拖：這一下是點在格位以外的地方。有選取中的符時當成「棄符」或「取消」。
+    if (source === null) {
+      if (this.selected === null) return;
+      const chosen = this.selected;
+      this.clearSelection();
+      if (chosen.where === 'hand' && pointer.y > 930 && !this.over) {
+        if (discardHand(this.run, chosen.index)) audio.play('gateTrap');
+      }
+      this.refreshCards();
+      this.updateHud();
+      return;
+    }
+
+    // 手指幾乎沒動＝這是一次點擊，不是拖曳。改走兩段式，讓玩家看清楚再決定落點。
+    const moved = Math.hypot(pointer.x - this.dragFrom.x, pointer.y - this.dragFrom.y);
+    if (moved < TAP_SLOP && !this.over) {
+      this.select(source);
+      return;
+    }
+
     this.discardZone.setVisible(false);
     this.clearMergeHints();
-    if (source === null || this.over) return;
+    if (this.over) return;
 
     const target = this.slotAt(pointer.x, pointer.y, this.cardAt(source));
     if (target !== null) {
@@ -698,7 +906,7 @@ export class RunScene extends Phaser.Scene {
   /**
    * 把成立中的陣法連成光線。
    *
-   * 沒有這條線的話，陣法就是一個只會反映在「道行」數字上的隱形加成——
+   * 沒有這條線的話，陣法就是一個只會反映在「每秒輸出」數字上的隱形加成——
    * 玩家不會知道自己剛剛做對了什麼，也就學不會下次要怎麼排。
    */
   private refreshFormations(): void {
@@ -706,21 +914,27 @@ export class RunScene extends Phaser.Scene {
     this.formationLayer.clear();
 
     for (const line of lines) {
-      // 兩種陣式給的量不同，所以顏色也要不同——同一個金色會讓玩家以為只有一種規則。
+      // 兩種陣式給的量不同，所以看起來也要不同——同一個樣子會讓玩家以為只有一種規則。
       // 玩家回報「只知道湊不同的圖案成一條線會有 buff」，正是因為同色那條路看起來一樣。
-      const color = hexToNumber(line.pattern === 'distinct' ? JADE : GOLD);
+      //
+      // **差別不能只靠顏色。** 金與綠對紅綠色盲來說是同一個灰，
+      // 那等於把這條規則從約 8% 的男性玩家眼前整個拿掉。所以再加一層形狀：
+      // 五行（全不同種）＝實線＋圓點，同心（全同種）＝虛線＋方點。
+      const distinct = line.pattern === 'distinct';
+      const color = hexToNumber(distinct ? JADE : GOLD);
       const points = line.slots.map((slot) => this.slotPosition({ where: 'field', index: slot }));
       const first = points[0];
       const last = points[points.length - 1];
       if (first === undefined || last === undefined) continue;
       // 外粗內細兩道：外面那道是光暈，裡面那道才是線本身。
       this.formationLayer.lineStyle(10, color, 0.18);
-      this.formationLayer.lineBetween(first.x, first.y, last.x, last.y);
+      this.strokeFormationLine(first, last, distinct);
       this.formationLayer.lineStyle(3, color, 0.85);
-      this.formationLayer.lineBetween(first.x, first.y, last.x, last.y);
+      this.strokeFormationLine(first, last, distinct);
       for (const point of points) {
         this.formationLayer.fillStyle(color, 0.9);
-        this.formationLayer.fillCircle(point.x, point.y, 5);
+        if (distinct) this.formationLayer.fillCircle(point.x, point.y, 5);
+        else this.formationLayer.fillRect(point.x - 5, point.y - 5, 10, 10);
       }
     }
 
@@ -750,6 +964,7 @@ export class RunScene extends Phaser.Scene {
       this.hudFormation
         .setText(`陣法 ${kinds}${lines.length} 條　+${Math.round((average - 1) * 100)}%`)
         .setColor(distinct === 0 ? GOLD : JADE);
+      fitText(this.hudFormation, 316);
     }
 
     // 剛成立的那些才報，已經成立的不重複報。
@@ -760,6 +975,38 @@ export class RunScene extends Phaser.Scene {
     );
     this.formationKeys = keys;
     if (fresh.length > 0) this.announceFormations(fresh);
+  }
+
+  /**
+   * 陣線本身。實線代表五行、虛線代表同心。
+   *
+   * 虛線 Phaser 的 Graphics 沒有內建，所以自己沿著方向切段畫——
+   * 這幾行的存在理由是可及性，不是好看：色盲玩家要能只看形狀就分辨兩種陣。
+   */
+  private strokeFormationLine(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    solid: boolean,
+  ): void {
+    if (solid) {
+      this.formationLayer.lineBetween(from.x, from.y, to.x, to.y);
+      return;
+    }
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1) return;
+    const step = 16;
+    const drawn = 10;
+    for (let at = 0; at < length; at += step) {
+      const end = Math.min(at + drawn, length);
+      this.formationLayer.lineBetween(
+        from.x + (dx * at) / length,
+        from.y + (dy * at) / length,
+        from.x + (dx * end) / length,
+        from.y + (dy * end) / length,
+      );
+    }
   }
 
   /**
@@ -782,7 +1029,7 @@ export class RunScene extends Phaser.Scene {
     audio.play('gold');
     this.showHintOnce(
       HINT_FORMATION,
-      '一整條線全同種（金線）或全不同種（綠線）都會成陣：橫排加傷害、直排加出手速度',
+      '一整條線全同種（金色虛線）或全不同種（綠色實線）都會成陣：橫排加傷害、直排加出手速度',
       260,
     );
   }
@@ -807,7 +1054,15 @@ export class RunScene extends Phaser.Scene {
     if (this.over) return;
     // 教學的前兩步把戰鬥停住：新手還在找哪裡可以拖的時候，妖魔不該已經走到山門。
     if (this.step === 'deploy' || this.step === 'merge') return;
-    const report = tickCombat(this.run, delta, this.rng);
+    if (this.paused) return;
+    // 命中的凍格（hitstop）：把這幾毫秒從模擬裡扣掉，畫面停住但不會漏算時間。
+    if (this.freezeMs > 0) {
+      this.freezeMs -= delta;
+      return;
+    }
+    // 加速只是把每一拍餵給 tickCombat 的時間乘上去。
+    // 模擬本來就是 delta 驅動、而且用 while 補齊出手間隔，所以乘上去不會漏掉輸出。
+    const report = tickCombat(this.run, delta * this.speed, this.rng);
     this.applyReport(report);
     this.syncEnemies();
     this.updateHud();
@@ -1322,7 +1577,8 @@ export class RunScene extends Phaser.Scene {
     this.hudLives.setText(`山門 ${run.disciples}`);
     this.hudLives.setColor(run.disciples <= run.maxDisciples * 0.3 ? DANGER : JADE);
     this.refreshGateDamage();
-    this.hudPower.setText(`道行 ${formatNumber(fieldDps(run.field, run.loadout))}`);
+    this.hudPower.setText(`每秒輸出 ${formatNumber(fieldDps(run.field, run.loadout))}`);
+    fitText(this.hudPower, 190);
     this.hudTier.setText(`階數上限 ${maxTierForStage(run.stage)}`);
     this.hudGold.setText(`金幣 ${formatNumber(run.gold)}`);
     fitText(this.hudGold, 150);

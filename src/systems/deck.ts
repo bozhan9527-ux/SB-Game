@@ -114,7 +114,7 @@ export function cardDps(card: Card, loadout: Loadout): number {
 }
 
 /**
- * 場上所有符的理論總輸出，用於 HUD 的「道行」。
+ * 場上所有符的理論總輸出，用於 HUD 的「每秒輸出」。
  *
  * 陣法加成算在裡面——玩家把一列排成同種符時，這個數字要立刻跳，
  * 不然他不會知道剛剛那一下有沒有用。

@@ -27,7 +27,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
-    settings: { sound: true },
+    settings: { sound: true, speed: 1 },
   };
 }
 
@@ -90,7 +90,11 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       runs: Math.max(0, Math.floor(asNumber(world['runs'], 0))),
       clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
     },
-    settings: { sound: settings['sound'] !== false },
+    settings: {
+      sound: settings['sound'] !== false,
+      // 只收 1／2／3，其他一律當 1——存檔被手改成 99 倍不該讓遊戲失控。
+      speed: [1, 2, 3].includes(asNumber(settings['speed'], 1)) ? asNumber(settings['speed'], 1) : 1,
+    },
   };
 }
 

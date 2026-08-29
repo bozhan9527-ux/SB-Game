@@ -78,6 +78,12 @@ const addTalismans: Migration = (data) => {
   };
 };
 
+/** v6 → v7：加入遊戲速度偏好。舊存檔一律是 1×，也就是他們原本玩到的速度。 */
+const addSpeed: Migration = (data) => {
+  const settings = (data['settings'] ?? {}) as Record<string, unknown>;
+  return { ...data, settings: { ...settings, speed: 1 } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -85,6 +91,7 @@ export const MIGRATIONS: readonly Migration[] = [
   toDefenseStats,
   addHints,
   addTalismans,
+  addSpeed,
 ];
 
 /**
