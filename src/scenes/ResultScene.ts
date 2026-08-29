@@ -102,16 +102,32 @@ export class ResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    this.buildPanel(cx, breakthrough ? 520 : 480, result, save.player.wallet.gold);
+    const panelBottom = this.buildPanel(cx, breakthrough ? 520 : 480, result, save.player.wallet.gold);
+
+    // 破紀錄與試煉達成合成一行，寫在結算表**下面**。
+    //
+    // 它們不是統計，是「這一場最值得說嘴的地方」，所以不進表格；
+    // 但也不能各佔一行——突破境界那一場表格會往下長四十像素，
+    // 兩行就會直接撞上「下一關」。合成一行再用 fitText 縮，任何組合都放得下。
+    const highlights = [
+      ...beaten.map((item) => `${item.label} ${item.text}`),
+      ...challenges.map((item) => `試煉達成 ${item.name}`),
+    ];
+    if (highlights.length > 0) {
+      const line = this.add
+        .text(cx, panelBottom + 18, highlights.join('　'), textStyle({ size: 16, color: JADE, bold: true }))
+        .setOrigin(0.5);
+      fitText(line, GAME_WIDTH - 40);
+    }
 
     const nextStage = save.world.stage;
     this.add
-      .text(cx, 690, `下一關：第 ${nextStage} 關 · ${realmTitle(nextStage)}`, textStyle({ size: 22, color: INK }))
+      .text(cx, 724, `下一關：第 ${nextStage} 關 · ${realmTitle(nextStage)}`, textStyle({ size: 20, color: INK }))
       .setOrigin(0.5);
 
-    createButton(this, cx, 770, {
+    createButton(this, cx, 784, {
       width: 340,
-      height: 72,
+      height: 66,
       label: result.victory ? '繼續挑戰' : '再戰一次',
       fontSize: 28,
       strokeColor: 0x6f8b7a,
@@ -141,32 +157,6 @@ export class ResultScene extends Phaser.Scene {
       fontSize: 20,
       onClick: () => this.showReport(),
     });
-
-    // 破紀錄那一行寫在結算表下面：它是「這一場最值得說嘴的地方」，
-    // 不是統計，所以不進表格。一場可能同時破好幾項，擠成一行再縮字級，
-    // 硬換行會把它推去撞下面的按鈕。
-    if (beaten.length > 0) {
-      const line = this.add
-        .text(
-          cx,
-          620,
-          `新紀錄　${beaten.map((item) => `${item.label} ${item.text}`).join('　')}`,
-          textStyle({ size: 17, color: JADE, bold: true }),
-        )
-        .setOrigin(0.5);
-      fitText(line, GAME_WIDTH - 40);
-    }
-
-    if (challenges.length > 0) {
-      this.add
-        .text(
-          cx,
-          648,
-          `試煉達成：${challenges.map((item) => item.name).join('・')}`,
-          textStyle({ size: 20, color: GOLD, bold: true }),
-        )
-        .setOrigin(0.5);
-    }
 
     if (unlocked.length > 0) this.showAchievements(unlocked);
   }
@@ -240,7 +230,8 @@ export class ResultScene extends Phaser.Scene {
     return `妖魔攻破山門，${formatNumber(result.leaks)} 隻踏了進來`;
   }
 
-  private buildPanel(cx: number, cy: number, result: RunResultData, totalGold: number): void {
+  /** 回傳面板底緣的 y，讓上層知道下一行可以從哪裡開始寫。 */
+  private buildPanel(cx: number, cy: number, result: RunResultData, totalGold: number): number {
     const width = GAME_WIDTH - 64;
     const rows: [string, string, string][] = [
       ['山門殘存', `${formatNumber(result.survivors)} / ${formatNumber(result.maxDisciples)}`, INK],
@@ -261,6 +252,7 @@ export class ResultScene extends Phaser.Scene {
         .text(cx + width / 2 - 24, y, row[1], textStyle({ size: 24, color: row[2], bold: true }))
         .setOrigin(1, 0.5);
     });
+    return cy + height / 2;
   }
 
   /**
