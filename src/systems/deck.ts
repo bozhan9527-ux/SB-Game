@@ -8,7 +8,7 @@
  * 這是整個遊戲唯一的指數成長來源。若上限固定，長期難度（同樣是指數）就永遠追不上，
  * 這正是舊版升級系統失效的原因（見 PROGRESS 的 L-05）。
  */
-import { BALANCE, CARDS } from '../data';
+import { BALANCE, CARDS, REALMS } from '../data';
 import type { CardDef } from '../data/types';
 import type { Loadout } from './loadout';
 import type { Rng } from './rng';
@@ -27,10 +27,30 @@ export function cardDef(type: string): CardDef {
   return def;
 }
 
-/** 該關卡的法寶階數上限。每 stagesPerTier 關 +1。 */
+/** 飛升境（最後一個境界）從第幾關開始。資料驅動，不寫死 82。 */
+function ascensionStart(): number {
+  return REALMS[REALMS.length - 1]?.stageFrom ?? Number.POSITIVE_INFINITY;
+}
+
+/**
+ * 該關卡的法寶階數上限。第 1–81 關每 stagesPerTier 關 +1，飛升境改用較快的節奏。
+ *
+ * 為什麼飛升境要換節奏：長期難度是兩條指數在賽跑——傷害上限每 3 關 ×1.35，
+ * 血量每關 ×1.148（3 關 ×1.513）。淨值 ×0.892，每三關玩家掉 10.8% 相對戰力，
+ * 複利下去必然撞牆。詳見 FieldBalance.ascendStagesPerTier 的說明。
+ *
+ * 取兩條的較大值，是為了保證**不會有任何一關的上限比舊規則低**——
+ * 換節奏若讓某幾關倒退，玩家看到的是「越推越弱」，那比撞牆更糟。
+ */
 export function maxTierForStage(stage: number): number {
   const { field } = BALANCE;
-  return field.maxTierBase + Math.floor((Math.max(1, stage) - 1) / field.stagesPerTier);
+  const current = Math.max(1, stage);
+  const steady = field.maxTierBase + Math.floor((current - 1) / field.stagesPerTier);
+  const start = ascensionStart();
+  if (current < start) return steady;
+  const atStart = field.maxTierBase + Math.floor((start - 2) / field.stagesPerTier);
+  const ascended = atStart + Math.floor((current - start + 1) / field.ascendStagesPerTier);
+  return Math.max(steady, ascended);
 }
 
 /** 抽到的符大約落在上限往下數幾階，偶爾多一階。 */

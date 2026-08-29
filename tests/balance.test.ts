@@ -126,15 +126,37 @@ function playOneAction(state: DefenseState, rng: ReturnType<typeof createRng>): 
   }
 }
 
+/** 場上有沒有還能合的一對，或有沒有空位可以補。 */
+function hasMergeOrDeploy(state: DefenseState): boolean {
+  const maxTier = maxTierForStage(state.stage);
+  const all: (Card | null)[] = [...state.hand, ...state.field];
+  for (let i = 0; i < all.length; i += 1) {
+    const a = all[i] ?? null;
+    if (a === null || a.tier >= maxTier) continue;
+    for (let j = i + 1; j < all.length; j += 1) {
+      const b = all[j] ?? null;
+      if (b !== null && b.type === a.type && b.tier === a.tier) return true;
+    }
+  }
+  return state.field.includes(null) && state.hand.some((card) => card != null);
+}
+
 /**
  * 「會排陣」的玩家：在 playOneAction 之上多一步——把場上兩格對調，只要總輸出更高就換。
  *
  * 為什麼要另外寫一支，而不是把它加進 playOneAction：
  * 上面所有測試的難度門檻都是在「不排陣的 AI」之下校準的，動它等於重訂全部門檻。
- * 而且這兩種玩家本來就該分開量——**會排陣的那一種，正是上一版被懲罰的那一種**
- * （排得越慢死得越快）。不排陣的 AI 對這件事完全不敏感，用它來守這條規則等於沒守。
+ * 而且這兩種玩家本來就該分開量——**會排陣的那一種，正是 L-18 那一版被懲罰的那一種**。
+ *
+ * 順序很要緊：**合成與補位永遠優先於排陣**。第一版寫成「只要有更好的擺法就先換」，
+ * 結果九宮格擺滿之後幾乎永遠找得到微幅更優的交換，這支 AI 就再也不合成了，
+ * 深層關卡直接掛零——那不是玩家會做的事，是我把模型寫錯了。
  */
 function playOneArrangingAction(state: DefenseState, rng: ReturnType<typeof createRng>): void {
+  if (hasMergeOrDeploy(state)) {
+    playOneAction(state, rng);
+    return;
+  }
   const before = fieldDps(state.field, state.loadout);
   let gain = 0;
   let move: [number, number] | null = null;
@@ -152,13 +174,11 @@ function playOneArrangingAction(state: DefenseState, rng: ReturnType<typeof crea
       }
     }
   }
-  // 合成與補位優先；沒有更好的擺法時才動手排陣。排陣和其他動作一樣要花一次操作。
   if (move === null) {
     playOneAction(state, rng);
     return;
   }
-  const [i, j] = move;
-  swapSlots(state, { where: 'field', index: i }, { where: 'field', index: j });
+  swapSlots(state, { where: 'field', index: move[0] }, { where: 'field', index: move[1] });
 }
 
 interface RunOutcome {
@@ -350,13 +370,15 @@ describe('數值平衡', () => {
 
   it('飛升境（第 82 關之後）在真人操作速度下仍然守得住', () => {
     // PROGRESS L-18：製作人在第 97 關回報「出怪太快，符陣來不及排好就被淹沒」。
+    // 第 115 關那一項守的是 L-19（飛升境的長期指數失衡）：
+    // 舊規則下真人速度在第 110 關附近就再也過不去，那不是難度，是曲線斷掉。
     // 上面所有測試都跑 250ms 決策——那等於一場做將近兩百次零延遲的拖曳，
     // 於是「來不來得及操作」這一整類問題在模擬裡完全隱形，而且 STAGES 只到 81，
     // 無限模式從來沒被跑過。這條測試補的正是這兩個洞。
     const maxed: Record<string, number> = {};
     for (const track of UPGRADES) maxed[track.id] = track.maxLevel;
 
-    for (const stage of [90, 97]) {
+    for (const stage of [90, 97, 115]) {
       let wins = 0;
       const samples = 8;
       for (let i = 0; i < samples; i += 1) {

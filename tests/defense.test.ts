@@ -318,6 +318,40 @@ describe('山門防守', () => {
     expect(bossHp(200)).toBeGreaterThan(bossHp(97));
   });
 
+  it('飛升境的階數上限走比較快的節奏，但第 1–81 關一格都不動', () => {
+    // 長期難度是兩條指數在賽跑：傷害上限每 3 關 ×1.35，血量每關 ×1.148。
+    // 主線用 3 關 +1 階，一段淨值 1.35÷1.148³ = ×0.892——每三關玩家掉 10.8%，
+    // 複利下去必然撞牆（實測第 130 關附近）。飛升境改用較快的節奏把牆推遠。
+    const { field } = BALANCE;
+    const steady = (stage: number): number =>
+      field.maxTierBase + Math.floor((Math.max(1, stage) - 1) / field.stagesPerTier);
+
+    // 主線完全不受影響——那條曲線是校準過的，不能因為改飛升境而動到。
+    for (let stage = 1; stage <= 81; stage += 1) {
+      expect(maxTierForStage(stage), `第 ${stage} 關的階數上限變了`).toBe(steady(stage));
+    }
+    // 任何一關都不得低於原本的節奏：換節奏若讓某幾關倒退，玩家看到的是「越推越弱」。
+    for (let stage = 1; stage <= 400; stage += 1) {
+      expect(maxTierForStage(stage), `第 ${stage} 關比舊規則還低`).toBeGreaterThanOrEqual(steady(stage));
+    }
+    // 而且要真的比較快，否則這條設定等於沒作用。
+    expect(field.ascendStagesPerTier).toBeLessThan(field.stagesPerTier);
+    expect(maxTierForStage(200)).toBeGreaterThan(steady(200));
+  });
+
+  it('飛升境仍然會越來越難，只是慢得多——無限模式不該永遠不難', () => {
+    const { field } = BALANCE;
+    const net = field.tierGrowth / Math.pow(BALANCE.wave.hpGrowth, field.ascendStagesPerTier);
+    // 小於 1：難度仍在爬升，飛升境終究會結束。等於 1 的話進飛升境時多輕鬆就永遠多輕鬆，
+    // 那條「無限」就變成無限的無聊。
+    expect(net, '飛升境不再變難，等於沒有難度曲線').toBeLessThan(1);
+    // 但要慢到讓飛升境的長度和主線（81 關）相當。實測：相對戰力減半約 90 關時，
+    // 真人速度下起手四符從第 82 關可以推到 170 附近，也就是再玩一輪主線的長度。
+    const halveIn = (Math.log(0.5) / Math.log(net)) * field.ascendStagesPerTier;
+    expect(halveIn, `戰力減半只需 ${halveIn.toFixed(0)} 關，飛升境太短`).toBeGreaterThan(60);
+    expect(halveIn, `戰力減半要 ${halveIn.toFixed(0)} 關，飛升境長到沒有終點`).toBeLessThan(130);
+  });
+
   it('妖魔走到山門就扣耐久，扣到零即失守', () => {
     const state = stateFor('sword', 1, 5);
     const rng = createRng(5);

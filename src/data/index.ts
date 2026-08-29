@@ -92,6 +92,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       tierGrowth: p(field_, 'tierGrowth', 'field'),
       maxTierBase: p(field_, 'maxTierBase', 'field'),
       stagesPerTier: p(field_, 'stagesPerTier', 'field'),
+      ascendStagesPerTier: p(field_, 'ascendStagesPerTier', 'field'),
       drawTierBelowMax: p(field_, 'drawTierBelowMax', 'field'),
       drawTierBonusChance: p(field_, 'drawTierBonusChance', 'field'),
       drawIntervalMs: p(field_, 'drawIntervalMs', 'field'),
