@@ -8,12 +8,34 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
   /** 權威數值集中於 wallet 之下（TECH_SPEC 第 9.3 節）。 */
   gold: number;
+}
+
+/**
+ * 輪迴轉世的進度。
+ *
+ * 只存三個原始事實：轉了幾世、手上還有幾點、已經換過點數的最深關卡。
+ * 花掉的點數存等級（spent），實際加成由公式算——和金幣升級同一套規矩。
+ */
+export interface KarmaState {
+  /** 轉世次數。純顯示，也是成就的依據。 */
+  rebirths: number;
+  /** 尚未花掉的仙緣點。 */
+  points: number;
+  /** 仙緣線 id → 等級。 */
+  spent: Record<string, number>;
+  /**
+   * 已經換算成點數的最深關卡。
+   *
+   * 有這一個欄位，同一段進度才不會被反覆轉世刷點——
+   * 沒有它，轉世就從一個決定退化成一個必須重複執行的動作。
+   */
+  claimedStage: number;
 }
 
 /**
@@ -88,6 +110,7 @@ export interface PlayerState {
   /** 曾經帶著這條挑戰通關過的 id。純紀錄，不影響任何數值。 */
   challengesDone: string[];
   records: RecordsState;
+  karma: KarmaState;
   stats: StatsState;
 }
 

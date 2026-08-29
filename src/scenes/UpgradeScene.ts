@@ -161,7 +161,7 @@ export class UpgradeScene extends Phaser.Scene {
     return [
       `${sect.name}　下一關山門 ${l.disciples}　陣位 ${l.fieldSlots} 格`,
       `法寶傷害 ${x(l.damageMultiplier)}　出手 ${x(l.fireRateMultiplier)}　抽符 ${x(l.drawSpeedMultiplier)}`,
-      `金幣 ${x(l.goldMultiplier)}　法寶階數上限 ${maxTierForStage(save.world.stage)} 階`,
+      `金幣 ${x(l.goldMultiplier)}　法寶階數上限 ${maxTierForStage(save.world.stage, l.tierBonus)} 階`,
     ].join('\n');
   }
 }

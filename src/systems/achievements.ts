@@ -29,6 +29,8 @@ function reached(save: SaveData, item: Achievement): boolean {
     case 'sectMastery':
       // 任何一派到達門檻即可。這是「專精一道」的獎勵，不是「四道都練滿」。
       return SECTS.some((sect) => masteryTier(save, sect.id) >= item.value);
+    case 'rebirths':
+      return save.player.karma.rebirths >= item.value;
   }
 }
 
@@ -69,5 +71,7 @@ export function progressOf(save: SaveData, item: Achievement): string {
       const best = SECTS.reduce((max, sect) => Math.max(max, masteryTier(save, sect.id)), 0);
       return `最高 ${best} / ${item.value} 階`;
     }
+    case 'rebirths':
+      return `${save.player.karma.rebirths} / ${item.value} 世`;
   }
 }

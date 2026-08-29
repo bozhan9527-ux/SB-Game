@@ -42,23 +42,30 @@ function ascensionStart(): number {
  * 取兩條的較大值，是為了保證**不會有任何一關的上限比舊規則低**——
  * 換節奏若讓某幾關倒退，玩家看到的是「越推越弱」，那比撞牆更糟。
  */
-export function maxTierForStage(stage: number): number {
+/**
+ * 這一關的法寶階數上限。
+ *
+ * bonus 是仙緣「宿慧未泯」買到的固定加值：它是跨世帶著走的東西，
+ * 因此不屬於關卡曲線本身，而是疊在算完的曲線上。
+ */
+export function maxTierForStage(stage: number, bonus = 0): number {
   const { field } = BALANCE;
   const current = Math.max(1, stage);
   const steady = field.maxTierBase + Math.floor((current - 1) / field.stagesPerTier);
   const start = ascensionStart();
-  if (current < start) return steady;
+  if (current < start) return steady + Math.max(0, Math.floor(bonus));
   const atStart = field.maxTierBase + Math.floor((start - 2) / field.stagesPerTier);
   const ascended = atStart + Math.floor((current - start + 1) / field.ascendStagesPerTier);
-  return Math.max(steady, ascended);
+  return Math.max(steady, ascended) + Math.max(0, Math.floor(bonus));
 }
 
 /** 抽到的符大約落在上限往下數幾階，偶爾多一階。 */
-export function drawTierForStage(stage: number, rng: Rng): number {
+export function drawTierForStage(stage: number, rng: Rng, tierBonus = 0): number {
   const { field } = BALANCE;
-  const base = Math.max(1, maxTierForStage(stage) - field.drawTierBelowMax);
+  const cap = maxTierForStage(stage, tierBonus);
+  const base = Math.max(1, cap - field.drawTierBelowMax);
   const bonus = rng.next() < field.drawTierBonusChance ? 1 : 0;
-  return Math.min(maxTierForStage(stage), base + bonus);
+  return Math.min(cap, base + bonus);
 }
 
 /**
@@ -70,7 +77,7 @@ export function drawTierForStage(stage: number, rng: Rng): number {
  */
 export function drawCard(loadout: Loadout, stage: number, rng: Rng): Card {
   const def = rng.pickWeighted(loadout.talismans, (card) => card.weight);
-  return { type: def.id, tier: drawTierForStage(stage, rng) };
+  return { type: def.id, tier: drawTierForStage(stage, rng, loadout.tierBonus) };
 }
 
 /** 兩張符能不能合：同一種符、同一階，且還沒到這一關的上限。 */

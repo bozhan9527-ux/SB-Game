@@ -1,0 +1,42 @@
+[
+  {
+    "id": "karmaPower",
+    "name": "道基永固",
+    "desc": "每一世都帶著的法寶傷害加成。",
+    "unit": "%",
+    "perLevel": 8,
+    "cost": 1,
+    "costGrowth": 1,
+    "maxLevel": 20
+  },
+  {
+    "id": "karmaGold",
+    "name": "夙世積財",
+    "desc": "每一世都帶著的金幣加成，重爬的速度差在這裡。",
+    "unit": "%",
+    "perLevel": 12,
+    "cost": 1,
+    "costGrowth": 1,
+    "maxLevel": 20
+  },
+  {
+    "id": "karmaGate",
+    "name": "護山大陣",
+    "desc": "每一世都帶著的山門耐久加成。",
+    "unit": "%",
+    "perLevel": 10,
+    "cost": 1,
+    "costGrowth": 1,
+    "maxLevel": 12
+  },
+  {
+    "id": "karmaTier",
+    "name": "宿慧未泯",
+    "desc": "法寶階數上限直接 +1。整條線裡最貴也最有感的一項。",
+    "unit": "階",
+    "perLevel": 1,
+    "cost": 6,
+    "costGrowth": 2,
+    "maxLevel": 3
+  }
+]

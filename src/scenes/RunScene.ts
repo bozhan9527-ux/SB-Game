@@ -713,7 +713,7 @@ export class RunScene extends Phaser.Scene {
    * 合成是這個遊戲的核心決策，不能靠玩家自己記哪張是幾階。
    */
   private showMergeHints(card: Card, source: DragSource): void {
-    const cap = maxTierForStage(this.run.stage);
+    const cap = maxTierForStage(this.run.stage, this.run.loadout.tierBonus);
     const mark = (glow: Phaser.GameObjects.Rectangle | undefined, target: Card | null, self: boolean): void => {
       if (glow === undefined) return;
       const same =
@@ -769,7 +769,7 @@ export class RunScene extends Phaser.Scene {
       existing !== null &&
       existing.type === card.type &&
       existing.tier === card.tier &&
-      existing.tier < maxTierForStage(this.run.stage);
+      existing.tier < maxTierForStage(this.run.stage, this.run.loadout.tierBonus);
 
     const text = same ? '' : merges ? '合成' : existing === null ? '放置' : '交換';
     const color = merges ? JADE : existing === null ? GOLD : INK_DIM;
@@ -906,7 +906,7 @@ export class RunScene extends Phaser.Scene {
    * 交換可以再拖回來，合成錯過的那一張已經被覆蓋掉了。
    */
   private slotAt(x: number, y: number, dragged: Card | null = null): CardSlot | null {
-    const cap = maxTierForStage(this.run.stage);
+    const cap = maxTierForStage(this.run.stage, this.run.loadout.tierBonus);
     const candidates: { slot: CardSlot; distance: number; merges: boolean }[] = [];
 
     const consider = (slot: CardSlot, cx: number, cy: number, target: Card | null): void => {
@@ -1799,7 +1799,7 @@ export class RunScene extends Phaser.Scene {
     this.refreshGateDamage();
     this.hudPower.setText(`每秒輸出 ${formatNumber(fieldDps(run.field, run.loadout))}`);
     fitText(this.hudPower, 190);
-    this.hudTier.setText(`階數上限 ${maxTierForStage(run.stage)}`);
+    this.hudTier.setText(`階數上限 ${maxTierForStage(run.stage, run.loadout.tierBonus)}`);
     this.hudGold.setText(`金幣 ${formatNumber(run.gold)}`);
     fitText(this.hudGold, 150);
 
@@ -1818,7 +1818,7 @@ export class RunScene extends Phaser.Scene {
    */
   private diagnose(reason: 'breached' | 'timeout' | 'abandon' | null): string {
     if (reason === 'abandon') return '中途退出，未計入通關';
-    const cap = maxTierForStage(this.run.stage);
+    const cap = maxTierForStage(this.run.stage, this.run.loadout.tierBonus);
     if (reason === 'timeout') {
       return '首領血太厚而輸出不夠——把符合到更高階，或提升淬鍊功法與御器訣';
     }

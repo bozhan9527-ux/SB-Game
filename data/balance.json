@@ -45,6 +45,10 @@
     "leakCostBase": 1,
     "leakCostGrowth": 1.02
   },
+  "rebirth": {
+    "minStage": 82,
+    "stagesPerPoint": 6
+  },
   "trait": {
     "armorPercentOfMaxHp": 0.02,
     "armorMaxCut": 0.5,

@@ -203,6 +203,36 @@ export interface TraitBalance {
   splitSpeedMultiplier: number;
 }
 
+/**
+ * 輪迴轉世。
+ *
+ * 通關 81 關之後只剩無限模式，沒有轉生、沒有新周目，也就沒有理由再開一輪。
+ * 轉世把「已經爬到多深」換成跨世永久生效的仙緣點：進度歸零，但下一世爬得快得多。
+ *
+ * **只有比上一次更深才給點數。** 否則同一段進度可以反覆轉世刷點，
+ * 轉世會從一個決定退化成一個必須重複執行的動作。
+ */
+export interface RebirthBalance {
+  /** 至少要抵達這一關才能轉世。 */
+  minStage: number;
+  /** 超過門檻之後，每幾關換一點仙緣。 */
+  stagesPerPoint: number;
+}
+
+/** 仙緣升級線。花的是轉世點數，不是金幣。 */
+export interface KarmaTrack {
+  id: string;
+  name: string;
+  desc: string;
+  unit: string;
+  perLevel: number;
+  /** 第一級的點數花費。 */
+  cost: number;
+  /** 每升一級花費乘上多少。1 代表每級同價。 */
+  costGrowth: number;
+  maxLevel: number;
+}
+
 /** 山門的耐久（弟子數）。 */
 export interface PowerBalance {
   baseDisciples: number;
@@ -249,6 +279,7 @@ export interface Balance {
   formation: FormationBalance;
   wave: WaveBalance;
   trait: TraitBalance;
+  rebirth: RebirthBalance;
   sect: SectBalance;
   power: PowerBalance;
   boss: BossBalance;
@@ -476,7 +507,8 @@ export type AchievementKind =
   | 'clears'
   | 'gold'
   | 'sects'
-  | 'sectMastery';
+  | 'sectMastery'
+  | 'rebirths';
 
 export interface Achievement {
   id: string;

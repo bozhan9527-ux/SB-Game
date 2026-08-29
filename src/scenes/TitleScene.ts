@@ -2,9 +2,11 @@ import Phaser from 'phaser';
 import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
+import type { SaveData } from '../save/types';
 import { sectById } from '../systems/loadout';
 import { TALISMAN_SLOTS, talismanDefs } from '../systems/talismans';
 import { activeChallenges, challengeGoldMultiplier } from '../systems/challenges';
+import { canRebirth } from '../systems/karma';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
@@ -55,13 +57,18 @@ export class TitleScene extends Phaser.Scene {
       .text(
         cx,
         486,
-        sect === null ? '尚未拜入門派' : `${sect.name} · ${sect.path}`,
+        // 轉世次數接在門派後面，不另開一行：這一區已經排滿，而它們講的是同一件事
+        // ——「我現在是誰」。
+        sect === null
+          ? '尚未拜入門派'
+          : `${sect.name} · ${sect.path}${karmaLine(save)}`,
         textStyle({ size: 22, color: sect === null ? INK_DIM : sect.color }),
       )
       .setOrigin(0.5);
     this.add
       .text(cx, 526, `金幣 ${formatNumber(save.player.wallet.gold)}`, textStyle({ size: 24, color: GOLD }))
       .setOrigin(0.5);
+
 
     // 按鈕
     // 帶哪四張符是每一場都值得改的決定，所以它和洞府一樣是主按鈕，不是塞在小按鈕列裡。
@@ -134,6 +141,20 @@ export class TitleScene extends Phaser.Scene {
       });
     });
 
+    // 輪迴只在「推得夠深」或「已經轉過世」之後才出現在畫面上。
+    // 提前露出只會讓還在第 5 關的新玩家困惑——他離那件事還有八十關。
+    const karma = save.player.karma;
+    if (canRebirth(save) || karma.rebirths > 0) {
+      createButton(this, 82, 60, {
+        width: 132,
+        height: 56,
+        label: karma.rebirths > 0 ? `輪迴 · 第 ${karma.rebirths + 1} 世` : '輪迴',
+        fontSize: 17,
+        textColor: GOLD,
+        onClick: () => fadeToScene(this, 'Rebirth'),
+      });
+    }
+
     // 音效開關。放在標題頁右上角，切換後立刻生效並寫進存檔。
     const soundButton = createButton(this, GAME_WIDTH - 82, 60, {
       width: 132,
@@ -161,4 +182,11 @@ export class TitleScene extends Phaser.Scene {
 
     persist();
   }
+}
+
+/** 轉過世才顯示，沒轉過就不佔任何空間。 */
+function karmaLine(save: SaveData): string {
+  const { rebirths, points } = save.player.karma;
+  if (rebirths <= 0) return '';
+  return ` · 第 ${rebirths + 1} 世（仙緣 ${points}）`;
 }

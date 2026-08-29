@@ -12,6 +12,7 @@ import upgradesJson from '../../data/upgrades.json';
 import enemiesJson from '../../data/enemies.json';
 import achievementsJson from '../../data/achievements.json';
 import lessonsJson from '../../data/lessons.json';
+import karmaJson from '../../data/karma.json';
 import challengesJson from '../../data/challenges.json';
 
 import type {
@@ -24,6 +25,7 @@ import type {
   CardDef,
   CardEffect,
   ChallengeDef,
+  KarmaTrack,
   FormationTierBalance,
   MobArt,
   MobTrait,
@@ -67,6 +69,7 @@ const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
 const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
   'stage', 'maxTier', 'kills', 'perfect', 'clears', 'gold', 'sects',
   'sectMastery',
+  'rebirths',
 ];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
@@ -88,6 +91,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const wave = obj(raw, 'wave', path);
   const power = obj(raw, 'power', path);
   const trait = obj(raw, 'trait', path);
+  const rebirth = obj(raw, 'rebirth', path);
   const sect = obj(raw, 'sect', path);
   const boss = obj(raw, 'boss', path);
   const gold = obj(raw, 'gold', path);
@@ -145,6 +149,10 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       splitCount: p(trait, 'splitCount', 'trait'),
       splitHpRatio: p(trait, 'splitHpRatio', 'trait'),
       splitSpeedMultiplier: p(trait, 'splitSpeedMultiplier', 'trait'),
+    },
+    rebirth: {
+      minStage: p(rebirth, 'minStage', 'rebirth'),
+      stagesPerPoint: p(rebirth, 'stagesPerPoint', 'rebirth'),
     },
     sect: {
       clearsPerMastery: p(sect, 'clearsPerMastery', 'sect'),
@@ -415,7 +423,28 @@ export function parseChallenges(raw: unknown, path = 'challenges.json'): Challen
   return challenges;
 }
 
+export function parseKarma(raw: unknown, path = 'karma.json'): KarmaTrack[] {
+  const tracks = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    name: str(item, 'name', p),
+    desc: str(item, 'desc', p),
+    unit: str(item, 'unit', p),
+    perLevel: num(item, 'perLevel', p),
+    cost: num(item, 'cost', p),
+    costGrowth: num(item, 'costGrowth', p),
+    maxLevel: num(item, 'maxLevel', p),
+  }));
+  assertUniqueIds(tracks, path);
+  for (const track of tracks) {
+    if (track.maxLevel < 1) throw new DataError(path, `${track.id} 的 maxLevel 至少為 1`);
+    if (track.cost < 1) throw new DataError(path, `${track.id} 的 cost 至少為 1`);
+    if (track.costGrowth < 1) throw new DataError(path, `${track.id} 的 costGrowth 不得小於 1`);
+  }
+  return tracks;
+}
+
 export const CARDS: readonly CardDef[] = parseCards(cardsJson);
+export const KARMA: readonly KarmaTrack[] = parseKarma(karmaJson);
 export const CHALLENGES: readonly ChallengeDef[] = parseChallenges(challengesJson);
 export const LESSONS: readonly LessonDef[] = parseLessons(lessonsJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);

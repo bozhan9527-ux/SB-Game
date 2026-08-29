@@ -1,14 +1,14 @@
 /**
  * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
  */
-import { SECTS, UPGRADES } from '../data';
+import { KARMA, SECTS, UPGRADES } from '../data';
 import { sanitizeChallenges } from '../systems/challenges';
 import { sanitizeTalismans, starterTalismans } from '../systems/talismans';
 import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { RecordsState, SaveData } from './types';
+import type { KarmaState, RecordsState, SaveData } from './types';
 import { SAVE_KEY, SAVE_VERSION } from './types';
 
 export function createDefaultSave(now: number = Date.now()): SaveData {
@@ -28,6 +28,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       sectClears: {},
       challenges: [],
       challengesDone: [],
+      karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
       records: {
         bestDps: 0,
         fastestClearMs: 0,
@@ -44,6 +45,23 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
 
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** 仙緣一律夾成非負整數，等級也夾在該線的上限之內。 */
+function normalizeKarma(raw: unknown): KarmaState {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const spentRaw = (source['spent'] ?? {}) as Record<string, unknown>;
+  const spent: Record<string, number> = {};
+  for (const track of KARMA) {
+    const level = Math.max(0, Math.floor(asNumber(spentRaw[track.id], 0)));
+    spent[track.id] = Math.min(track.maxLevel, level);
+  }
+  return {
+    rebirths: Math.max(0, Math.floor(asNumber(source['rebirths'], 0))),
+    points: Math.max(0, Math.floor(asNumber(source['points'], 0))),
+    spent,
+    claimedStage: Math.max(0, Math.floor(asNumber(source['claimedStage'], 0))),
+  };
 }
 
 /** 紀錄一律夾成非負數：負的最佳紀錄會讓「破紀錄」的判定永遠成立。 */
@@ -121,6 +139,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),
       records: normalizeRecords(player['records']),
+      karma: normalizeKarma(player['karma']),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),

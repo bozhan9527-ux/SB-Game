@@ -497,7 +497,7 @@ export function mergeInto(
 }
 
 function maxTier(state: DefenseState): number {
-  return maxTierForStage(state.stage);
+  return maxTierForStage(state.stage, state.loadout.tierBonus);
 }
 
 // ---------------------------------------------------------------- 每一拍

@@ -12,6 +12,7 @@ import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect } from '../data/types';
 import type { SaveData } from '../save/types';
 import { challengeGoldMultiplier, hasChallenge } from './challenges';
+import { karmaAmount } from './karma';
 import { masteryBonus, masteryTier } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
@@ -66,6 +67,8 @@ export interface Loadout {
   talismans: CardDef[];
   /** 這一場的挑戰條件加上去的規則。沒開任何一條時是 NO_RULES。 */
   rules: RunRules;
+  /** 仙緣「宿慧未泯」帶來的階數上限加值。跨世永久生效。 */
+  tierBonus: number;
 }
 
 export function sectById(id: string | null): Sect | null {
@@ -83,11 +86,19 @@ export function buildLoadout(save: SaveData, stage: number): Loadout {
   const solo = hasChallenge(save, 'soloTalisman');
   const talismans = solo ? all.slice(0, 1) : all;
   const mastery = masteryBonus(masteryTier(save, sect.id));
-  const loadout = buildLoadoutFor(sect, save.player.upgrades, stage, talismans, mastery, {
-    noMerge: hasChallenge(save, 'noMerge'),
-    suddenDeath: hasChallenge(save, 'noLeak'),
-    bossTimeMultiplier: hasChallenge(save, 'hasteBoss') ? 0.5 : 1,
-  });
+  const loadout = buildLoadoutFor(
+    sect,
+    save.player.upgrades,
+    stage,
+    talismans,
+    mastery,
+    {
+      noMerge: hasChallenge(save, 'noMerge'),
+      suddenDeath: hasChallenge(save, 'noLeak'),
+      bossTimeMultiplier: hasChallenge(save, 'hasteBoss') ? 0.5 : 1,
+    },
+    karmaBonuses(save),
+  );
   // 孤身守門：容錯幾乎歸零。放在這裡而不是 RunRules 裡，
   // 是因為它改的是一個既有的起始值，不是一條新規則。
   if (hasChallenge(save, 'thinGate')) {
@@ -95,6 +106,30 @@ export function buildLoadout(save: SaveData, stage: number): Loadout {
   }
   loadout.goldMultiplier *= challengeGoldMultiplier(save);
   return loadout;
+}
+
+/**
+ * 仙緣帶來的跨世乘區。
+ *
+ * 和 masteryBonus 同一個理由做成參數而不是從存檔撈：平衡模擬沒有存檔，
+ * 而「幾世之後有多強」正是要能單獨掃的一個維度。
+ */
+export interface KarmaBonuses {
+  damage: number;
+  gold: number;
+  disciples: number;
+  tierBonus: number;
+}
+
+export const NO_KARMA: KarmaBonuses = { damage: 0, gold: 0, disciples: 0, tierBonus: 0 };
+
+function karmaBonuses(save: SaveData): KarmaBonuses {
+  return {
+    damage: karmaAmount(save, 'karmaPower') / 100,
+    gold: karmaAmount(save, 'karmaGold') / 100,
+    disciples: karmaAmount(save, 'karmaGate') / 100,
+    tierBonus: karmaAmount(save, 'karmaTier'),
+  };
 }
 
 /** 百分比升級換算成倍率。 */
@@ -115,7 +150,9 @@ export function buildLoadoutFor(
   talismans?: readonly CardDef[],
   masteryBonusValue = 0,
   rules: RunRules = NO_RULES,
+  karma: KarmaBonuses = NO_KARMA,
 ): Loadout {
+  const tierBonus = Math.max(0, Math.floor(karma.tierBonus));
   const { power } = BALANCE;
   const realm = realmForStage(stage);
   // 沒指定就用開局那四張。測試與平衡模擬大多跑預設配置，指定的才是在驗特效。
@@ -128,18 +165,26 @@ export function buildLoadoutFor(
     disciples: Math.max(
       1,
       Math.round(
-        power.baseDisciples * sect.discipleMultiplier * multiplierOf(upgrades, 'startDisciples'),
+        power.baseDisciples *
+          sect.discipleMultiplier *
+          multiplierOf(upgrades, 'startDisciples') *
+          (1 + Math.max(0, karma.disciples)),
       ),
     ),
     damageMultiplier:
-      sect.damageMultiplier * multiplierOf(upgrades, 'startAttack') * (1 + Math.max(0, masteryBonusValue)),
+      sect.damageMultiplier *
+      multiplierOf(upgrades, 'startAttack') *
+      (1 + Math.max(0, masteryBonusValue)) *
+      (1 + Math.max(0, karma.damage)),
     fireRateMultiplier: multiplierOf(upgrades, 'startDefense'),
     drawSpeedMultiplier: sect.drawSpeedMultiplier * multiplierOf(upgrades, 'drawSpeed'),
     bossDamageMultiplier: sect.bossDamageMultiplier,
     fieldSlots: BALANCE.field.fieldSlots + amountOf(upgrades, 'fieldSlots'),
-    goldMultiplier: sect.goldMultiplier * multiplierOf(upgrades, 'goldGain'),
+    goldMultiplier:
+      sect.goldMultiplier * multiplierOf(upgrades, 'goldGain') * (1 + Math.max(0, karma.gold)),
     realmPowerBonus: realm.powerBonus,
     talismans: pool,
     rules,
+    tierBonus,
   };
 }

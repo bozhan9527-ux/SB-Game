@@ -129,6 +129,17 @@ const addRecords: Migration = (data) => {
   };
 };
 
+/**
+ * v10 → v11：加入輪迴轉世。
+ *
+ * claimedStage 補 0 而不是補目前的 highestStage：已經推到飛升境的老玩家
+ * 應該能立刻用那段進度換到第一次的仙緣點，那是他已經打出來的東西。
+ */
+const addKarma: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 } } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -140,6 +151,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addSectClears,
   addChallenges,
   addRecords,
+  addKarma,
 ];
 
 /**
