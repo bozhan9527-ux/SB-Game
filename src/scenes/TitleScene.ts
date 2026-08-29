@@ -115,19 +115,21 @@ export class TitleScene extends Phaser.Scene {
       onClick: () => fadeToScene(this, 'Talisman'),
     });
 
-    // 四顆並排：540 寬放得下 4×124 加間距，比擠成兩排省一列高度。
+    // 五顆並排：540 寬放得下 5×102 加間距，比擠成兩排省一列高度。
+    // 字級縮到 17：這一排全是兩到四個字，縮了仍然讀得清楚。
     const minor: [string, string][] = [
       ['玩法說明', 'Help'],
       ['仙途錄', 'Achievements'],
       [hasSect ? '換門派' : '門派', 'Sect'],
       ['試煉', 'Challenge'],
+      ['存檔', 'Archive'],
     ];
     minor.forEach(([label, target], index) => {
-      createButton(this, cx + (index - 1.5) * 128, 850, {
-        width: 124,
+      createButton(this, cx + (index - 2) * 104, 850, {
+        width: 100,
         height: 56,
         label,
-        fontSize: 19,
+        fontSize: 17,
         onClick: () => fadeToScene(this, target),
       });
     });

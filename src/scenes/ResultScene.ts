@@ -4,7 +4,8 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { CARDS } from '../data';
 import { addGold, recordClear, recordDefeat } from '../save';
 import { claimAchievements } from '../systems/achievements';
-import { recordChallengeClears } from '../systems/challenges';
+import { activeChallenges, recordChallengeClears } from '../systems/challenges';
+import { updateRecords } from '../systems/records';
 import type { RunTelemetry } from '../systems/defense';
 import {
   averageDps,
@@ -53,6 +54,15 @@ export class ResultScene extends Phaser.Scene {
     // 試煉的達成紀錄要在成就結算之前寫入：日後若有「達成某條試煉」的成就，
     // 順序反了就會慢一場才發。
     const challenges = result.victory ? recordChallengeClears(save) : [];
+    const beaten = updateRecords(save, {
+      victory: result.victory,
+      stage: result.stage,
+      kills: result.kills,
+      dps: averageDps(result.telemetry, result.elapsedMs),
+      formationBonus: averageFormationBonus(result.telemetry),
+      elapsedMs: result.elapsedMs,
+      challengeCount: activeChallenges(save).length,
+    });
     const unlocked = claimAchievements(save);
     for (const item of unlocked) addGold(save, item.reward);
     persist();
@@ -131,6 +141,21 @@ export class ResultScene extends Phaser.Scene {
       fontSize: 20,
       onClick: () => this.showReport(),
     });
+
+    // 破紀錄那一行寫在結算表下面：它是「這一場最值得說嘴的地方」，
+    // 不是統計，所以不進表格。一場可能同時破好幾項，擠成一行再縮字級，
+    // 硬換行會把它推去撞下面的按鈕。
+    if (beaten.length > 0) {
+      const line = this.add
+        .text(
+          cx,
+          620,
+          `新紀錄　${beaten.map((item) => `${item.label} ${item.text}`).join('　')}`,
+          textStyle({ size: 17, color: JADE, bold: true }),
+        )
+        .setOrigin(0.5);
+      fitText(line, GAME_WIDTH - 40);
+    }
 
     if (challenges.length > 0) {
       this.add

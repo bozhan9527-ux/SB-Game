@@ -8,7 +8,7 @@ import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { SaveData } from './types';
+import type { RecordsState, SaveData } from './types';
 import { SAVE_KEY, SAVE_VERSION } from './types';
 
 export function createDefaultSave(now: number = Date.now()): SaveData {
@@ -28,6 +28,13 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       sectClears: {},
       challenges: [],
       challengesDone: [],
+      records: {
+        bestDps: 0,
+        fastestClearMs: 0,
+        bestFormationBonus: 0,
+        bestChallengeStage: 0,
+        bestKills: 0,
+      },
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
@@ -37,6 +44,19 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
 
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** 紀錄一律夾成非負數：負的最佳紀錄會讓「破紀錄」的判定永遠成立。 */
+function normalizeRecords(raw: unknown): RecordsState {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const at = (key: string): number => Math.max(0, asNumber(source[key], 0));
+  return {
+    bestDps: at('bestDps'),
+    fastestClearMs: at('fastestClearMs'),
+    bestFormationBonus: at('bestFormationBonus'),
+    bestChallengeStage: at('bestChallengeStage'),
+    bestKills: at('bestKills'),
+  };
 }
 
 /**
@@ -100,6 +120,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       sectClears: normalizeSectClears(player['sectClears']),
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),
+      records: normalizeRecords(player['records']),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),
@@ -146,6 +167,22 @@ export function saveGame(
 ): void {
   data.savedAt = now;
   storage.write(SAVE_KEY, JSON.stringify(data));
+}
+
+/**
+ * 把一份外來的存檔物件套用進來（匯入碼用）。
+ *
+ * 走的是和 loadSave 完全相同的遷移與正規化路徑：匯入的碼可能來自幾個版本以前，
+ * 若這裡自己做一套修補，兩份規則會各自演化，而舊碼遲早會踩到差異。
+ */
+export function adoptSave(
+  raw: Record<string, unknown>,
+  storage: Storage = defaultStorage(),
+  now: number = Date.now(),
+): SaveData {
+  const data = normalize(migrate(raw, SAVE_VERSION), now);
+  saveGame(data, storage, now);
+  return data;
 }
 
 export function resetSave(storage: Storage = defaultStorage()): SaveData {

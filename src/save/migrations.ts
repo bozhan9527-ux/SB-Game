@@ -106,6 +106,29 @@ const addChallenges: Migration = (data) => {
   return { ...data, player: { ...player, challenges: [], challengesDone: [] } };
 };
 
+/**
+ * v9 → v10：加入個人最佳紀錄。
+ *
+ * 一律從零開始：這幾個數字要靠一場結束時的戰績才算得出來，而戰績是這一版才開始收的。
+ * 舊存檔沒有任何依據可以回推，硬填一個數字只會讓第一筆「新紀錄」永遠打不破。
+ */
+const addRecords: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return {
+    ...data,
+    player: {
+      ...player,
+      records: {
+        bestDps: 0,
+        fastestClearMs: 0,
+        bestFormationBonus: 0,
+        bestChallengeStage: 0,
+        bestKills: 0,
+      },
+    },
+  };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -116,6 +139,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addSpeed,
   addSectClears,
   addChallenges,
+  addRecords,
 ];
 
 /**

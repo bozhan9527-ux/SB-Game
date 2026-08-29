@@ -22,3 +22,8 @@ export function state(): SaveData {
 export function persist(): void {
   saveGame(state());
 }
+
+/** 匯入存檔：換掉整個單例，之後的每一個場景都會看到新的進度。 */
+export function replaceState(next: SaveData): void {
+  current = next;
+}

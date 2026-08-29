@@ -8,12 +8,32 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
   /** 權威數值集中於 wallet 之下（TECH_SPEC 第 9.3 節）。 */
   gold: number;
+}
+
+/**
+ * 個人最佳紀錄。
+ *
+ * 無限模式的唯一動機是比較，而這個專案沒有後端、也就沒有排行榜。
+ * 在有之前，先讓玩家至少能跟**自己**比：推到多深、打得多快、輸出的頂點在哪。
+ * 這幾個數字全部來自一場結束時的戰績，不需要任何伺服器。
+ */
+export interface RecordsState {
+  /** 單場最高每秒輸出。 */
+  bestDps: number;
+  /** 最快斬掉首領的一場（ms）。沒有紀錄為 0。 */
+  fastestClearMs: number;
+  /** 單場最高的陣法平均加成（0.42 = +42%）。 */
+  bestFormationBonus: number;
+  /** 帶著試煉通關過的最深關卡。 */
+  bestChallengeStage: number;
+  /** 單場最高擊殺數。 */
+  bestKills: number;
 }
 
 /** 成就判定用的長期統計。只存原始事實，不存衍生值。 */
@@ -67,6 +87,7 @@ export interface PlayerState {
   challenges: string[];
   /** 曾經帶著這條挑戰通關過的 id。純紀錄，不影響任何數值。 */
   challengesDone: string[];
+  records: RecordsState;
   stats: StatsState;
 }
 
