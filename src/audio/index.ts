@@ -7,7 +7,18 @@
  * 瀏覽器規定 AudioContext 必須在使用者操作之後才能出聲，因此第一次點擊／按鍵前
  * 整個模組都是靜默的，unlock() 由 main.ts 掛的一次性事件觸發。
  */
-import { noteFrequency, phraseForRealm, rootForRealm, scaleNote } from './notes';
+import {
+  BASS_BEATS,
+  MELODY_BEATS,
+  MELODY_CEILING,
+  PENTATONIC,
+  SPARKLE_CEILING,
+  octaveShift,
+  noteFrequency,
+  phraseForRealm,
+  rootForRealm,
+  scaleNote,
+} from './notes';
 import { renderGong, renderNoise, renderPluck, renderThud } from './synth';
 
 export type SfxName =
@@ -28,8 +39,13 @@ export type SfxName =
 const MASTER_GAIN = 0.9;
 const MUSIC_GAIN = 0.22;
 const SFX_GAIN = 0.5;
-/** 每拍秒數，約 70 BPM 的從容感。 */
-const BEAT_SECONDS = 0.42;
+/**
+ * 每拍秒數。
+ *
+ * 原本是 0.42（約 70 BPM 的從容感），但這個遊戲的節奏是「一直在動手」——
+ * 配樂比玩家慢，整體就顯得沉。0.30 大約 100 BPM，跟得上手上的動作。
+ */
+const BEAT_SECONDS = 0.3;
 const BEATS_PER_BAR = 8;
 
 type AudioContextCtor = new () => AudioContext;
@@ -282,25 +298,46 @@ class AudioEngine {
     const phrase = phraseForRealm(realm);
     const start = Math.max(this.nextBarTime, ctx.currentTime + 0.05);
 
+    // 整段一起移到舒服的音域，而不是逐音折——逐音折會把旋律的輪廓折壞。
+    const melodyNotes = phrase.map((degree) => scaleNote(root + 12, degree));
+    const melodyShift = octaveShift(Math.max(...melodyNotes), MELODY_CEILING);
+    const sparkleNotes = phrase.map((degree) => scaleNote(root + 24, degree % PENTATONIC.length));
+    const sparkleShift = octaveShift(Math.max(...sparkleNotes), SPARKLE_CEILING);
+
     for (let beat = 0; beat < BEATS_PER_BAR; beat += 1) {
-      const degree = phrase[beat % phrase.length] ?? 0;
       const when = start + beat * BEAT_SECONDS;
+      const sounding = MELODY_BEATS[beat] ?? true;
 
-      // 主旋律
-      const frequency = noteFrequency(scaleNote(root + 12, degree));
-      this.emit(
-        this.buffer(`music-${Math.round(frequency)}`, (c) => renderPluck(c, frequency, 1.6, 0.6)),
-        this.musicBus,
-        { gain: beat % 2 === 0 ? 0.5 : 0.32, when },
-      );
-
-      // 低音：每小節的第 1 與第 5 拍撥一次根音，撐住整段。
-      if (beat % 4 === 0) {
-        const bass = noteFrequency(scaleNote(root - 12, beat === 0 ? 0 : 3));
+      // 主旋律。衰減從 1.6 秒縮到 0.9：拖太長會把相鄰的音糊成一片持續音，
+      // 聽起來像鋪底而不是旋律，快起來之後更明顯。
+      if (sounding) {
+        const frequency = noteFrequency((melodyNotes[beat] ?? 0) + melodyShift);
         this.emit(
-          this.buffer(`music-bass-${Math.round(bass)}`, (c) => renderPluck(c, bass, 2.6, 0.25)),
+          this.buffer(`music-${Math.round(frequency)}`, (c) => renderPluck(c, frequency, 0.9, 0.72)),
           this.musicBus,
-          { gain: 0.45, when },
+          { gain: beat === 0 || beat === 5 ? 0.52 : 0.36, when },
+        );
+      } else {
+        // 休止的拍子改在半拍後點一個高八度的輕音。
+        // 留白不等於空白——這一點是整段「活起來」的地方。
+        // 音級要先收進一個八度內：直接沿用旋律的音級會疊到第三個八度，
+        // 最高衝到 5kHz，那不叫明亮叫刺耳。
+        const sparkle = noteFrequency((sparkleNotes[beat] ?? 0) + sparkleShift);
+        this.emit(
+          this.buffer(`music-hi-${Math.round(sparkle)}`, (c) => renderPluck(c, sparkle, 0.5, 0.9)),
+          this.musicBus,
+          { gain: 0.16, when: when + BEAT_SECONDS * 0.5 },
+        );
+      }
+
+      // 低音：根音與五度交替，一小節四下，走出往前推的步伐。
+      const bassDegree = BASS_BEATS[beat] ?? null;
+      if (bassDegree !== null) {
+        const bass = noteFrequency(scaleNote(root - 12, bassDegree));
+        this.emit(
+          this.buffer(`music-bass-${Math.round(bass)}`, (c) => renderPluck(c, bass, 1.4, 0.28)),
+          this.musicBus,
+          { gain: beat % 4 === 0 ? 0.44 : 0.3, when },
         );
       }
     }
