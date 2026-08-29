@@ -8,6 +8,7 @@ import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '..
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { GOLD, INK, INK_DIM, formatNumber, textStyle } from '../ui/theme';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 標題畫面：顯示目前境界與金幣，通往挑戰、升級、換門派。 */
 export class TitleScene extends Phaser.Scene {
@@ -16,6 +17,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
     const sect = sectById(save.player.sectId);
@@ -79,7 +81,7 @@ export class TitleScene extends Phaser.Scene {
       label: hasSect ? '開始挑戰' : '選擇門派',
       fontSize: 30,
       strokeColor: 0x6f8b7a,
-      onClick: () => this.scene.start(hasSect ? 'Run' : 'Sect'),
+      onClick: () => fadeToScene(this, hasSect ? 'Run' : 'Sect'),
     });
 
     createButton(this, cx, 710, {
@@ -87,7 +89,7 @@ export class TitleScene extends Phaser.Scene {
       height: 62,
       label: '洞府 · 提升屬性',
       fontSize: 25,
-      onClick: () => this.scene.start('Upgrade'),
+      onClick: () => fadeToScene(this, 'Upgrade'),
     });
 
     createButton(this, cx, 780, {
@@ -95,7 +97,7 @@ export class TitleScene extends Phaser.Scene {
       height: 62,
       label: `符籙譜 · 帶 ${TALISMAN_SLOTS} 張入場`,
       fontSize: 25,
-      onClick: () => this.scene.start('Talisman'),
+      onClick: () => fadeToScene(this, 'Talisman'),
     });
 
     // 三顆並排：540 寬放得下 3×112 加間距，比擠成兩排省一列高度。
@@ -104,21 +106,21 @@ export class TitleScene extends Phaser.Scene {
       height: 56,
       label: '玩法說明',
       fontSize: 20,
-      onClick: () => this.scene.start('Help'),
+      onClick: () => fadeToScene(this, 'Help'),
     });
     createButton(this, cx, 850, {
       width: 112,
       height: 56,
       label: '仙途錄',
       fontSize: 20,
-      onClick: () => this.scene.start('Achievements'),
+      onClick: () => fadeToScene(this, 'Achievements'),
     });
     createButton(this, cx + 118, 850, {
       width: 112,
       height: 56,
       label: hasSect ? '換門派' : '門派',
       fontSize: 20,
-      onClick: () => this.scene.start('Sect'),
+      onClick: () => fadeToScene(this, 'Sect'),
     });
 
     // 音效開關。放在標題頁右上角，切換後立刻生效並寫進存檔。

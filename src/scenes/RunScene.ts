@@ -70,6 +70,7 @@ import {
   textStyle,
 } from '../ui/theme';
 import type { RunResultData } from './types';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 妖魔的行進區間。上緣是妖魔出場處，下緣就是山門。 */
 const ARENA_TOP = 116;
@@ -111,7 +112,35 @@ const MAX_TRACERS_PER_FRAME = 5;
 /** 傷害數字累積多久吐一次。太短會變成一片閃爍，太長又跟不上戰況。 */
 const DAMAGE_FLUSH_MS = 320;
 
+/**
+ * 出手前的預備：冷卻剩下這麼多毫秒時開始往下縮，出手瞬間彈回原位。
+ *
+ * 動畫的基本功是 anticipation → action。原本符牌完全不動，只有一條靈光飛出去，
+ * 看起來像是那條線自己冒出來的，跟這張牌沒有關係。
+ */
+const CHARGE_MS = 140;
+const CHARGE_DIP = 7;
+
+/**
+ * 受擊白閃：亮多久、以及最短隔多久才能再閃一次。
+ *
+ * 後期一隻妖魔可能每一幀都被打到。若每次命中都重新點亮，牠就會從頭到尾是一團白色，
+ * 「被打到」這件事反而看不見了——閃光要有暗的時候才叫閃光。
+ * 45／160 讓密集開火時大約三成時間是亮的，讀起來是頻閃；單發命中則是一次乾淨的閃。
+ */
+const FLASH_MS = 45;
+const FLASH_GAP_MS = 160;
+
+/** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
+const FREEZE_BOSS_HIT_MS = 28;
+const FREEZE_BOSS_HIT_GAP_MS = 500;
+const FREEZE_BOSS_KILL_MS = 160;
+const FREEZE_MERGE_MS = 24;
+
 type DragSource = CardSlot;
+
+/** 妖魔的身體本體。受擊白閃與倒下都動它，不動外層容器（容器的位置由模擬決定）。 */
+type EnemyBody = Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
 
 /**
  * 山門防守戰。
@@ -194,12 +223,14 @@ export class RunScene extends Phaser.Scene {
   /** 每隻妖魔累積中的傷害，湊夠一段時間才吐一個數字。 */
   private pendingDamage = new Map<number, { total: number; since: number }>();
   private lastHitSoundAt = 0;
+  private lastFreezeAt = -9999;
 
   constructor() {
     super('Run');
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     if (save.player.sectId === null) {
       this.scene.start('Sect');
@@ -244,6 +275,7 @@ export class RunScene extends Phaser.Scene {
     this.pendingDamage = new Map<number, { total: number; since: number }>();
     this.lastHitSoundAt = 0;
     this.gateStage = -1;
+    this.lastFreezeAt = -9999;
     this.buildPauseOverlay();
     this.buildCoach();
     this.refreshCards();
@@ -772,12 +804,56 @@ export class RunScene extends Phaser.Scene {
     if (result === 'merged') {
       const merged = cardAt(this.run, target);
       audio.play('gold');
-      this.pulseSlot(target, GOLD);
+      this.playMerge(source, target, card);
       this.floatText(pos.x, pos.y - 46, `${cardDef(card.type).name} ${merged?.tier ?? ''} 階`, GOLD, 24);
     } else {
       audio.play('gateGood');
       if (target.where === 'field') this.pulseSlot(target, JADE);
     }
+  }
+
+  /**
+   * 合成的過程。
+   *
+   * 合成是這個遊戲最爽的一刻——輸出乘上 1.35 倍就發生在這一下——
+   * 但原本畫面上只有數字瞬間變大加一次縮放，等於把高潮剪掉了。
+   *
+   * 補的是三拍：來源那張飛過去（它在模擬裡已經被吃掉，所以飛的是一個分身）、
+   * 撞上時爆一圈光、目標那張彈起來。凍格幾毫秒讓這一下站得住。
+   */
+  private playMerge(source: CardSlot, target: CardSlot, card: Card): void {
+    const from = this.slotPosition(source);
+    const to = this.slotPosition(target);
+    const ghost = createCardView(this, from.x, from.y);
+    ghost.refresh(card);
+    ghost.container.setDepth(80).setScale(source.where === 'hand' ? 1 : 0.82);
+    this.tweens.add({
+      targets: ghost.container,
+      x: to.x,
+      y: to.y,
+      scale: 0.45,
+      duration: 170,
+      ease: 'Back.easeIn',
+      onComplete: () => {
+        ghost.container.destroy();
+        this.mergeRing(to.x, to.y);
+        this.pulseSlot(target, GOLD);
+        this.freeze(FREEZE_MERGE_MS);
+      },
+    });
+  }
+
+  /** 合成撞擊點的一圈金光。只是一個會擴散淡出的圓環，沒有貼圖成本。 */
+  private mergeRing(x: number, y: number): void {
+    const ring = this.add.circle(x, y, 14).setStrokeStyle(4, hexToNumber(GOLD), 0.95).setDepth(79);
+    this.tweens.add({
+      targets: ring,
+      scale: 3.4,
+      alpha: 0,
+      duration: 320,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    });
   }
 
   private slotPosition(slot: CardSlot): { x: number; y: number } {
@@ -1065,11 +1141,35 @@ export class RunScene extends Phaser.Scene {
     const report = tickCombat(this.run, delta * this.speed, this.rng);
     this.applyReport(report);
     this.syncEnemies();
+    this.animateCharge();
     this.updateHud();
 
     if (this.run.outcome === 'cleared') this.finish(true, null);
     else if (this.run.outcome === 'defeated') this.finish(false, 'breached');
     else if (this.run.outcome === 'timeout') this.finish(false, 'timeout');
+  }
+
+  /**
+   * 出手前的預備動作：冷卻快走完時把符牌往下縮，出手那一瞬間彈回原位。
+   *
+   * 直接依冷卻進度算位移，不開 tween——每一格每秒可能出手好幾次，
+   * 開 tween 等於每秒生出幾十個物件，而這裡要的只是一個位置。
+   * 冷卻在出手時被重設成一整個間隔，所以「彈回去」是免費的：t 直接回到 0。
+   */
+  private animateCharge(): void {
+    for (let i = 0; i < this.fieldViews.length; i += 1) {
+      const view = this.fieldViews[i];
+      const baseY = this.fieldSlotY[i];
+      if (view === undefined || baseY === undefined) continue;
+      const dragging = this.drag?.where === 'field' && this.drag.index === i;
+      if (this.run.field[i] == null || dragging) {
+        view.container.y = baseY;
+        continue;
+      }
+      const cooling = this.run.cooldowns[i] ?? 0;
+      const t = cooling >= CHARGE_MS ? 0 : 1 - cooling / CHARGE_MS;
+      view.container.y = baseY + CHARGE_DIP * t;
+    }
   }
 
   private applyReport(report: TickReport): void {
@@ -1088,6 +1188,11 @@ export class RunScene extends Phaser.Scene {
       if (!hitThisFrame.has(shot.enemyId)) {
         hitThisFrame.add(shot.enemyId);
         this.flashEnemy(view, shot.killed);
+        // 打在首領身上的每一下都是這一場的重點，給它重量。
+        if (view.getData('boss') === true && this.time.now - this.lastFreezeAt > FREEZE_BOSS_HIT_GAP_MS) {
+          this.lastFreezeAt = this.time.now;
+          this.freeze(FREEZE_BOSS_HIT_MS);
+        }
       }
       this.accrueDamage(shot.enemyId, shot.damage);
       if (drawn >= MAX_TRACERS_PER_FRAME) continue;
@@ -1106,12 +1211,15 @@ export class RunScene extends Phaser.Scene {
       if (view !== undefined) {
         this.burst(view.x, view.y, kill.boss ? GOLD : DANGER, kill.boss ? 40 : 10);
         this.floatText(view.x, view.y - 20, `+${Math.max(1, Math.round(kill.gold))}`, GOLD, 20);
-        view.destroy();
         this.enemySprites.delete(kill.enemyId);
+        this.killEnemyView(view, kill.boss);
       }
       if (kill.boss) {
         this.bossPanel?.destroy();
         this.bossPanel = null;
+        // 斬殺首領是一整關的句點，凍格拉長，再補一次鏡頭震動。
+        this.freeze(FREEZE_BOSS_KILL_MS);
+        this.cameras.main.shake(260, 0.012);
         audio.play('victory');
       } else {
         audio.play('mob');
@@ -1190,6 +1298,8 @@ export class RunScene extends Phaser.Scene {
       const aura = this.add.circle(0, 0, 62, hexToNumber(DANGER), 0.16);
       const body = this.add.image(0, 0, bossTexture(enemy.bossArt)).setDisplaySize(140, 140);
       container.add([aura, body]);
+      container.setData('body', body);
+      container.setData('boss', true);
       this.tweens.add({ targets: aura, alpha: 0.3, duration: 900, yoyo: true, repeat: -1 });
     } else {
       const scale = ENEMY_DISPLAY_HEIGHT / ENEMY_SOURCE_HEIGHT;
@@ -1197,6 +1307,7 @@ export class RunScene extends Phaser.Scene {
       sprite.play(enemyWalkKey(enemy.art));
       sprite.anims.setProgress(this.rng.next());
       container.add(sprite);
+      container.setData('body', sprite);
     }
 
     // 一般妖魔各有一條小血條：沒有它就看不出「打不動」和「快死了」的差別。
@@ -1230,6 +1341,11 @@ export class RunScene extends Phaser.Scene {
       const ember = view.getData('ember') as Phaser.GameObjects.Arc | undefined;
       frost?.setVisible(enemy.slowUntilMs > this.run.elapsedMs);
       ember?.setVisible(enemy.burnRemaining > 0);
+      const tintUntil = view.getData('tintUntil') as number | undefined;
+      if (tintUntil !== undefined && this.time.now >= tintUntil) {
+        view.setData('tintUntil', undefined);
+        (view.getData('body') as EnemyBody | undefined)?.clearTint();
+      }
       if (enemy.boss) this.refreshBossPanel(enemy);
     }
   }
@@ -1340,11 +1456,74 @@ export class RunScene extends Phaser.Scene {
    *
    * 用 scale 的縮放而不是位移，是因為位移會和推進的座標打架（每一拍都在寫 y）。
    */
+  /**
+   * 受擊反應：彈一下、白閃一格、往後退一點。
+   *
+   * 三件事缺一不可。只放大會像在呼吸；只白閃看不出方向；
+   * 而「被打退」是唯一能讓玩家感覺到「這一下有力量」的位移。
+   *
+   * 位移做在身體上、不做在容器上：容器的 y 每一幀都會被 syncEnemies 依模擬位置覆寫，
+   * 動在那裡等於沒動。
+   */
   private flashEnemy(view: Phaser.GameObjects.Container, killed: boolean): void {
-    if (killed) return; // 死亡有自己的爆散，不必再閃一次
+    if (killed) return; // 死亡有自己的倒下動作，不必再閃一次
+    const now = this.time.now;
+    const nextAt = view.getData('flashAt') as number | undefined;
+    if (nextAt !== undefined && now < nextAt) return;
+    view.setData('flashAt', now + FLASH_GAP_MS);
+
     this.tweens.killTweensOf(view);
     view.setScale(1.14);
     this.tweens.add({ targets: view, scale: 1, duration: 130, ease: 'Quad.easeOut' });
+
+    const body = view.getData('body') as EnemyBody | undefined;
+    if (body === undefined) return;
+    body.setTintFill(0xffffff);
+    // 熄燈交給 syncEnemies 按時間關，不綁在位移的 tween 上：
+    // 位移要 150ms 才走完，白閃只該亮 45ms，綁在一起就變成一團白。
+    view.setData('tintUntil', now + FLASH_MS);
+    this.tweens.killTweensOf(body);
+    // 妖魔是由上往下走的，所以「往後」＝往上。
+    body.y = -7;
+    this.tweens.add({ targets: body, y: 0, duration: 150, ease: 'Quad.easeOut' });
+  }
+
+  /**
+   * 倒下。
+   *
+   * 原本是 destroy() 加一次粒子爆散——畫面上只看得到「東西不見了」，
+   * 看不到「它死了」。壓扁、轉倒、淡出，兩百多毫秒就把這兩件事分開。
+   * 屍體只是演出：它已經從 enemySprites 移除，模擬那邊早就沒有這隻了。
+   */
+  private killEnemyView(view: Phaser.GameObjects.Container, boss: boolean): void {
+    this.tweens.killTweensOf(view);
+    const body = view.getData('body') as EnemyBody | undefined;
+    if (body !== undefined) {
+      this.tweens.killTweensOf(body);
+      body.setTintFill(0xffffff);
+    }
+    this.tweens.add({
+      targets: view,
+      scaleX: boss ? 1.6 : 1.35,
+      scaleY: 0.16,
+      angle: boss ? 0 : 20,
+      alpha: 0,
+      duration: boss ? 460 : 230,
+      ease: 'Quad.easeIn',
+      onComplete: () => view.destroy(),
+    });
+  }
+
+  /**
+   * 凍格（hitstop）。
+   *
+   * **它是真的把那幾毫秒從模擬裡拿掉**，不是只停畫面：整個世界一起停，
+   * 妖魔不會前進、冷卻不會走、首領的計時也不會動，所以不會有「畫面停了但我被偷打」。
+   * 代價是那段真實時間裡遊戲進度為零，因此只給最重的兩件事——首領受擊與斬殺首領——
+   * 而且受擊那一種上了節流；每隻雜兵都凍格會讓整場變成卡頓。
+   */
+  private freeze(ms: number): void {
+    this.freezeMs = Math.max(this.freezeMs, ms);
   }
 
   /**
@@ -1637,7 +1816,6 @@ export class RunScene extends Phaser.Scene {
       defeatReason: reason,
     };
 
-    this.cameras.main.fadeOut(420, 0, 0, 0);
-    this.time.delayedCall(460, () => this.scene.start('Result', result));
+    fadeToScene(this, 'Result', result);
   }
 }

@@ -9,6 +9,7 @@ import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, hexToNumber, textStyle, wrapText } from '../ui/theme';
 import type { RunResultData } from './types';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
 export class ResultScene extends Phaser.Scene {
@@ -23,6 +24,7 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     const result = this.result;
 
@@ -88,21 +90,21 @@ export class ResultScene extends Phaser.Scene {
       label: result.victory ? '繼續挑戰' : '再戰一次',
       fontSize: 28,
       strokeColor: 0x6f8b7a,
-      onClick: () => this.scene.start('Run'),
+      onClick: () => fadeToScene(this, 'Run'),
     });
     createButton(this, cx, 856, {
       width: 340,
       height: 62,
       label: '洞府 · 提升屬性',
       fontSize: 24,
-      onClick: () => this.scene.start('Upgrade'),
+      onClick: () => fadeToScene(this, 'Upgrade'),
     });
     createButton(this, cx, 926, {
       width: 340,
       height: 52,
       label: '回主畫面',
       fontSize: 20,
-      onClick: () => this.scene.start('Title'),
+      onClick: () => fadeToScene(this, 'Title'),
     });
 
     if (unlocked.length > 0) this.showAchievements(unlocked);

@@ -26,6 +26,7 @@ import {
   textStyle,
   wrapText,
 } from '../ui/theme';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 interface Tile {
   def: CardDef;
@@ -71,6 +72,7 @@ export class TalismanScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     const highest = save.world.highestStage;
     const realm = realmForStage(save.world.stage);
@@ -106,7 +108,7 @@ export class TalismanScene extends Phaser.Scene {
       onClick: () => {
         save.player.talismans = [...this.chosen];
         persist();
-        this.scene.start('Title');
+        fadeToScene(this, 'Title');
       },
     });
 
@@ -115,7 +117,7 @@ export class TalismanScene extends Phaser.Scene {
       height: 64,
       label: '取消',
       fontSize: 22,
-      onClick: () => this.scene.start('Title'),
+      onClick: () => fadeToScene(this, 'Title'),
     });
 
     this.focus(this.chosen[0] ?? null);

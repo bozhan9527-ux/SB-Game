@@ -8,6 +8,7 @@ import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, GOLD, INK, INK_DIM, JADE, LINE, formatNumber, hexToNumber, textStyle } from '../ui/theme';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 成就一覽。可上下拖曳捲動，因為條目比一頁多。 */
 export class AchievementScene extends Phaser.Scene {
@@ -16,6 +17,7 @@ export class AchievementScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     // 條件已經滿足卻還沒發放的成就在這裡一併結算。
     // 否則清單會出現「進度 7/6」卻標成未達成，看起來像壞掉。
@@ -89,7 +91,7 @@ export class AchievementScene extends Phaser.Scene {
       height: 62,
       label: '回主畫面',
       fontSize: 24,
-      onClick: () => this.scene.start('Title'),
+      onClick: () => fadeToScene(this, 'Title'),
     });
   }
 }

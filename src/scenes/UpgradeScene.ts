@@ -12,6 +12,7 @@ import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, textStyle } from '../ui/theme';
 import { realmForStage } from '../systems/realms';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 interface Row {
   track: UpgradeTrack;
@@ -31,6 +32,7 @@ export class UpgradeScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     this.rows = [];
     const realm = realmForStage(save.world.stage);
@@ -60,7 +62,7 @@ export class UpgradeScene extends Phaser.Scene {
       height: 66,
       label: '回主畫面',
       fontSize: 24,
-      onClick: () => this.scene.start('Title'),
+      onClick: () => fadeToScene(this, 'Title'),
     });
     createButton(this, cx + 92, 900, {
       width: 168,
@@ -68,7 +70,7 @@ export class UpgradeScene extends Phaser.Scene {
       label: '開始挑戰',
       fontSize: 24,
       strokeColor: 0x6f8b7a,
-      onClick: () => this.scene.start(save.player.sectId === null ? 'Sect' : 'Run'),
+      onClick: () => fadeToScene(this, save.player.sectId === null ? 'Sect' : 'Run'),
     });
 
     this.refresh();

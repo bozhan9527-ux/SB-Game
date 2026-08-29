@@ -7,6 +7,7 @@ import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, BG_PANEL_ALT, INK, INK_DIM, LINE, hexToNumber, textStyle, wrapText } from '../ui/theme';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 interface SectCard {
   sect: Sect;
@@ -23,6 +24,7 @@ export class SectScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
     drawBackdrop(this, realm.color, realm.scenery);
@@ -56,7 +58,7 @@ export class SectScene extends Phaser.Scene {
         if (this.selected === null) return;
         save.player.sectId = this.selected.id;
         persist();
-        this.scene.start('Title');
+        fadeToScene(this, 'Title');
       },
     });
     confirm.setEnabled(this.selected !== null);
@@ -66,7 +68,7 @@ export class SectScene extends Phaser.Scene {
       height: 70,
       label: '返回',
       fontSize: 22,
-      onClick: () => this.scene.start('Title'),
+      onClick: () => fadeToScene(this, 'Title'),
     });
 
     this.refresh(confirm.setEnabled.bind(confirm));

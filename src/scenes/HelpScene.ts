@@ -13,6 +13,7 @@ import {
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, GOLD, INK, INK_DIM, JADE, LINE, hexToNumber, textStyle, wrapText } from '../ui/theme';
+import { fadeIn, fadeToScene } from '../ui/transition';
 
 interface Section {
   title: string;
@@ -145,6 +146,7 @@ export class HelpScene extends Phaser.Scene {
   }
 
   create(): void {
+    fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
     drawBackdrop(this, realm.color, realm.scenery);
@@ -205,7 +207,7 @@ export class HelpScene extends Phaser.Scene {
       height: 62,
       label: '回主畫面',
       fontSize: 24,
-      onClick: () => this.scene.start('Title'),
+      onClick: () => fadeToScene(this, 'Title'),
     });
   }
 }
