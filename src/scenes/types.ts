@@ -3,13 +3,18 @@ export interface RunResultData {
   victory: boolean;
   stage: number;
   bossName: string;
-  /** 結束時剩餘門人數。 */
+  /** 結束時剩餘的山門耐久。 */
   survivors: number;
-  /** 本場最高門人數，用於成就統計。 */
-  peakDisciples: number;
-  arms: number;
-  /** 首領戰耗時（ms），沒打到首領為 0。 */
-  bossMs: number;
+  /** 起始耐久，用於顯示「守下了幾成」。 */
+  maxDisciples: number;
+  /** 本場漏進山門的妖魔數。 */
+  leaks: number;
+  /** 本場斬殺的妖魔數。 */
+  kills: number;
+  /** 本場合成出的最高法寶階數。 */
+  peakTier: number;
+  /** 本場合成次數。 */
+  merges: number;
   /** 關卡途中拾取的金幣。 */
   goldCollected: number;
   /** 通關／失敗獎勵金幣。 */
@@ -18,8 +23,7 @@ export interface RunResultData {
   diagnosis: string | null;
   /**
    * 失敗原因，勝利時為 null。
-   * route：還沒走到首領就全滅；wiped：死在首領手上；
-   * timeout：時限內沒打死首領；abandon：玩家中途放棄。
+   * breached：山門被攻破；timeout：時限內沒斬掉首領；abandon：玩家中途放棄。
    */
-  defeatReason: 'route' | 'wiped' | 'timeout' | 'abandon' | null;
+  defeatReason: 'breached' | 'timeout' | 'abandon' | null;
 }

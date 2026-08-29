@@ -30,12 +30,9 @@ export class ResultScene extends Phaser.Scene {
     const beforeRealm = realmForStage(save.world.stage);
     // 先更新長期統計，再推進關卡，最後才結算成就——成就要看得到這一場的成果。
     const stats = save.player.stats;
-    stats.maxCrowd = Math.max(stats.maxCrowd, result.peakDisciples);
-    stats.maxArms = Math.max(stats.maxArms, result.arms);
-    if (result.victory && result.bossMs > 0) {
-      stats.fastestBossMs =
-        stats.fastestBossMs === 0 ? result.bossMs : Math.min(stats.fastestBossMs, result.bossMs);
-    }
+    stats.maxTier = Math.max(stats.maxTier, result.peakTier);
+    stats.totalKills += result.kills;
+    if (result.victory && result.leaks === 0) stats.perfectClears += 1;
     if (result.victory) recordClear(save, result.goldCollected + result.goldReward);
     else recordDefeat(save, result.goldCollected + result.goldReward);
 
@@ -143,18 +140,22 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private headline(result: RunResultData): string {
-    if (result.victory) return `斬殺 ${result.bossName}，殘部 ${formatNumber(result.survivors)} 人`;
+    if (result.victory) {
+      return result.leaks === 0
+        ? `${result.bossName} 伏誅，一隻妖魔都沒能踏進山門`
+        : `斬殺 ${result.bossName}，山門尚存 ${formatNumber(result.survivors)}`;
+    }
     if (result.defeatReason === 'abandon') return '半途收兵，來日再戰';
-    if (result.defeatReason === 'route') return '尚未見到首領，門人已在半途折損殆盡';
-    if (result.defeatReason === 'timeout') return `久攻不下，${result.bossName} 遁走，門人潰散`;
-    return `門人盡歿於 ${result.bossName} 之手`;
+    if (result.defeatReason === 'timeout') return `久攻不下，${result.bossName} 破陣而去`;
+    return `妖魔攻破山門，${formatNumber(result.leaks)} 隻踏了進來`;
   }
 
   private buildPanel(cx: number, cy: number, result: RunResultData, totalGold: number): void {
     const width = GAME_WIDTH - 64;
     const rows: [string, string, string][] = [
-      ['剩餘弟子', formatNumber(result.survivors), INK],
-      ['武裝值', formatNumber(result.arms), INK],
+      ['山門殘存', `${formatNumber(result.survivors)} / ${formatNumber(result.maxDisciples)}`, INK],
+      ['斬殺妖魔', `${formatNumber(result.kills)} 隻（漏 ${formatNumber(result.leaks)}）`, INK],
+      ['最高法寶', `${result.peakTier} 階（合成 ${result.merges} 次）`, INK],
       ['途中拾取', `${formatNumber(result.goldCollected)} 金`, GOLD],
       [result.victory ? '通關獎勵' : '殘存所得', `${formatNumber(result.goldReward)} 金`, GOLD],
       ['金幣總計', formatNumber(totalGold), GOLD],

@@ -1,65 +1,52 @@
 {
-  "input": {
-    "followSpeed": 15,
-    "trackMarginPx": 110,
-    "momentumPerPixel": 0.004
+  "field": {
+    "fieldSlots": 6,
+    "handSlots": 5,
+    "startingHand": 3,
+    "startingField": 3,
+    "tierGrowth": 1.35,
+    "maxTierBase": 4,
+    "stagesPerTier": 3,
+    "drawTierBelowMax": 4,
+    "drawTierBonusChance": 0.28,
+    "drawIntervalMs": 2600
   },
-  "run": {
-    "gateSpeedBase": 165,
-    "gateSpeedPerStage": 5,
-    "gateSpeedMax": 380,
-    "encounterSpacingPx": 520,
-    "gateValueGrowth": 1.09,
-    "gatesPerStageBase": 6,
-    "gatesPerStagePerRealm": 1,
-    "gatesPerStageMax": 14,
-    "mobWaveEvery": 2,
-    "goldGateChance": 0.18,
-    "trapChance": 0.22,
-    "volleyMaxWeaken": 0.45,
-    "volleyRangePx": 560,
-    "volleyIntervalMs": 230,
-    "volleyConeHalfPx": 135,
-    "comboGoldPerStack": 0.1,
-    "comboMaxStack": 10
+  "wave": {
+    "wavesPerStage": 5,
+    "waveIntervalMs": 9000,
+    "waveSpread": 0.85,
+    "minSpawnGapMs": 260,
+    "countBase": 3,
+    "countPerWave": 1.5,
+    "countPerRealm": 1,
+    "countMax": 22,
+    "hpBase": 120,
+    "hpGrowth": 1.15,
+    "hpPerWave": 0.3,
+    "speedBase": 46,
+    "speedPerStage": 0.5,
+    "speedMax": 105,
+    "trackPx": 620,
+    "leakCostBase": 1,
+    "leakCostGrowth": 1.02,
+    "bossLeakMultiplier": 6
   },
   "power": {
-    "baseDisciples": 8,
-    "baseAttack": 4,
-    "baseDefense": 2,
-    "baseArms": 0,
-    "maxDisciples": 9999,
-    "defenseMitigation": 0.5,
-    "armsMitigation": 0.5,
-    "mitigationFloor": 1,
-    "minLossPerHit": 1
-  },
-  "mob": {
-    "powerBase": 5,
-    "powerExponent": 0.55,
-    "powerJitter": 0.12
+    "baseDisciples": 20,
+    "maxDisciples": 999
   },
   "boss": {
-    "hpBase": 9000,
-    "hpGrowth": 1.29,
-    "attackBase": 2,
-    "attackGrowth": 1.09,
-    "attackIntervalMs": 1100,
-    "timeLimitMs": 40000,
-    "dpsFactor": 0.6,
-    "tickMs": 100,
-    "momentumMax": 0.6,
-    "momentumDecayPerSec": 0.25,
-    "guardIdleMs": 420,
-    "guardDpsMultiplier": 0.45,
-    "guardDamageMultiplier": 0.45,
-    "comboMomentumRatio": 0.3
+    "hpBase": 7000,
+    "hpGrowth": 1.15,
+    "speed": 22,
+    "timeLimitMs": 60000,
+    "goldBonus": 2
   },
   "gold": {
-    "clearBase": 30,
-    "clearGrowth": 1.2,
-    "gateGoldBase": 20,
-    "gateGoldGrowth": 1.2,
+    "clearBase": 40,
+    "clearGrowth": 1.12,
+    "killBase": 1.6,
+    "killGrowth": 1.12,
     "defeatRatio": 0.35
   }
 }

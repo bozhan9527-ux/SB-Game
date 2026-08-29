@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -18,12 +18,12 @@ export interface WalletState {
 
 /** 成就判定用的長期統計。只存原始事實，不存衍生值。 */
 export interface StatsState {
-  /** 單場最高門人數。 */
-  maxCrowd: number;
-  /** 單場最高武裝值。 */
-  maxArms: number;
-  /** 最快的首領戰耗時（ms），尚未通關過為 0。 */
-  fastestBossMs: number;
+  /** 單場合成出的最高法寶階數。 */
+  maxTier: number;
+  /** 累計斬殺的妖魔數。 */
+  totalKills: number;
+  /** 是否曾經零漏怪通關。 */
+  perfectClears: number;
   /** 累計獲得的金幣。 */
   totalGoldEarned: number;
   /** 曾用來通關的門派 id。 */

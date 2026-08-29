@@ -13,13 +13,12 @@ function reached(save: SaveData, item: Achievement): boolean {
   switch (item.kind) {
     case 'stage':
       return save.world.highestStage >= item.value;
-    case 'crowd':
-      return stats.maxCrowd >= item.value;
-    case 'arms':
-      return stats.maxArms >= item.value;
-    case 'fastBoss':
-      // 唯一的「越小越好」條件，0 代表還沒通關過。
-      return stats.fastestBossMs > 0 && stats.fastestBossMs <= item.value;
+    case 'maxTier':
+      return stats.maxTier >= item.value;
+    case 'kills':
+      return stats.totalKills >= item.value;
+    case 'perfect':
+      return stats.perfectClears >= item.value;
     case 'clears':
       return save.world.clears >= item.value;
     case 'gold':
@@ -50,12 +49,12 @@ export function progressOf(save: SaveData, item: Achievement): string {
   switch (item.kind) {
     case 'stage':
       return `${save.world.highestStage} / ${item.value} 關`;
-    case 'crowd':
-      return `${stats.maxCrowd} / ${item.value} 人`;
-    case 'arms':
-      return `${stats.maxArms} / ${item.value}`;
-    case 'fastBoss':
-      return stats.fastestBossMs > 0 ? `最快 ${(stats.fastestBossMs / 1000).toFixed(1)} 秒` : '尚未通關';
+    case 'maxTier':
+      return `最高 ${stats.maxTier} / ${item.value} 階`;
+    case 'kills':
+      return `${stats.totalKills} / ${item.value} 隻`;
+    case 'perfect':
+      return stats.perfectClears >= item.value ? '已達成' : '尚未達成';
     case 'clears':
       return `${save.world.clears} / ${item.value} 次`;
     case 'gold':

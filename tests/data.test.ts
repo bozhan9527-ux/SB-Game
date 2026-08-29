@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BALANCE, GATES, REALMS, SECTS, UPGRADES, parseGates, parseRealms, parseUpgrades } from '../src/data';
+import { BALANCE, CARDS, REALMS, SECTS, UPGRADES, parseCards, parseRealms, parseUpgrades } from '../src/data';
 import { DataError } from '../src/data/validate';
 import { realmForStage, realmIndexForStage, realmTitle } from '../src/systems/realms';
 
@@ -46,20 +46,36 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
     expect(SECTS.map((s) => s.path).sort()).toEqual(['丹修', '劍修', '體修', '符修'].sort());
   });
 
-  it('升級線正好是要求的五項', () => {
+  it('升級線正好是要求的六項', () => {
     expect(UPGRADES.map((u) => u.id).sort()).toEqual(
-      ['bossDamage', 'goldGain', 'startAttack', 'startDefense', 'startDisciples'].sort(),
+      ['drawSpeed', 'fieldSlots', 'goldGain', 'startAttack', 'startDefense', 'startDisciples'].sort(),
     );
   });
 
-  it('閘門同時具備人數與武裝兩種資源，且含陷阱', () => {
-    expect(GATES.some((g) => g.target === 'disciples' && !g.trap)).toBe(true);
-    expect(GATES.some((g) => g.target === 'arms' && !g.trap)).toBe(true);
-    expect(GATES.some((g) => g.trap)).toBe(true);
+  it('四種法寶符各有不同的取捨：單體高傷、多目標、快慢有別', () => {
+    expect(CARDS.length).toBeGreaterThanOrEqual(4);
+    // 有單體重擊也有多目標，否則「該放哪一種」不成為選擇。
+    expect(CARDS.some((c) => c.targets === 1)).toBe(true);
+    expect(CARDS.some((c) => c.targets >= 3)).toBe(true);
+    // 傷害高的必然出手慢，不得有一張在兩個維度上全面勝出。
+    const best = [...CARDS].sort((a, b) => b.damage - a.damage)[0]!;
+    for (const card of CARDS) {
+      if (card.id === best.id) continue;
+      expect(best.intervalMs, `${best.name} 又快又痛，其他符沒有存在意義`).toBeGreaterThan(card.intervalMs);
+    }
+  });
+
+  it('每個門派專精的符種都存在，且四派不重複', () => {
+    const favored = SECTS.map((s) => s.favoredCard);
+    for (const id of favored) expect(CARDS.some((c) => c.id === id)).toBe(true);
+    expect(new Set(favored).size).toBe(SECTS.length);
   });
 
   it('平衡數值為正常範圍', () => {
     expect(BALANCE.boss.hpGrowth).toBeGreaterThan(1);
+    expect(BALANCE.wave.hpGrowth).toBeGreaterThan(1);
+    expect(BALANCE.field.tierGrowth).toBeGreaterThan(1);
+    expect(BALANCE.field.stagesPerTier).toBeGreaterThanOrEqual(1);
     expect(BALANCE.gold.defeatRatio).toBeGreaterThan(0);
     expect(BALANCE.gold.defeatRatio).toBeLessThan(1);
   });
@@ -73,8 +89,10 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
       ]),
     ).toThrow(/連續/);
     expect(() =>
-      parseGates([{ id: 'x', target: '弟子', op: 'add', value: 1, tier: 0, weight: 1, trap: false }]),
-    ).toThrow(DataError);
+      parseCards([
+        { id: 'x', name: 'N', desc: 'D', color: '#fff', art: 'a', damage: 1, intervalMs: 0, targets: 1, weight: 1 },
+      ]),
+    ).toThrow(/intervalMs/);
     expect(() =>
       parseUpgrades([
         { id: 'x', name: 'N', desc: 'D', unit: '點', perLevel: 1, baseCost: 10, costGrowth: 0.5, maxLevel: 3 },

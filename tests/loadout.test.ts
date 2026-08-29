@@ -16,37 +16,39 @@ function sect(id: string): Sect {
 }
 
 describe('開局配置', () => {
-  it('未升級時起始屬性＝基礎值＋門派', () => {
-    const loadout = buildLoadoutFor(sect('body'), {}, 1);
+  it('未升級時起始耐久＝基礎值 × 門派倍率', () => {
     const s = sect('body');
-    expect(loadout.disciples).toBe(BALANCE.power.baseDisciples + s.discipleBonus);
-    expect(loadout.attack).toBe(BALANCE.power.baseAttack + s.attackBonus);
-    expect(loadout.defense).toBe(BALANCE.power.baseDefense + s.defenseBonus);
+    const loadout = buildLoadoutFor(s, {}, 1);
+    expect(loadout.disciples).toBe(Math.round(BALANCE.power.baseDisciples * s.discipleMultiplier));
+    expect(loadout.fieldSlots).toBe(BALANCE.field.fieldSlots);
   });
 
-  it('五條升級線都是百分比乘算，各自對應到正確的乘區', () => {
+  it('六條升級線都是乘算（陣法擴充除外），各自對應到正確的乘區', () => {
     const plain = buildLoadoutFor(sect('body'), {}, 1);
     const disciples = buildLoadoutFor(sect('body'), { startDisciples: 10 }, 1);
-    const attack = buildLoadoutFor(sect('body'), { startAttack: 10 }, 1);
-    const defense = buildLoadoutFor(sect('body'), { startDefense: 10 }, 1);
+    const damage = buildLoadoutFor(sect('body'), { startAttack: 10 }, 1);
+    const rate = buildLoadoutFor(sect('body'), { startDefense: 10 }, 1);
+    const draw = buildLoadoutFor(sect('body'), { drawSpeed: 10 }, 1);
     const gold = buildLoadoutFor(sect('body'), { goldGain: 10 }, 1);
-    const boss = buildLoadoutFor(sect('body'), { bossDamage: 10 }, 1);
+    const slots = buildLoadoutFor(sect('body'), { fieldSlots: 2 }, 1);
 
-    expect(disciples.discipleMultiplier).toBeGreaterThan(plain.discipleMultiplier);
     expect(disciples.disciples).toBeGreaterThan(plain.disciples);
-    expect(attack.attackMultiplier).toBeGreaterThan(plain.attackMultiplier);
-    expect(defense.mitigationMultiplier).toBeGreaterThan(plain.mitigationMultiplier);
+    expect(damage.damageMultiplier).toBeGreaterThan(plain.damageMultiplier);
+    expect(rate.fireRateMultiplier).toBeGreaterThan(plain.fireRateMultiplier);
+    expect(draw.drawSpeedMultiplier).toBeGreaterThan(plain.drawSpeedMultiplier);
     expect(gold.goldMultiplier).toBeGreaterThan(plain.goldMultiplier);
-    expect(boss.bossDamageMultiplier).toBeGreaterThan(plain.bossDamageMultiplier);
-    // 乘算才不會在後期被閘門稀釋，這是 L-05 的結論。
-    expect(attack.attackMultiplier).toBeCloseTo(1 + (10 * trackPerLevel('startAttack')) / 100, 6);
+    // 陣法擴充是唯一的加算線：它加的是格位數，不是百分比。
+    expect(slots.fieldSlots).toBe(plain.fieldSlots + 2);
+    // 乘算才不會在後期被難度稀釋，這是 L-05 的結論。
+    expect(damage.damageMultiplier).toBeCloseTo(
+      sect('body').damageMultiplier * (1 + (10 * trackPerLevel('startAttack')) / 100),
+      6,
+    );
   });
 
-  it('起始人數至少 1、防禦不為負', () => {
-    const harsh: Sect = { ...sect('sword'), discipleBonus: -999, defenseBonus: -999 };
-    const loadout = buildLoadoutFor(harsh, {}, 1);
-    expect(loadout.disciples).toBe(1);
-    expect(loadout.defense).toBe(0);
+  it('起始耐久至少 1', () => {
+    const harsh: Sect = { ...sect('sword'), discipleMultiplier: 0 };
+    expect(buildLoadoutFor(harsh, {}, 1).disciples).toBe(1);
   });
 
   it('境界壓制隨關卡帶入', () => {

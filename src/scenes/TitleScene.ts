@@ -27,7 +27,7 @@ export class TitleScene extends Phaser.Scene {
       .text(cx, 190, '問道飛升', textStyle({ size: 68, color: INK, bold: true }))
       .setOrigin(0.5);
     this.add
-      .text(cx, 252, '左右滑動 · 聚眾成軍 · 一路飛升', textStyle({ size: 22, color: INK_DIM }))
+      .text(cx, 252, '拖符布陣 · 合成升階 · 鎮守山門', textStyle({ size: 22, color: INK_DIM }))
       .setOrigin(0.5);
 
     // 目前進度

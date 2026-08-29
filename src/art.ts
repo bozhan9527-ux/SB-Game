@@ -8,10 +8,16 @@
 import type { BossArt, MobArt, SectArt } from './data/types';
 
 export const ART = {
-  gateArch: 'gate-arch',
   cloud: 'cloud',
   slash: 'slash',
 } as const;
+
+/** 法寶符牌上的圖騰，用來一眼分辨符種。 */
+export function glyphTexture(art: string): string {
+  return `glyph-${art}`;
+}
+
+const GLYPH_ARTS = ['sword', 'bolt', 'fan', 'flame'] as const;
 
 /** 人物圖以兩倍尺寸點陣化再縮小，避免在高解析度手機上糊掉。 */
 export const DISCIPLE_SOURCE_HEIGHT = 112;
@@ -96,7 +102,12 @@ const SVGS: readonly SvgSpec[] = [
       height: ENEMY_SOURCE_HEIGHT,
     })),
   ),
-  { key: ART.gateArch, file: 'gate-arch.svg', width: 448, height: 232 },
+  ...GLYPH_ARTS.map((art) => ({
+    key: glyphTexture(art),
+    file: `glyph-${art}.svg`,
+    width: 64,
+    height: 80,
+  })),
   { key: ART.cloud, file: 'cloud.svg', width: 240, height: 76 },
   { key: ART.slash, file: 'slash.svg', width: 240, height: 240 },
   { key: bossTexture('beast'), file: 'boss-beast.svg', width: 320, height: 320 },

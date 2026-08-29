@@ -16,7 +16,7 @@ export function realmForStage(stage: number): Realm {
   return stage < 1 ? (REALMS[0] ?? last) : last;
 }
 
-/** 境界在資料表中的索引，用於閘門階層與難度成長。 */
+/** 境界在資料表中的索引，用於難度成長與境界壓制。 */
 export function realmIndexForStage(stage: number): number {
   const realm = realmForStage(stage);
   return REALMS.findIndex((item) => item.id === realm.id);

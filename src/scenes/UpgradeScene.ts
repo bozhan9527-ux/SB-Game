@@ -5,6 +5,7 @@ import type { UpgradeTrack } from '../data/types';
 import { buyUpgrade } from '../save';
 import { persist, state } from '../state';
 import { buildLoadout, sectById } from '../systems/loadout';
+import { maxTierForStage } from '../systems/deck';
 import { upgradeAmount, upgradeCost } from '../systems/upgrades';
 import type { Button } from '../ui/button';
 import { createButton } from '../ui/button';
@@ -19,7 +20,7 @@ interface Row {
   button: Button;
 }
 
-/** 洞府：用金幣提升起始人數 / 起始防禦 / 起始攻擊 / 金幣蒐集量 / 對首領傷害。 */
+/** 洞府：用金幣提升山門耐久 / 出手速度 / 法寶傷害 / 抽符速度 / 金幣收益 / 陣位數。 */
 export class UpgradeScene extends Phaser.Scene {
   private rows: Row[] = [];
   private goldText!: Phaser.GameObjects.Text;
@@ -147,9 +148,9 @@ export class UpgradeScene extends Phaser.Scene {
     const l = buildLoadout(save, save.world.stage);
     const x = (value: number): string => `×${value.toFixed(2)}`;
     return [
-      `${sect.name}　下一關起始 ${l.disciples} 人`,
-      `人數 ${x(l.discipleMultiplier)}　攻擊 ${x(l.attackMultiplier)}　減傷 ${x(l.mitigationMultiplier)}`,
-      `金幣 ${x(l.goldMultiplier)}　首領傷害 ${x(l.bossDamageMultiplier)}`,
+      `${sect.name}　下一關山門 ${l.disciples}　陣位 ${l.fieldSlots} 格`,
+      `法寶傷害 ${x(l.damageMultiplier)}　出手 ${x(l.fireRateMultiplier)}　抽符 ${x(l.drawSpeedMultiplier)}`,
+      `金幣 ${x(l.goldMultiplier)}　法寶階數上限 ${maxTierForStage(save.world.stage)} 階`,
     ].join('\n');
   }
 }

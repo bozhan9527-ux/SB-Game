@@ -1,0 +1,46 @@
+[
+  {
+    "id": "sword",
+    "name": "劍陣符",
+    "desc": "單體直射，出手快、傷害穩。斬首領最可靠。",
+    "color": "#7fd8ff",
+    "art": "sword",
+    "damage": 11,
+    "intervalMs": 520,
+    "targets": 1,
+    "weight": 3
+  },
+  {
+    "id": "bolt",
+    "name": "天雷符",
+    "desc": "單體重擊，傷害極高但出手極慢——打小妖會浪費，打首領最狠。",
+    "color": "#c79cf0",
+    "art": "bolt",
+    "damage": 40,
+    "intervalMs": 1500,
+    "targets": 1,
+    "weight": 1.6
+  },
+  {
+    "id": "fan",
+    "name": "風刃符",
+    "desc": "一次三道，同時打三個目標。清雜兵最快，對首領最弱。",
+    "color": "#8fe08a",
+    "art": "fan",
+    "damage": 8,
+    "intervalMs": 620,
+    "targets": 3,
+    "weight": 2.4
+  },
+  {
+    "id": "flame",
+    "name": "烈焰符",
+    "desc": "一次兩道中等傷害，攻守之間最平衡。",
+    "color": "#e08a5a",
+    "art": "flame",
+    "damage": 15,
+    "intervalMs": 800,
+    "targets": 2,
+    "weight": 2.4
+  }
+]

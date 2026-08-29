@@ -25,8 +25,31 @@ const addAchievements: Migration = (data) => {
   };
 };
 
+/**
+ * v3 → v4：玩法由閘門跑酷改為山門防守，長期統計換成新玩法的原始事實。
+ * 金幣、關卡進度、升級等級與已達成的成就一律保留；只有統計欄位重新開始累計
+ * （舊的「單場人數／武裝值」在新玩法裡沒有對應的量）。
+ */
+const toDefenseStats: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const old = (player['stats'] ?? {}) as Record<string, unknown>;
+  return {
+    ...data,
+    player: {
+      ...player,
+      stats: {
+        maxTier: 0,
+        totalKills: 0,
+        perfectClears: 0,
+        totalGoldEarned: typeof old['totalGoldEarned'] === 'number' ? old['totalGoldEarned'] : 0,
+        clearedSects: Array.isArray(old['clearedSects']) ? old['clearedSects'] : [],
+      },
+    },
+  };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
-export const MIGRATIONS: readonly Migration[] = [addSettings, addAchievements];
+export const MIGRATIONS: readonly Migration[] = [addSettings, addAchievements, toDefenseStats];
 
 /**
  * 把任意版本的存檔套用至最新版。

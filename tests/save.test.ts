@@ -88,6 +88,37 @@ describe('存檔（TECH_SPEC 第 4 節）', () => {
     expect(loaded.player.upgrades['startAttack']).toBe(3);
   });
 
+  it('v3 舊存檔（閘門跑酷時代）遷到防守玩法：金幣與進度保留，統計重新累計', () => {
+    const storage = createMemoryStorage();
+    storage.write(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 3,
+        savedAt: 1,
+        player: {
+          sectId: 'sword',
+          wallet: { gold: 5000 },
+          upgrades: { startAttack: 7 },
+          achievements: ['first_clear'],
+          stats: { maxCrowd: 900, maxArms: 400, fastestBossMs: 2100, totalGoldEarned: 88000, clearedSects: ['sword'] },
+        },
+        world: { stage: 22, highestStage: 22, runs: 40, clears: 30 },
+        settings: { sound: false },
+      }),
+    );
+    const loaded = loadSave(storage);
+    expect(loaded.version).toBe(SAVE_VERSION);
+    expect(loaded.world.stage).toBe(22);
+    expect(loaded.player.wallet.gold).toBe(5000);
+    expect(loaded.player.upgrades['startAttack']).toBe(7);
+    expect(loaded.player.achievements).toContain('first_clear');
+    // 跨玩法仍然成立的長期事實留著，只跟舊玩法有關的量歸零。
+    expect(loaded.player.stats.totalGoldEarned).toBe(88000);
+    expect(loaded.player.stats.clearedSects).toEqual(['sword']);
+    expect(loaded.player.stats.maxTier).toBe(0);
+    expect(loaded.player.stats.totalKills).toBe(0);
+  });
+
   it('音效關閉的設定會被存下來', () => {
     const storage = createMemoryStorage();
     const save = createDefaultSave(1);
@@ -121,7 +152,7 @@ describe('金幣升級', () => {
 
   it('滿級後無法再買', () => {
     const save = createDefaultSave();
-    const track = trackById('bossDamage');
+    const track = trackById('fieldSlots');
     save.player.upgrades[track.id] = track.maxLevel;
     addGold(save, 10_000_000);
     const result = buyUpgrade(save, track.id);

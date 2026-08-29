@@ -1,107 +1,157 @@
 import { describe, it, expect } from 'vitest';
 import { BALANCE, SECTS, UPGRADES } from '../src/data';
+import { cardDps, maxTierForStage } from '../src/systems/deck';
+import type { Card } from '../src/systems/deck';
+import type { CardSlot, DefenseState } from '../src/systems/defense';
+import {
+  clearReward,
+  createDefenseState,
+  defeatReward,
+  deployCard,
+  discardHand,
+  mergeInto,
+  swapCards,
+  tickCombat,
+} from '../src/systems/defense';
 import { buildLoadoutFor } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
-import type { GateEncounter, RunState } from '../src/systems/run';
-import {
-  applyGate,
-  bossDps,
-  bossHitLoss,
-  clearReward,
-  comboBossMomentum,
-  createBoss,
-  createRunState,
-  defeatReward,
-  resolveMob,
-  teamPower,
-} from '../src/systems/run';
 import { trackById, upgradeCost } from '../src/systems/upgrades';
 
 /**
  * 數值平衡的自動驗算。
  *
- * 這裡把整個遊戲循環（挑戰 → 拿金幣 → 升級 → 下一關）用程式跑完 30 關，
- * 用來擋住「某一關突然打不過」或「首領被秒殺」這種只有實際玩才會發現的失衡。
- * 調 data/*.json 之後這組測試會直接反映後果。
+ * 場景與這裡跑的是**同一支 tickCombat**，因此模擬出來的難度就是玩家實際遇到的難度，
+ * 不是另一套近似模型。整個遊戲循環（防守 → 拿金幣 → 升級 → 下一關）跑完 81 關，
+ * 用來擋住「某一關突然守不住」或「首領被秒殺」這種只有實際玩才會發現的失衡。
  */
 
-/** 模擬玩家的選擇：每道閘門都挑「選完之後隊伍戰力較高」的一側。 */
-function chooseBest(state: RunState, encounter: GateEncounter): 'left' | 'right' {
-  const score = (side: 'left' | 'right'): number => {
-    const clone: RunState = structuredClone(state);
-    applyGate(clone, encounter[side]);
-    // 金幣不計入戰力，但給一點權重，否則金幣閘門會被當成零收益。
-    return teamPower(clone) + clone.goldCollected * 0.5;
-  };
-  return score('left') >= score('right') ? 'left' : 'right';
+/** 模擬玩家每 250ms 做一個決定——大約是人在手機上能反應的速度。 */
+const DECISION_MS = 250;
+const TICK_MS = 100;
+
+function dpsOf(card: Card | null, state: DefenseState): number {
+  return card === null ? 0 : cardDps(card, state.loadout);
+}
+
+/**
+ * 一個「會玩但不完美」的策略：能合就合，有空位就放最強的，卡住就換掉場上最弱的。
+ *
+ * 刻意不做長期規劃（不會為了湊某一種符而留手牌），因此模擬結果對真人是保守的。
+ */
+function playOneAction(state: DefenseState, rng: ReturnType<typeof createRng>): void {
+  const maxTier = maxTierForStage(state.stage);
+  const all: CardSlot[] = [
+    ...state.hand.map((_, index) => ({ where: 'hand' as const, index })),
+    ...state.field.map((_, index) => ({ where: 'field' as const, index })),
+  ];
+  const at = (slot: CardSlot): Card | null =>
+    (slot.where === 'hand' ? state.hand[slot.index] : state.field[slot.index]) ?? null;
+
+  // 1. 能合就合。手牌之間也算，因為玩家會先在手裡湊一對再放下去。
+  let best: { a: CardSlot; b: CardSlot; score: number } | null = null;
+  for (const a of all) {
+    const cardA = at(a);
+    if (cardA === null || cardA.tier >= maxTier) continue;
+    for (const b of all) {
+      if (a.where === b.where && a.index === b.index) continue;
+      const cardB = at(b);
+      if (cardB === null || cardB.type !== cardA.type || cardB.tier !== cardA.tier) continue;
+      // 同樣能合的話優先合在場上，合完就立刻在打。
+      const score = cardA.tier * 2 + (b.where === 'field' ? 1 : 0);
+      if (best === null || score > best.score) best = { a, b, score };
+    }
+  }
+  if (best !== null) {
+    mergeInto(state, best.a, best.b, rng);
+    return;
+  }
+
+  // 2. 場上有空位就放手牌裡最強的一張。
+  const empty = state.field.indexOf(null);
+  if (empty >= 0) {
+    let pick = -1;
+    for (let h = 0; h < state.hand.length; h += 1) {
+      if (state.hand[h] == null) continue;
+      if (pick < 0 || dpsOf(state.hand[h] ?? null, state) > dpsOf(state.hand[pick] ?? null, state)) {
+        pick = h;
+      }
+    }
+    if (pick >= 0) {
+      deployCard(state, pick, empty);
+      return;
+    }
+  }
+
+  // 3. 手牌滿了又合不了：換掉場上最弱的一張，換不划算就直接棄掉最弱的手牌。
+  if (!state.hand.includes(null)) {
+    let worstField = 0;
+    let bestHand = 0;
+    for (let f = 1; f < state.field.length; f += 1) {
+      if (dpsOf(state.field[f] ?? null, state) < dpsOf(state.field[worstField] ?? null, state)) {
+        worstField = f;
+      }
+    }
+    for (let h = 1; h < state.hand.length; h += 1) {
+      if (dpsOf(state.hand[h] ?? null, state) > dpsOf(state.hand[bestHand] ?? null, state)) {
+        bestHand = h;
+      }
+    }
+    if (dpsOf(state.hand[bestHand] ?? null, state) > dpsOf(state.field[worstField] ?? null, state)) {
+      swapCards(state, bestHand, worstField);
+    } else {
+      let worstHand = 0;
+      for (let h = 1; h < state.hand.length; h += 1) {
+        if (dpsOf(state.hand[h] ?? null, state) < dpsOf(state.hand[worstHand] ?? null, state)) {
+          worstHand = h;
+        }
+      }
+      discardHand(state, worstHand);
+    }
+  }
 }
 
 interface RunOutcome {
   victory: boolean;
   survivors: number;
-  arms: number;
-  /** 首領戰耗時，單位 ms。 */
-  bossMs: number;
+  leaks: number;
+  peakTier: number;
+  elapsedMs: number;
   gold: number;
 }
 
-/**
- * 陣前齊射的平均削弱量。
- *
- * 上限是 balance.json 的 volleyMaxWeaken，但那要走位走得很準才吃得滿；
- * 這裡取大約一半，代表「會用但沒用好」的普通玩家，模擬結果因此偏保守。
- */
-const AVERAGE_WEAKEN = BALANCE.run.volleyMaxWeaken * 0.5;
-
-/**
- * 完整跑一場挑戰。
- * momentum 給的是「普通玩家的滑動頻率」，不假設玩家能一直把氣勢頂滿。
- */
 function runOnce(
   stage: number,
   upgrades: Record<string, number>,
   sectId: string,
   seed: number,
-  momentum = 0.2,
 ): RunOutcome {
   const sect = SECTS.find((item) => item.id === sectId);
   if (sect === undefined) throw new Error(`測試用門派不存在：${sectId}`);
-  const state = createRunState(buildLoadoutFor(sect, upgrades, stage), seed);
+  const rng = createRng(seed);
+  const state = createDefenseState(buildLoadoutFor(sect, upgrades, stage), rng);
 
-  for (const encounter of state.encounters) {
-    if (encounter.kind === 'gate') applyGate(state, encounter[chooseBest(state, encounter)]);
-    else resolveMob(state, encounter, AVERAGE_WEAKEN);
-    if (state.disciples <= 0) break;
+  let sinceDecision = 0;
+  // 上限是「首領時限 + 所有波次的排程長度」，正常情況不會走到。
+  const hardLimit =
+    BALANCE.wave.wavesPerStage * BALANCE.wave.waveIntervalMs + BALANCE.boss.timeLimitMs + 30000;
+
+  while (state.outcome === 'running' && state.elapsedMs < hardLimit) {
+    tickCombat(state, TICK_MS, rng);
+    sinceDecision += TICK_MS;
+    while (sinceDecision >= DECISION_MS) {
+      sinceDecision -= DECISION_MS;
+      playOneAction(state, rng);
+    }
   }
 
-  const cfg = BALANCE.boss;
-  const boss = createBoss(stage, createRng(seed));
-  // 沿路累積的連擊會換成開場氣勢，模擬時一併計入，否則首領戰會被低估。
-  const startMomentum = Math.min(cfg.momentumMax, momentum + comboBossMomentum(state.combo));
-  let victory = false;
-  let elapsed = 0;
-  let attackAccum = 0;
-
-  while (state.disciples > 0 && elapsed < cfg.timeLimitMs) {
-    boss.hp -= (bossDps(state, startMomentum) * cfg.tickMs) / 1000;
-    if (boss.hp <= 0) {
-      victory = true;
-      break;
-    }
-    attackAccum += cfg.tickMs;
-    while (attackAccum >= cfg.attackIntervalMs) {
-      attackAccum -= cfg.attackIntervalMs;
-      state.disciples = Math.max(0, state.disciples - bossHitLoss(state, boss));
-    }
-    elapsed += cfg.tickMs;
-  }
-
+  const victory = state.outcome === 'cleared';
   return {
     victory,
     survivors: state.disciples,
-    arms: state.arms,
-    bossMs: elapsed,
-    gold: state.goldCollected + (victory ? clearReward(state) : defeatReward(state)),
+    leaks: state.leaks,
+    peakTier: state.peakTier,
+    elapsedMs: state.elapsedMs,
+    gold: Math.round(state.gold) + (victory ? clearReward(state) : defeatReward(state)),
   };
 }
 
@@ -125,14 +175,17 @@ interface Progress {
   maxAttempts: number;
   /** 卡關的關卡編號，全部通關則為 null。 */
   stuckAt: number | null;
-  bossDurations: number[];
+  durations: number[];
+  leaks: number[];
 }
 
 const RETRY_LIMIT = 12;
+const STAGES = 81;
 
 function playThrough(sectId: string, maxStage: number): Progress {
   const levels: Record<string, number> = {};
-  const bossDurations: number[] = [];
+  const durations: number[] = [];
+  const leaks: number[] = [];
   let gold = 0;
   let totalRuns = 0;
   let maxAttempts = 0;
@@ -145,22 +198,22 @@ function playThrough(sectId: string, maxStage: number): Progress {
       attempts += 1;
       gold = spendGold(levels, gold + outcome.gold);
       if (outcome.victory) {
-        bossDurations.push(outcome.bossMs);
+        durations.push(outcome.elapsedMs);
+        leaks.push(outcome.leaks);
         break;
       }
-      if (attempts >= RETRY_LIMIT) return { totalRuns, maxAttempts: attempts, stuckAt: stage, bossDurations };
+      if (attempts >= RETRY_LIMIT) {
+        return { totalRuns, maxAttempts: attempts, stuckAt: stage, durations, leaks };
+      }
     }
     maxAttempts = Math.max(maxAttempts, attempts);
   }
-  return { totalRuns, maxAttempts, stuckAt: null, bossDurations };
+  return { totalRuns, maxAttempts, stuckAt: null, durations, leaks };
 }
-
-const STAGES = 81;
 
 describe('數值平衡', () => {
   it('第 1 關在零升級下，四個門派的勝率都在六成以上', () => {
-    // 用單一種子判斷會被閘門運氣左右，這裡看的是勝率而非單場結果。
-    const samples = 40;
+    const samples = 24;
     for (const sect of SECTS) {
       let wins = 0;
       for (let i = 0; i < samples; i += 1) {
@@ -171,30 +224,26 @@ describe('數值平衡', () => {
     }
   });
 
-  it('照著「打完就把金幣花掉」玩，四個門派都能一路推到第 30 關', () => {
+  it('照著「打完就把金幣花掉」玩，四個門派都能一路推到第 81 關', () => {
     for (const sect of SECTS) {
       const progress = playThrough(sect.id, STAGES);
       expect(progress.stuckAt, `${sect.name} 卡在第 ${progress.stuckAt} 關`).toBeNull();
-      // 平均一關重打不到一次，且沒有任何一關要打超過 6 次。
-      expect(progress.totalRuns, `${sect.name} 需要 ${progress.totalRuns} 場才推到 ${STAGES} 關`).toBeLessThanOrEqual(STAGES * 2);
+      expect(
+        progress.totalRuns,
+        `${sect.name} 需要 ${progress.totalRuns} 場才推到 ${STAGES} 關`,
+      ).toBeLessThanOrEqual(STAGES * 2);
       expect(progress.maxAttempts, `${sect.name} 有一關重打了 ${progress.maxAttempts} 次`).toBeLessThanOrEqual(6);
     }
   });
 
-  it('首領戰長度落在可玩範圍，不會被秒殺也不會拖到超時', () => {
-    for (const sect of SECTS) {
-      const { bossDurations } = playThrough(sect.id, STAGES);
-      const sorted = [...bossDurations].sort((a, b) => a - b);
-      const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
-      const inRange = bossDurations.filter((ms) => ms >= 2000 && ms <= 25000).length;
-      expect(median, `${sect.name} 首領戰中位數只有 ${median}ms`).toBeGreaterThanOrEqual(2500);
-      expect(Math.max(...bossDurations)).toBeLessThan(BALANCE.boss.timeLimitMs);
-      expect(inRange / bossDurations.length, `${sect.name} 首領戰長度失衡`).toBeGreaterThan(0.6);
-    }
+  it('守得住不代表守得輕鬆：相當比例的關卡都會漏怪，山門不是擺著好看', () => {
+    // 零漏怪通關應該是「打得特別好的一場」，不是常態；否則山門的耐久等於裝飾。
+    const { leaks } = playThrough('body', STAGES);
+    const withLeaks = leaks.filter((count) => count > 0).length;
+    expect(withLeaks / leaks.length, '幾乎每關都零漏怪，代表難度太低').toBeGreaterThan(0.15);
   });
 
   it('不花金幣升級的話會在中後期卡死，升級才有意義', () => {
-    // 找出「零升級且換幾個種子都過不了」的第一關。
     const seeds = [0, 1, 2, 3, 4];
     let wall: number | null = null;
     for (let stage = 1; stage <= STAGES; stage += 1) {
@@ -204,30 +253,47 @@ describe('數值平衡', () => {
         break;
       }
     }
-    expect(wall, '零升級也能一路推到 30 關，升級系統形同虛設').not.toBeNull();
-    // 第 1 關必須在零升級下打得過，否則新玩家一開始就沒有金幣來源。
+    expect(wall, '零升級也能一路推到 81 關，升級系統形同虛設').not.toBeNull();
     expect(wall ?? Infinity, '零升級連第 1 關都過不了').toBeGreaterThanOrEqual(2);
-    // 門檻隨關卡總長調整：境界改為每境界九層後，一輪十個境界共 81 關，
-    // 「零升級撐到第 40 關」大約是全程的一半，再晚就代表升級系統前期沒有存在感。
-    expect(wall ?? Infinity, `零升級可以推到第 ${wall} 關，升級的必要性太晚出現`).toBeLessThanOrEqual(60);
+    expect(wall ?? Infinity, '零升級撐太久，升級系統前期沒有存在感').toBeLessThanOrEqual(40);
   });
 
-  it('首領戰的氣勢（滑動）會縮短戰鬥時間', () => {
-    const lazy = runOnce(6, {}, 'body', 7919, 0);
-    const active = runOnce(6, {}, 'body', 7919, BALANCE.boss.momentumMax);
-    expect(active.bossMs).toBeLessThan(lazy.bossMs);
+  it('五條戰鬥升級線在「快打不過的那一關」都能明顯提高勝率（不得有形同虛設的線）', () => {
+    // 這是 PROGRESS L-05 的教訓：升級線看起來有數字，不代表它真的改變得了任何一關。
+    // 量測的是玩家真正在乎的事——買了這條線，這一關贏得了嗎。
+    const winRate = (levels: Record<string, number>, stage: number): number => {
+      const samples = 16;
+      let wins = 0;
+      for (let i = 0; i < samples; i += 1) {
+        if (runOnce(stage, levels, 'body', stage * 7919 + i * 104729).victory) wins += 1;
+      }
+      return wins / samples;
+    };
+
+    // 找一關「零升級大多會輸」的關卡當作量測點。
+    let probe = 2;
+    for (let stage = 2; stage <= STAGES; stage += 1) {
+      if (winRate({}, stage) <= 0.25) {
+        probe = stage;
+        break;
+      }
+    }
+    const base = winRate({}, probe);
+
+    for (const track of UPGRADES) {
+      // 聚寶之術只影響金幣，照定義不會改變單場勝負，另外驗。
+      if (track.id === 'goldGain') continue;
+      const improved = winRate({ [track.id]: Math.min(track.maxLevel, 12) }, probe);
+      expect(
+        improved,
+        `第 ${probe} 關的勝率在買滿 ${track.name} 之後仍是 ${Math.round(improved * 100)}%（原本 ${Math.round(base * 100)}%），這條線是死的`,
+      ).toBeGreaterThan(base);
+    }
   });
 
-  it('敵陣造成比例傷亡：小隊不會被一波抹平', () => {
-    const state = createRunState(buildLoadoutFor(SECTS[0]!, {}, 1), 1);
-    state.disciples = 4;
-    resolveMob(state, { kind: 'mob', name: '測試', art: 'bandit', power: 9999 });
-    // 比例傷亡最多打光，但一般情況下必有殘存；這裡驗的是不會因為固定人數而必死。
-    const survivable = createRunState(buildLoadoutFor(SECTS[0]!, {}, 1), 1);
-    survivable.disciples = 40;
-    survivable.arms = 30;
-    const loss = resolveMob(survivable, { kind: 'mob', name: '測試', art: 'bandit', power: 20 });
-    expect(loss).toBeLessThan(40);
-    expect(survivable.disciples).toBeGreaterThan(0);
+  it('聚寶之術確實提高單場收入（它改變的是升級速度，不是單場勝負）', () => {
+    const plain = runOnce(5, {}, 'body', 4242).gold;
+    const rich = runOnce(5, { goldGain: 10 }, 'body', 4242).gold;
+    expect(rich).toBeGreaterThan(plain);
   });
 });

@@ -410,3 +410,47 @@ for kind, (fn, width, palette) in BEASTS.items():
         write(f'enemy-{kind}-{frame}.svg', width, 56, fn(palette, frame))
 
 print('beasts ok', len(BEASTS) * 2)
+
+
+# ================================================================ 法寶符的圖騰
+#
+# 每張符牌上方的小圖騰，用來一眼分辨「這是哪一種符」。
+# 只畫輪廓、留白多，因為它在手牌上只有二十來個像素高。
+
+def glyph_sword():
+    return [
+        '<path d="M16 4 L20 12 L20 30 L16 34 L12 30 L12 12z" fill="#dfe9f2"/>',
+        '<path d="M16 6 L18 12 L18 29 L16 31z" fill="#ffffff"/>',
+        '<rect x="6" y="30" width="20" height="3.6" rx="1.8" fill="#c9a227"/>',
+        '<rect x="14.4" y="33" width="3.2" height="6" rx="1.6" fill="#8b6b1f"/>',
+    ]
+
+
+def glyph_bolt():
+    return [
+        '<path d="M19 3 L9 21 L15 21 L12 37 L24 17 L17.5 17z" fill="#ffe066"/>',
+        '<path d="M18 7 L12.5 19 L16 19 L14 30 L20.5 18 L16.5 18z" fill="#fffbe0"/>',
+    ]
+
+
+def glyph_fan():
+    return [
+        '<path d="M16 36 A18 18 0 0 1 16 6 A12 12 0 0 0 16 36z" fill="#9fe8b8"/>',
+        '<path d="M23 33 A16 16 0 0 0 23 9" stroke="#cff5dd" stroke-width="2.6" fill="none" stroke-linecap="round"/>',
+        '<path d="M28 29 A11 11 0 0 0 28 13" stroke="#cff5dd" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
+    ]
+
+
+def glyph_flame():
+    return [
+        '<path d="M16 3 C24 12 27 18 27 24 A11 11 0 0 1 5 24 C5 18 9 15 11 10 C12 16 14 17 15 15 C16 12 15 8 16 3z" fill="#ff8a3d"/>',
+        '<path d="M16 15 C20 20 21 23 21 26 A5 5 0 0 1 11 26 C11 22 14 20 16 15z" fill="#ffe066"/>',
+    ]
+
+
+GLYPHS = {'sword': glyph_sword, 'bolt': glyph_bolt, 'fan': glyph_fan, 'flame': glyph_flame}
+
+for name, fn in GLYPHS.items():
+    write(f'glyph-{name}.svg', 32, 40, fn())
+
+print('glyphs ok', len(GLYPHS))

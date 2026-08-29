@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH } from '../config';
-import { SECTS } from '../data';
+import { CARDS, SECTS } from '../data';
 import type { Sect } from '../data/types';
 import { persist, state } from '../state';
 import { realmForStage } from '../systems/realms';
@@ -112,17 +112,18 @@ export class SectScene extends Phaser.Scene {
   /** 把門派的數值差異攤開，避免玩家只能看敘述猜。 */
   private statLine(sect: Sect): string {
     const parts: string[] = [];
-    const push = (label: string, value: number, suffix = ''): void => {
-      if (value === 0) return;
-      parts.push(`${label}${value > 0 ? '+' : ''}${value}${suffix}`);
+    const mul = (label: string, value: number): void => {
+      if (value !== 1) parts.push(`${label}×${value}`);
     };
-    push('人數', sect.discipleBonus);
-    push('攻擊', sect.attackBonus);
-    push('防禦', sect.defenseBonus);
-    if (sect.armsMultiplier !== 1) parts.push(`武裝效果×${sect.armsMultiplier}`);
-    if (sect.bossDamageMultiplier !== 1) parts.push(`首領傷害×${sect.bossDamageMultiplier}`);
-    if (sect.goldMultiplier !== 1) parts.push(`金幣×${sect.goldMultiplier}`);
-    if (sect.mobLossMultiplier !== 1) parts.push(`敵陣傷亡×${sect.mobLossMultiplier}`);
+    mul('山門', sect.discipleMultiplier);
+    mul('法寶傷害', sect.damageMultiplier);
+    mul('抽符', sect.drawSpeedMultiplier);
+    mul('首領傷害', sect.bossDamageMultiplier);
+    mul('金幣', sect.goldMultiplier);
+    const favored = CARDS.find((card) => card.id === sect.favoredCard);
+    if (favored !== undefined && sect.favoredDamageMultiplier !== 1) {
+      parts.push(`${favored.name}×${sect.favoredDamageMultiplier}`);
+    }
     return parts.join(' ');
   }
 

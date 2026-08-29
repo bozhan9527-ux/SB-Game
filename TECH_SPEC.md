@@ -29,19 +29,18 @@
 ├─ .github/workflows/deploy.yml   # CI：build + 部署 Pages
 ├─ public/art/                    # 手寫 SVG 美術資源
 ├─ data/                          # 遊戲資料（JSON）— 見第 3 節
-│   ├─ balance.json              # 全域數值常數（滑動門檻、戰力公式、敵陣、首領、金幣）
-│   ├─ realms.json               # 境界：關卡區間、配色、境界壓制
-│   ├─ sects.json                # 門派：起始屬性與各項乘區
-│   ├─ gates.json                # 閘門模板：資源、加算／乘算、基準值、權重、是否陷阱
-│   ├─ upgrades.json             # 五條金幣升級線
-│   └─ enemies.json              # 各境界的敵陣與首領
+│   ├─ balance.json              # 全域數值常數（手牌與陣位、階數曲線、波次、首領、金幣）
+│   ├─ realms.json               # 境界：關卡區間、配色、境界壓制、地貌
+│   ├─ cards.json                # 四種法寶符：傷害、出手間隔、目標數、抽取權重
+│   ├─ sects.json                # 門派：乘區與被動
+│   ├─ upgrades.json             # 六條金幣升級線
+│   └─ enemies.json              # 各境界的妖魔與首領
 ├─ src/
 │   ├─ main.ts                    # 進入點
 │   ├─ art.ts                     # 美術資源載入
 │   ├─ state.ts                   # 執行期的存檔單例
-│   ├─ scenes/                    # Boot / Title / Sect / Run / Result / Upgrade
-│   ├─ input/                     # 滑動手勢辨識
-│   ├─ systems/                   # 閘門 / 敵陣 / 首領 / 境界 / 升級 / 開局配置
+│   ├─ scenes/                    # Boot / Title / Sect / Run / Result / Upgrade / Achievement
+│   ├─ systems/                   # 法寶符 / 防守戰 / 境界 / 升級 / 成就 / 開局配置
 │   ├─ audio/                     # 音高、合成、播放與配樂排程
 │   ├─ data/                      # JSON 讀取與型別定義
 │   ├─ save/                      # 存檔、遷移
@@ -58,10 +57,10 @@
 
 **所有遊戲數值一律寫在 `data/*.json`，禁止硬編碼於 `src/`。**
 
-包含但不限於：**閘門類型與數值、境界區間與壓制、門派加成、升級線的效果與花費曲線、
-敵陣威脅值、首領血量與攻擊的成長曲線**。
+包含但不限於：**法寶符的傷害與出手間隔、階數曲線與上限成長、抽符節奏、境界區間與壓制、
+門派加成、升級線的效果與花費曲線、波次編成、妖魔血量與首領血量的成長曲線**。
 
-關卡難度的調整一律透過 `balance.json` 與 `gates.json` 完成，不得改動 `src/`。
+關卡難度的調整一律透過 `balance.json` 與 `cards.json` 完成，不得改動 `src/`。
 
 程式碼中只允許出現：讀取資料的邏輯、計算公式的結構。公式中的係數本身也放進 `balance.json`。
 
@@ -77,11 +76,11 @@
 範例：
 
 ```jsonc
-// data/gates.json — 閘門模板
+// data/cards.json — 法寶符
 [
-  { "id": "d_mul_2", "target": "disciples", "op": "mul", "value": 2, "weight": 7, "trap": false },
-  { "id": "a_add_7", "target": "arms",      "op": "add", "value": 7, "weight": 9, "trap": false },
-  { "id": "d_sub_4", "target": "disciples", "op": "add", "value": -4, "weight": 8, "trap": true }
+  { "id": "sword", "name": "劍陣符", "damage": 11, "intervalMs": 520,  "targets": 1, "weight": 3 },
+  { "id": "bolt",  "name": "天雷符", "damage": 40, "intervalMs": 1500, "targets": 1, "weight": 1.6 },
+  { "id": "fan",   "name": "風刃符", "damage": 8,  "intervalMs": 620,  "targets": 3, "weight": 2.4 }
 ]
 ```
 
@@ -125,22 +124,33 @@ interface SaveData {
 
 ## 4.5 輸入層
 
-**觸控跟隨規範**（`src/input/follow.ts`）：
+**拖放規範**：
 
-隊伍**連續跟著手指走**，不是在固定車道之間跳。按下與拖曳都會更新目標位置，
-隊伍以指數逼近往目標移動。
+輸入只有一種手勢——**按住一張符、拖到另一個格位、放開**。手牌與陣位共用同一套判定，
+落點由 `RunScene.slotAt()` 以格位中心的矩形範圍決定，不做手勢辨識、不做長按或雙擊。
 
-- 目標位置夾在路面範圍內（`balance.json` 的 `input.trackMarginPx`）
-- 逼近速度為 `input.followSpeed`，以 `1 - e^(-k·t)` 計算，**與畫格率解耦**：
-  直接寫 `current += diff * 0.2` 會讓高畫格率的手機跟得比較快，手感隨裝置浮動
-- 首領戰的「氣勢」依橫向移動距離累積（`input.momentumPerPixel`），停手就自然衰退
+落下時的行為收斂成單一入口 `dropOn()`（`src/systems/defense.ts`）：
 
-閘門的選邊由**結算當下隊伍中心落在畫面哪一半**決定，不做手勢辨識。
+1. 同種同階且未達上限 → **合成**
+2. 目標是空格 → **搬移**
+3. 其餘 → **互換**
 
-戰鬥時間軸與畫格率解耦：所有時間窗以毫秒計，不以 frame 計。低階手機掉幀時節奏不得改變。
+三條規則依序判定，因此拖曳永遠會發生某件事。
+若讓「合成／放置／換位」各有各的前置條件，玩家會遇到「拖了半天什麼都沒發生」，
+那是這類遊戲最容易勸退人的地方。拖到畫面最下緣是棄符（唯一的破壞性操作，有專屬提示區）。
 
-> 變更紀錄：原規範為「離散左右滑，禁止連續拖曳」。2026-08-27 依製作人要求改為觸控跟隨，
-> 理由是走位要能微調（例如貼著中線等閘門捲近再決定），離散滑動做不到。
+**戰鬥時間軸與畫格率解耦**：所有時間窗以毫秒計，不以 frame 計。
+`tickCombat()` 收到的 `deltaMs` 可能是 16ms 也可能是 200ms，出手間隔以 `while` 補齊，
+掉幀時輸出總量不變（`tests/defense.test.ts` 有「一次 200ms 等於兩次 100ms」的驗證）。
+
+**場景與模擬跑同一支 tick**：`RunScene.update()` 與 `tests/balance.test.ts` 都呼叫
+`tickCombat(state, delta, rng)`。規則只有一份實作，因此模擬出來的難度就是玩家實際遇到的難度，
+不是另一套近似模型。這是刻意的架構選擇——上一版曾出現「模擬過的數值與畫面行為不一致」的風險。
+
+> 變更紀錄：
+> - 原規範為「離散左右滑，禁止連續拖曳」（閘門跑酷時代）。
+> - 2026-08-27 改為觸控跟隨（隊伍連續跟著手指走位）。
+> - 2026-08-28 玩法整體改為卡牌塔防，輸入改為上述拖放規範，`src/input/` 整個目錄移除。
 
 ---
 

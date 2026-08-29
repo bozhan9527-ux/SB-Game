@@ -7,7 +7,7 @@
 import balanceJson from '../../data/balance.json';
 import realmsJson from '../../data/realms.json';
 import sectsJson from '../../data/sects.json';
-import gatesJson from '../../data/gates.json';
+import cardsJson from '../../data/cards.json';
 import upgradesJson from '../../data/upgrades.json';
 import enemiesJson from '../../data/enemies.json';
 import achievementsJson from '../../data/achievements.json';
@@ -19,28 +19,24 @@ import type {
   Balance,
   BossArt,
   BossDef,
+  CardDef,
   MobArt,
   EnemyBook,
-  GateOp,
-  GateTarget,
-  GateTemplate,
   MobDef,
   Realm,
   Sect,
   SectArt,
   UpgradeTrack,
 } from './types';
-import { assertUniqueIds, bool, field, list, num, obj, oneOf, str, DataError } from './validate';
+import { assertUniqueIds, field, list, num, obj, oneOf, str, DataError } from './validate';
 
-const GATE_TARGETS: readonly GateTarget[] = ['disciples', 'arms', 'gold'];
-const GATE_OPS: readonly GateOp[] = ['add', 'mul'];
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 const SCENERIES: readonly Scenery[] = [
   'peaks', 'forest', 'sea', 'volcano', 'voidrock', 'storm', 'palace', 'celestial',
 ];
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
 const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
-  'stage', 'crowd', 'arms', 'fastBoss', 'clears', 'gold', 'sects',
+  'stage', 'maxTier', 'kills', 'perfect', 'clears', 'gold', 'sects',
 ];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
@@ -48,76 +44,62 @@ const MOB_ARTS: readonly MobArt[] = [
 ];
 
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
-  const input = obj(raw, 'input', path);
-  const run = obj(raw, 'run', path);
+  const field_ = obj(raw, 'field', path);
+  const wave = obj(raw, 'wave', path);
   const power = obj(raw, 'power', path);
-  const mob = obj(raw, 'mob', path);
   const boss = obj(raw, 'boss', path);
   const gold = obj(raw, 'gold', path);
   const p = (o: unknown, k: string, sub: string): number => num(o, k, `${path}.${sub}`);
 
   return {
-    input: {
-      followSpeed: p(input, 'followSpeed', 'input'),
-      trackMarginPx: p(input, 'trackMarginPx', 'input'),
-      momentumPerPixel: p(input, 'momentumPerPixel', 'input'),
+    field: {
+      fieldSlots: p(field_, 'fieldSlots', 'field'),
+      handSlots: p(field_, 'handSlots', 'field'),
+      startingHand: p(field_, 'startingHand', 'field'),
+      startingField: p(field_, 'startingField', 'field'),
+      tierGrowth: p(field_, 'tierGrowth', 'field'),
+      maxTierBase: p(field_, 'maxTierBase', 'field'),
+      stagesPerTier: p(field_, 'stagesPerTier', 'field'),
+      drawTierBelowMax: p(field_, 'drawTierBelowMax', 'field'),
+      drawTierBonusChance: p(field_, 'drawTierBonusChance', 'field'),
+      drawIntervalMs: p(field_, 'drawIntervalMs', 'field'),
     },
-    run: {
-      gateSpeedBase: p(run, 'gateSpeedBase', 'run'),
-      gateSpeedPerStage: p(run, 'gateSpeedPerStage', 'run'),
-      gateSpeedMax: p(run, 'gateSpeedMax', 'run'),
-      encounterSpacingPx: p(run, 'encounterSpacingPx', 'run'),
-      gateValueGrowth: p(run, 'gateValueGrowth', 'run'),
-      gatesPerStageBase: p(run, 'gatesPerStageBase', 'run'),
-      gatesPerStagePerRealm: p(run, 'gatesPerStagePerRealm', 'run'),
-      gatesPerStageMax: p(run, 'gatesPerStageMax', 'run'),
-      mobWaveEvery: p(run, 'mobWaveEvery', 'run'),
-      goldGateChance: p(run, 'goldGateChance', 'run'),
-      trapChance: p(run, 'trapChance', 'run'),
-      volleyMaxWeaken: p(run, 'volleyMaxWeaken', 'run'),
-      volleyRangePx: p(run, 'volleyRangePx', 'run'),
-      volleyIntervalMs: p(run, 'volleyIntervalMs', 'run'),
-      volleyConeHalfPx: p(run, 'volleyConeHalfPx', 'run'),
-      comboGoldPerStack: p(run, 'comboGoldPerStack', 'run'),
-      comboMaxStack: p(run, 'comboMaxStack', 'run'),
+    wave: {
+      wavesPerStage: p(wave, 'wavesPerStage', 'wave'),
+      waveIntervalMs: p(wave, 'waveIntervalMs', 'wave'),
+      waveSpread: p(wave, 'waveSpread', 'wave'),
+      minSpawnGapMs: p(wave, 'minSpawnGapMs', 'wave'),
+      countBase: p(wave, 'countBase', 'wave'),
+      countPerWave: p(wave, 'countPerWave', 'wave'),
+      countPerRealm: p(wave, 'countPerRealm', 'wave'),
+      countMax: p(wave, 'countMax', 'wave'),
+      hpBase: p(wave, 'hpBase', 'wave'),
+      hpGrowth: p(wave, 'hpGrowth', 'wave'),
+      hpPerWave: p(wave, 'hpPerWave', 'wave'),
+      speedBase: p(wave, 'speedBase', 'wave'),
+      speedPerStage: p(wave, 'speedPerStage', 'wave'),
+      speedMax: p(wave, 'speedMax', 'wave'),
+      trackPx: p(wave, 'trackPx', 'wave'),
+      leakCostBase: p(wave, 'leakCostBase', 'wave'),
+      leakCostGrowth: p(wave, 'leakCostGrowth', 'wave'),
+      bossLeakMultiplier: p(wave, 'bossLeakMultiplier', 'wave'),
     },
     power: {
       baseDisciples: p(power, 'baseDisciples', 'power'),
-      baseAttack: p(power, 'baseAttack', 'power'),
-      baseDefense: p(power, 'baseDefense', 'power'),
-      baseArms: p(power, 'baseArms', 'power'),
       maxDisciples: p(power, 'maxDisciples', 'power'),
-      defenseMitigation: p(power, 'defenseMitigation', 'power'),
-      armsMitigation: p(power, 'armsMitigation', 'power'),
-      mitigationFloor: p(power, 'mitigationFloor', 'power'),
-      minLossPerHit: p(power, 'minLossPerHit', 'power'),
-    },
-    mob: {
-      powerBase: p(mob, 'powerBase', 'mob'),
-      powerExponent: p(mob, 'powerExponent', 'mob'),
-      powerJitter: p(mob, 'powerJitter', 'mob'),
     },
     boss: {
       hpBase: p(boss, 'hpBase', 'boss'),
       hpGrowth: p(boss, 'hpGrowth', 'boss'),
-      attackBase: p(boss, 'attackBase', 'boss'),
-      attackGrowth: p(boss, 'attackGrowth', 'boss'),
-      attackIntervalMs: p(boss, 'attackIntervalMs', 'boss'),
+      speed: p(boss, 'speed', 'boss'),
       timeLimitMs: p(boss, 'timeLimitMs', 'boss'),
-      dpsFactor: p(boss, 'dpsFactor', 'boss'),
-      tickMs: p(boss, 'tickMs', 'boss'),
-      momentumMax: p(boss, 'momentumMax', 'boss'),
-      momentumDecayPerSec: p(boss, 'momentumDecayPerSec', 'boss'),
-      guardIdleMs: p(boss, 'guardIdleMs', 'boss'),
-      guardDpsMultiplier: p(boss, 'guardDpsMultiplier', 'boss'),
-      guardDamageMultiplier: p(boss, 'guardDamageMultiplier', 'boss'),
-      comboMomentumRatio: p(boss, 'comboMomentumRatio', 'boss'),
+      goldBonus: p(boss, 'goldBonus', 'boss'),
     },
     gold: {
       clearBase: p(gold, 'clearBase', 'gold'),
       clearGrowth: p(gold, 'clearGrowth', 'gold'),
-      gateGoldBase: p(gold, 'gateGoldBase', 'gold'),
-      gateGoldGrowth: p(gold, 'gateGoldGrowth', 'gold'),
+      killBase: p(gold, 'killBase', 'gold'),
+      killGrowth: p(gold, 'killGrowth', 'gold'),
       defeatRatio: p(gold, 'defeatRatio', 'gold'),
     },
   };
@@ -161,41 +143,40 @@ export function parseSects(raw: unknown, path = 'sects.json'): Sect[] {
     motto: str(item, 'motto', p),
     desc: str(item, 'desc', p),
     color: str(item, 'color', p),
-    discipleBonus: num(item, 'discipleBonus', p),
-    attackBonus: num(item, 'attackBonus', p),
-    defenseBonus: num(item, 'defenseBonus', p),
-    armsMultiplier: num(item, 'armsMultiplier', p),
-    bossDamageMultiplier: num(item, 'bossDamageMultiplier', p),
+    discipleMultiplier: num(item, 'discipleMultiplier', p),
+    damageMultiplier: num(item, 'damageMultiplier', p),
     goldMultiplier: num(item, 'goldMultiplier', p),
-    mobLossMultiplier: num(item, 'mobLossMultiplier', p),
+    drawSpeedMultiplier: num(item, 'drawSpeedMultiplier', p),
+    bossDamageMultiplier: num(item, 'bossDamageMultiplier', p),
     passive: str(item, 'passive', p),
-    mobImmunityCount: num(item, 'mobImmunityCount', p),
-    trapImmune: bool(item, 'trapImmune', p),
-    goldGateHealRatio: num(item, 'goldGateHealRatio', p),
-    bossStartMomentum: num(item, 'bossStartMomentum', p),
-    momentumDecayMultiplier: num(item, 'momentumDecayMultiplier', p),
+    favoredCard: str(item, 'favoredCard', p),
+    favoredDamageMultiplier: num(item, 'favoredDamageMultiplier', p),
+    leakImmunityCount: num(item, 'leakImmunityCount', p),
+    mergeRefundChance: num(item, 'mergeRefundChance', p),
   }));
   assertUniqueIds(sects, path);
   return sects;
 }
 
-export function parseGates(raw: unknown, path = 'gates.json'): GateTemplate[] {
-  const gates = list(raw, path, (item, p) => ({
+export function parseCards(raw: unknown, path = 'cards.json'): CardDef[] {
+  const cards = list(raw, path, (item, p) => ({
     id: str(item, 'id', p),
-    target: oneOf(item, 'target', p, GATE_TARGETS),
-    op: oneOf(item, 'op', p, GATE_OPS),
-    value: num(item, 'value', p),
+    name: str(item, 'name', p),
+    desc: str(item, 'desc', p),
+    color: str(item, 'color', p),
+    art: str(item, 'art', p),
+    damage: num(item, 'damage', p),
+    intervalMs: num(item, 'intervalMs', p),
+    targets: num(item, 'targets', p),
     weight: num(item, 'weight', p),
-    trap: bool(item, 'trap', p),
   }));
-  assertUniqueIds(gates, path);
-  for (const gate of gates) {
-    if (gate.weight <= 0) throw new DataError(path, `${gate.id} 的 weight 必須大於 0`);
-    if (gate.op === 'mul' && gate.value < 0) {
-      throw new DataError(path, `${gate.id} 的乘算 value 不得為負`);
-    }
+  assertUniqueIds(cards, path);
+  for (const card of cards) {
+    if (card.weight <= 0) throw new DataError(path, `${card.id} 的 weight 必須大於 0`);
+    if (card.intervalMs <= 0) throw new DataError(path, `${card.id} 的 intervalMs 必須大於 0`);
+    if (card.targets < 1) throw new DataError(path, `${card.id} 的 targets 至少為 1`);
   }
-  return gates;
+  return cards;
 }
 
 export function parseUpgrades(raw: unknown, path = 'upgrades.json'): UpgradeTrack[] {
@@ -252,7 +233,7 @@ export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
 export const BALANCE: Balance = parseBalance(balanceJson);
 export const REALMS: readonly Realm[] = parseRealms(realmsJson);
 export const SECTS: readonly Sect[] = parseSects(sectsJson);
-export const GATES: readonly GateTemplate[] = parseGates(gatesJson);
+export const CARDS: readonly CardDef[] = parseCards(cardsJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);
 export const ENEMIES: EnemyBook = parseEnemies(enemiesJson);
 export const ACHIEVEMENTS: readonly Achievement[] = parseAchievements(achievementsJson);
@@ -264,5 +245,12 @@ for (const realm of REALMS) {
   }
   if (!ENEMIES.bosses.some((boss) => boss.realm === realm.id)) {
     throw new DataError('enemies.json.bosses', `境界 ${realm.id} 沒有對應的首領`);
+  }
+}
+
+/** 門派專精的符種必須真的存在，否則被動會靜默失效。 */
+for (const sect of SECTS) {
+  if (!CARDS.some((card) => card.id === sect.favoredCard)) {
+    throw new DataError('sects.json', `${sect.id} 的 favoredCard「${sect.favoredCard}」不存在`);
   }
 }
