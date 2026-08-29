@@ -11,10 +11,32 @@
 import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect } from '../data/types';
 import type { SaveData } from '../save/types';
+import { challengeGoldMultiplier, hasChallenge } from './challenges';
 import { masteryBonus, masteryTier } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
 import { amountOf } from './upgrades';
+
+/**
+ * 這一場的規則修改，來自玩家自己開的挑戰條件。
+ *
+ * 做成一個物件掛在 loadout 上，而不是散在各處讀存檔：
+ * tickCombat 從頭到尾不認得存檔，平衡模擬也才有辦法單獨掃「開了某條會變多難」。
+ */
+export interface RunRules {
+  /** 不能合成——拿掉這個遊戲唯一的指數成長。 */
+  noMerge: boolean;
+  /** 漏掉任何一隻立刻失守，不是扣耐久。 */
+  suddenDeath: boolean;
+  /** 首領時限倍率。 */
+  bossTimeMultiplier: number;
+}
+
+export const NO_RULES: RunRules = {
+  noMerge: false,
+  suddenDeath: false,
+  bossTimeMultiplier: 1,
+};
 
 export interface Loadout {
   sect: Sect;
@@ -42,6 +64,8 @@ export interface Loadout {
    * 它放在 loadout 而不是全域常數的理由：平衡模擬要能一次跑很多套不同的配置。
    */
   talismans: CardDef[];
+  /** 這一場的挑戰條件加上去的規則。沒開任何一條時是 NO_RULES。 */
+  rules: RunRules;
 }
 
 export function sectById(id: string | null): Sect | null {
@@ -53,9 +77,24 @@ export function buildLoadout(save: SaveData, stage: number): Loadout {
   const sect = sectById(save.player.sectId);
   if (sect === null) throw new Error('尚未選擇門派，無法開始挑戰');
   // 帶哪四張符看的是**歷史最高關卡**而不是這一關：重打舊關卡時不該被沒收選擇。
-  const talismans = talismanDefs(save.player.talismans, save.world.highestStage);
+  const all = talismanDefs(save.player.talismans, save.world.highestStage);
+  // 獨門一符：抽符池縮成第一張。每一張都合得起來，階數衝得極快，
+  // 但陣法只剩同心、特效完全沒有互補。
+  const solo = hasChallenge(save, 'soloTalisman');
+  const talismans = solo ? all.slice(0, 1) : all;
   const mastery = masteryBonus(masteryTier(save, sect.id));
-  return buildLoadoutFor(sect, save.player.upgrades, stage, talismans, mastery);
+  const loadout = buildLoadoutFor(sect, save.player.upgrades, stage, talismans, mastery, {
+    noMerge: hasChallenge(save, 'noMerge'),
+    suddenDeath: hasChallenge(save, 'noLeak'),
+    bossTimeMultiplier: hasChallenge(save, 'hasteBoss') ? 0.5 : 1,
+  });
+  // 孤身守門：容錯幾乎歸零。放在這裡而不是 RunRules 裡，
+  // 是因為它改的是一個既有的起始值，不是一條新規則。
+  if (hasChallenge(save, 'thinGate')) {
+    loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
+  }
+  loadout.goldMultiplier *= challengeGoldMultiplier(save);
+  return loadout;
 }
 
 /** 百分比升級換算成倍率。 */
@@ -75,6 +114,7 @@ export function buildLoadoutFor(
   stage: number,
   talismans?: readonly CardDef[],
   masteryBonusValue = 0,
+  rules: RunRules = NO_RULES,
 ): Loadout {
   const { power } = BALANCE;
   const realm = realmForStage(stage);
@@ -100,5 +140,6 @@ export function buildLoadoutFor(
     goldMultiplier: sect.goldMultiplier * multiplierOf(upgrades, 'goldGain'),
     realmPowerBonus: realm.powerBonus,
     talismans: pool,
+    rules,
   };
 }

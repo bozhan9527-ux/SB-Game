@@ -4,6 +4,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { sectById } from '../systems/loadout';
 import { TALISMAN_SLOTS, talismanDefs } from '../systems/talismans';
+import { activeChallenges, challengeGoldMultiplier } from '../systems/challenges';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
@@ -68,11 +69,25 @@ export class TitleScene extends Phaser.Scene {
     this.add
       .text(
         cx,
-        568,
+        556,
         `符籙 ${talismans.map((def) => def.name).join('・')}`,
         textStyle({ size: 17, color: INK_DIM }),
       )
       .setOrigin(0.5);
+
+    // 開了試煉就跟在「符籙」下面：這一區講的就是「我這一場的配置」，試煉屬於同一件事。
+    // 挑戰是跨關留著的設定，忘記自己開了什麼又一直打不過，是最容易讓人以為遊戲壞掉的情況。
+    const active = activeChallenges(save);
+    if (active.length > 0) {
+      this.add
+        .text(
+          cx,
+          580,
+          `試煉 ${active.map((item) => item.name).join('・')}　金幣 ×${challengeGoldMultiplier(save).toFixed(2)}`,
+          textStyle({ size: 16, color: GOLD }),
+        )
+        .setOrigin(0.5);
+    }
 
     const hasSect = sect !== null;
     createButton(this, cx, 628, {
@@ -100,27 +115,21 @@ export class TitleScene extends Phaser.Scene {
       onClick: () => fadeToScene(this, 'Talisman'),
     });
 
-    // 三顆並排：540 寬放得下 3×112 加間距，比擠成兩排省一列高度。
-    createButton(this, cx - 118, 850, {
-      width: 112,
-      height: 56,
-      label: '玩法說明',
-      fontSize: 20,
-      onClick: () => fadeToScene(this, 'Help'),
-    });
-    createButton(this, cx, 850, {
-      width: 112,
-      height: 56,
-      label: '仙途錄',
-      fontSize: 20,
-      onClick: () => fadeToScene(this, 'Achievements'),
-    });
-    createButton(this, cx + 118, 850, {
-      width: 112,
-      height: 56,
-      label: hasSect ? '換門派' : '門派',
-      fontSize: 20,
-      onClick: () => fadeToScene(this, 'Sect'),
+    // 四顆並排：540 寬放得下 4×124 加間距，比擠成兩排省一列高度。
+    const minor: [string, string][] = [
+      ['玩法說明', 'Help'],
+      ['仙途錄', 'Achievements'],
+      [hasSect ? '換門派' : '門派', 'Sect'],
+      ['試煉', 'Challenge'],
+    ];
+    minor.forEach(([label, target], index) => {
+      createButton(this, cx + (index - 1.5) * 128, 850, {
+        width: 124,
+        height: 56,
+        label,
+        fontSize: 19,
+        onClick: () => fadeToScene(this, target),
+      });
     });
 
     // 音效開關。放在標題頁右上角，切換後立刻生效並寫進存檔。

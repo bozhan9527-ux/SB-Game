@@ -100,6 +100,12 @@ const addSectClears: Migration = (data) => {
   return { ...data, player: { ...player, sectClears } };
 };
 
+/** v8 → v9：加入挑戰條件。舊存檔一律沒開任何一條，也沒有達成紀錄。 */
+const addChallenges: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, challenges: [], challengesDone: [] } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -109,6 +115,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addTalismans,
   addSpeed,
   addSectClears,
+  addChallenges,
 ];
 
 /**

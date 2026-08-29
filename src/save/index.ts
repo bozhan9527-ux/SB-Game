@@ -2,6 +2,7 @@
  * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
  */
 import { SECTS, UPGRADES } from '../data';
+import { sanitizeChallenges } from '../systems/challenges';
 import { sanitizeTalismans, starterTalismans } from '../systems/talismans';
 import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
@@ -25,6 +26,8 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       hints: [],
       talismans: starterTalismans(),
       sectClears: {},
+      challenges: [],
+      challengesDone: [],
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
@@ -69,6 +72,8 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const savedTalismans = Array.isArray(player['talismans'])
     ? (player['talismans'] as unknown[]).filter((id): id is string => typeof id === 'string')
     : [];
+  const strings = (value: unknown): string[] =>
+    Array.isArray(value) ? (value as unknown[]).filter((id): id is string => typeof id === 'string') : [];
   const clearedSects = Array.isArray(stats['clearedSects'])
     ? (stats['clearedSects'] as unknown[]).filter((id): id is string => typeof id === 'string')
     : [];
@@ -93,6 +98,8 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       // 存檔可能引用到已改名或尚未解鎖的符，一律修補成一份能直接開場的四張。
       talismans: sanitizeTalismans(savedTalismans, highestStage),
       sectClears: normalizeSectClears(player['sectClears']),
+      challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
+      challengesDone: strings(player['challengesDone']),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),

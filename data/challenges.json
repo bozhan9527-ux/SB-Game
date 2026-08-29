@@ -1,0 +1,42 @@
+[
+  {
+    "id": "noMerge",
+    "name": "不合之道",
+    "desc": "整場不能合成，只能靠鋪符與陣法",
+    "detail": "合成是這個遊戲唯一的指數成長。拿掉它，你得靠格位數與陣法把線性的輸出堆到夠用。",
+    "goldMultiplier": 1.8,
+    "minStage": 12
+  },
+  {
+    "id": "soloTalisman",
+    "name": "獨門一符",
+    "desc": "抽符池只剩你帶的第一張",
+    "detail": "抽符池縮成一種，代表每一張都合得起來——階數衝得極快，但陣法只剩同心，而且完全沒有特效互補。",
+    "goldMultiplier": 1.5,
+    "minStage": 12
+  },
+  {
+    "id": "thinGate",
+    "name": "孤身守門",
+    "desc": "山門耐久只剩三成",
+    "detail": "容錯幾乎歸零。漏一隻就可能結束，逼你把資源全押在前排清怪而不是堆關底輸出。",
+    "goldMultiplier": 1.6,
+    "minStage": 12
+  },
+  {
+    "id": "noLeak",
+    "name": "一夫當關",
+    "desc": "漏掉任何一隻立刻失守",
+    "detail": "不是扣耐久，是直接結束。這一條逼你算清楚每一波的清場速度，而不是用耐久換時間。",
+    "goldMultiplier": 2,
+    "minStage": 20
+  },
+  {
+    "id": "hasteBoss",
+    "name": "速斬",
+    "desc": "首領的時限砍半",
+    "detail": "關底的容錯沒了。前面每一秒的效率都會回頭決定你有沒有辦法在時限內斬掉牠。",
+    "goldMultiplier": 1.5,
+    "minStage": 20
+  }
+]

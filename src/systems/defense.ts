@@ -473,6 +473,9 @@ export function mergeInto(
   rng: Rng,
 ): boolean {
   if (source.where === target.where && source.index === target.index) return false;
+  // 不合之道：這一場沒有合成。擋在最底層而不是在畫面上把手勢關掉——
+  // 規則要在模擬裡成立，否則平衡模擬跑出來的數字和玩家看到的不是同一件事。
+  if (state.loadout.rules.noMerge) return false;
   const from = listOf(state, source.where);
   const into = listOf(state, target.where);
   const card = from[source.index];
@@ -845,6 +848,15 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       continue;
     }
     state.leaks += 1;
+    // 一夫當關：漏一隻就直接結束，不是扣耐久。
+    //
+    // 放在門派免傷**之前**：這一條是玩家自己開的絕對條件，
+    // 若體修的被動能擋掉它，那對體修來說這條挑戰等於白開。
+    if (state.loadout.rules.suddenDeath) {
+      state.disciples = 0;
+      report.leaks.push({ enemyId: enemy.id, loss: state.maxDisciples, immune: false, boss: false });
+      continue;
+    }
     // 體修：每關前幾次漏怪由門人硬擋，山門不掉耐久。
     if (state.leakImmunityUsed < state.loadout.sect.leakImmunityCount) {
       state.leakImmunityUsed += 1;
@@ -881,7 +893,8 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     state.outcome = 'cleared';
   } else if (
     state.bossSpawnedAtMs !== null &&
-    state.elapsedMs - state.bossSpawnedAtMs >= BALANCE.boss.timeLimitMs
+    state.elapsedMs - state.bossSpawnedAtMs >=
+      BALANCE.boss.timeLimitMs * state.loadout.rules.bossTimeMultiplier
   ) {
     state.outcome = 'timeout';
   }

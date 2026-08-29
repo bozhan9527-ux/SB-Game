@@ -493,3 +493,23 @@ export interface EnemyBook {
   mobs: MobDef[];
   bosses: BossDef[];
 }
+
+/**
+ * 自我設限的挑戰條件。
+ *
+ * 這是給「已經打得動了、但還想找點事做」的玩家用的框架。
+ * 條件一律只會讓這一場更難，獎勵一律只是金幣倍率——不能給任何無法用一般玩法取得的
+ * 東西，否則它就從「自己找事做」變成「不做就落後」，那是完全相反的一件事。
+ */
+export interface ChallengeDef {
+  id: string;
+  name: string;
+  /** 一行的規則，選擇畫面用。 */
+  desc: string;
+  /** 為什麼這條有意思——它逼你改變什麼打法。 */
+  detail: string;
+  /** 這一場的金幣倍率。多條同時開啟時相乘。 */
+  goldMultiplier: number;
+  /** 幾關之後才開放。太早開只會讓新玩家用它把自己卡死。 */
+  minStage: number;
+}

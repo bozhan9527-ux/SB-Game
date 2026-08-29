@@ -17,6 +17,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
 import type { MobTrait } from '../data/types';
 import { persist, state } from '../state';
+import { activeChallenges } from '../systems/challenges';
 import type { Card } from '../systems/deck';
 import { cardDef, fieldDps, maxTierForStage } from '../systems/deck';
 import type { ActiveEnemy, CardSlot, DefenseState, TickReport } from '../systems/defense';
@@ -422,6 +423,20 @@ export class RunScene extends Phaser.Scene {
       .text(GAME_WIDTH - 20, 84, '', textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(1, 0)
       .setDepth(51);
+
+    // 開了試煉就在 HUD 上常駐一行：規則改過的那一場，玩家必須隨時看得到改了什麼，
+    // 否則「怎麼合不起來」會被當成 bug。
+    const challenges = activeChallenges(state());
+    if (challenges.length > 0) {
+      this.add
+        .text(
+          20,
+          106,
+          `試煉　${challenges.map((item) => item.name).join('・')}`,
+          textStyle({ size: 15, color: GOLD, bold: true }),
+        )
+        .setDepth(52);
+    }
 
     this.add.rectangle(GAME_WIDTH / 2, 108, GAME_WIDTH, 4, LINE, 0.5).setDepth(51);
     this.waveBar = this.add

@@ -12,6 +12,7 @@ import upgradesJson from '../../data/upgrades.json';
 import enemiesJson from '../../data/enemies.json';
 import achievementsJson from '../../data/achievements.json';
 import lessonsJson from '../../data/lessons.json';
+import challengesJson from '../../data/challenges.json';
 
 import type {
   Achievement,
@@ -22,6 +23,7 @@ import type {
   BossDef,
   CardDef,
   CardEffect,
+  ChallengeDef,
   FormationTierBalance,
   MobArt,
   MobTrait,
@@ -393,7 +395,28 @@ export function parseLessons(raw: unknown, path = 'lessons.json'): LessonDef[] {
   return lessons;
 }
 
+export function parseChallenges(raw: unknown, path = 'challenges.json'): ChallengeDef[] {
+  const challenges = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    name: str(item, 'name', p),
+    desc: str(item, 'desc', p),
+    detail: str(item, 'detail', p),
+    goldMultiplier: num(item, 'goldMultiplier', p),
+    minStage: num(item, 'minStage', p),
+  }));
+  assertUniqueIds(challenges, path);
+  for (const item of challenges) {
+    // 倍率小於 1 的「挑戰」等於是懲罰玩家自找麻煩，那條就不會有人開。
+    if (item.goldMultiplier < 1) {
+      throw new DataError(path, `${item.id} 的 goldMultiplier 不得小於 1`);
+    }
+    if (item.minStage < 1) throw new DataError(path, `${item.id} 的 minStage 至少為 1`);
+  }
+  return challenges;
+}
+
 export const CARDS: readonly CardDef[] = parseCards(cardsJson);
+export const CHALLENGES: readonly ChallengeDef[] = parseChallenges(challengesJson);
 export const LESSONS: readonly LessonDef[] = parseLessons(lessonsJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);
 export const ENEMIES: EnemyBook = parseEnemies(enemiesJson);

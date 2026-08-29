@@ -4,6 +4,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { CARDS } from '../data';
 import { addGold, recordClear, recordDefeat } from '../save';
 import { claimAchievements } from '../systems/achievements';
+import { recordChallengeClears } from '../systems/challenges';
 import type { RunTelemetry } from '../systems/defense';
 import {
   averageDps,
@@ -49,6 +50,9 @@ export class ResultScene extends Phaser.Scene {
     if (result.victory) recordClear(save, result.goldCollected + result.goldReward);
     else recordDefeat(save, result.goldCollected + result.goldReward);
 
+    // 試煉的達成紀錄要在成就結算之前寫入：日後若有「達成某條試煉」的成就，
+    // 順序反了就會慢一場才發。
+    const challenges = result.victory ? recordChallengeClears(save) : [];
     const unlocked = claimAchievements(save);
     for (const item of unlocked) addGold(save, item.reward);
     persist();
@@ -127,6 +131,17 @@ export class ResultScene extends Phaser.Scene {
       fontSize: 20,
       onClick: () => this.showReport(),
     });
+
+    if (challenges.length > 0) {
+      this.add
+        .text(
+          cx,
+          648,
+          `試煉達成：${challenges.map((item) => item.name).join('・')}`,
+          textStyle({ size: 20, color: GOLD, bold: true }),
+        )
+        .setOrigin(0.5);
+    }
 
     if (unlocked.length > 0) this.showAchievements(unlocked);
   }

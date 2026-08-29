@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -58,6 +58,15 @@ export interface PlayerState {
    * 而不是一個隨時可改的修飾選單。存等級是衍生值，所以只存次數。
    */
   sectClears: Record<string, number>;
+  /**
+   * 這一場要開啟的挑戰條件（見 src/systems/challenges.ts）。
+   *
+   * 存在 player 而不是 world：它是玩家的偏好設定，不是關卡進度的一部分，
+   * 通關之後不會被清掉——想連著打十關硬模式的人不該每一關重勾一次。
+   */
+  challenges: string[];
+  /** 曾經帶著這條挑戰通關過的 id。純紀錄，不影響任何數值。 */
+  challengesDone: string[];
   stats: StatsState;
 }
 
