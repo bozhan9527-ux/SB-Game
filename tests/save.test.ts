@@ -119,6 +119,36 @@ describe('存檔（TECH_SPEC 第 4 節）', () => {
     expect(loaded.player.stats.totalKills).toBe(0);
   });
 
+  it('v4 舊存檔：已經玩過的人不會被新手教學打斷，全新存檔才會走教學', () => {
+    const storage = createMemoryStorage();
+    storage.write(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 4,
+        savedAt: 1,
+        player: { sectId: 'body', wallet: { gold: 10 }, upgrades: {}, achievements: [],
+          stats: { maxTier: 3, totalKills: 20, perfectClears: 0, totalGoldEarned: 500, clearedSects: [] } },
+        world: { stage: 6, highestStage: 6, runs: 9, clears: 5 },
+        settings: { sound: true },
+      }),
+    );
+    const veteran = loadSave(storage);
+    expect(veteran.player.hints).toContain('tutorial');
+
+    const empty = createMemoryStorage();
+    empty.write(
+      SAVE_KEY,
+      JSON.stringify({
+        version: 4, savedAt: 1,
+        player: { sectId: null, wallet: { gold: 0 }, upgrades: {}, achievements: [],
+          stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] } },
+        world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
+        settings: { sound: true },
+      }),
+    );
+    expect(loadSave(empty).player.hints).toEqual([]);
+  });
+
   it('音效關閉的設定會被存下來', () => {
     const storage = createMemoryStorage();
     const save = createDefaultSave(1);

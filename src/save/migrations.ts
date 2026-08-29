@@ -48,8 +48,27 @@ const toDefenseStats: Migration = (data) => {
   };
 };
 
+/**
+ * v4 → v5：加入新手教學與一次性提示的紀錄。
+ * 舊玩家（存檔已存在）視為已經會玩，不再被教學打斷；新玩家才會走教學。
+ */
+const addHints: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const played = typeof world['runs'] === 'number' && world['runs'] > 0;
+  return {
+    ...data,
+    player: { ...player, hints: played ? ['tutorial'] : [] },
+  };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
-export const MIGRATIONS: readonly Migration[] = [addSettings, addAchievements, toDefenseStats];
+export const MIGRATIONS: readonly Migration[] = [
+  addSettings,
+  addAchievements,
+  toDefenseStats,
+  addHints,
+];
 
 /**
  * 把任意版本的存檔套用至最新版。

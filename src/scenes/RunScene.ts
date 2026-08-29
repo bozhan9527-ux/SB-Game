@@ -15,7 +15,7 @@ import {
 } from '../art';
 import { GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
-import { state } from '../state';
+import { persist, state } from '../state';
 import type { Card } from '../systems/deck';
 import { cardDef, fieldDps, maxTierForStage } from '../systems/deck';
 import type { ActiveEnemy, CardSlot, DefenseState, TickReport } from '../systems/defense';
@@ -30,6 +30,18 @@ import {
   tickCombat,
 } from '../systems/defense';
 import { buildLoadout } from '../systems/loadout';
+import type { TutorialStep } from '../systems/tutorial';
+import {
+  HINT_BOSS,
+  HINT_HAND_FULL,
+  HINT_TUTORIAL,
+  advanceStep,
+  markHintSeen,
+  shouldRunTutorial,
+  tutorialCopy,
+  tutorialField,
+  tutorialHand,
+} from '../systems/tutorial';
 import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createRng } from '../systems/rng';
 import { drawBackdrop } from '../ui/backdrop';
@@ -112,6 +124,13 @@ export class RunScene extends Phaser.Scene {
   private discardZone!: Phaser.GameObjects.Rectangle;
   private drawWarning!: Phaser.GameObjects.Text;
 
+  /** 'done' 代表沒有教學要跑（老玩家或已教過）。 */
+  private step: TutorialStep = 'done';
+  private coach: Phaser.GameObjects.Container | null = null;
+  private coachTitle: Phaser.GameObjects.Text | null = null;
+  private coachBody: Phaser.GameObjects.Text | null = null;
+  private coachArrow: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super('Run');
   }
@@ -137,14 +156,24 @@ export class RunScene extends Phaser.Scene {
     audio.playMusic(realmIndexForStage(stage));
     drawBackdrop(this, realm.color, realm.scenery);
 
+    // 教學要換掉起手牌，必須在建立牌位之前決定，否則陣位數會對不上。
+    this.step = shouldRunTutorial(save) ? 'deploy' : 'done';
+    if (this.step !== 'done') {
+      this.run.field = tutorialField(this.run.field.length);
+      this.run.hand = tutorialHand(this.run.hand.length);
+      this.run.cooldowns = this.run.cooldowns.map(() => 0);
+    }
+
     this.drawArena(realm.color);
     this.buildHud(realm.color);
     this.buildFieldSlots();
     this.buildHand();
     this.buildDragLayer();
+    this.buildCoach();
     this.refreshCards();
     this.updateHud();
-    this.showIntro(realm.color);
+    if (this.step === 'done') this.showIntro(realm.color);
+    else this.refreshCoach();
   }
 
   private ensureSparkTexture(): void {
@@ -394,6 +423,10 @@ export class RunScene extends Phaser.Scene {
     if (result === 'none' || card === null) return;
 
     const pos = this.slotPosition(target);
+    if (result === 'merged') this.advanceTutorial('merge');
+    else if (result === 'moved' && source.where === 'hand' && target.where === 'field') {
+      this.advanceTutorial('deploy');
+    }
     if (result === 'merged') {
       const merged = cardAt(this.run, target);
       audio.play('gold');
@@ -463,6 +496,8 @@ export class RunScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     if (this.over) return;
+    // 教學的前兩步把戰鬥停住：新手還在找哪裡可以拖的時候，妖魔不該已經走到山門。
+    if (this.step === 'deploy' || this.step === 'merge') return;
     const report = tickCombat(this.run, delta, this.rng);
     this.applyReport(report);
     this.syncEnemies();
@@ -522,7 +557,10 @@ export class RunScene extends Phaser.Scene {
       );
     }
 
-    if (report.bossSpawned) this.buildBossPanel();
+    if (report.bossSpawned) {
+      this.buildBossPanel();
+      this.showHintOnce(HINT_BOSS, '首領血厚，別讓它走到山門——它一撞就是六倍耐久', 300);
+    }
     if (report.drawnSlot !== null) {
       this.refreshCards();
       this.pulseHand(report.drawnSlot);
@@ -531,6 +569,7 @@ export class RunScene extends Phaser.Scene {
     // 也不讓它往上飄——飄起來會蓋到山門那一排，而它要提醒的事就在手牌區。
     if (report.drawLost && this.time.now - this.lastDrawWarnAt > 3500) {
       this.lastDrawWarnAt = this.time.now;
+      this.showHintOnce(HINT_HAND_FULL, '手牌滿了會抽不到新符。用不到的符往畫面最下緣拖可以棄掉', 706);
       this.tweens.killTweensOf(this.drawWarning);
       this.drawWarning.setAlpha(1);
       this.tweens.add({ targets: this.drawWarning, alpha: 0, delay: 1200, duration: 500 });
@@ -663,6 +702,90 @@ export class RunScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
       onComplete: () => label.destroy(),
     });
+  }
+
+  // -------------------------------------------------------------- 新手教學
+
+  /** 教學面板。壓在畫面中段偏上，不擋住手牌與陣位——那正是玩家要動手的地方。 */
+  private buildCoach(): void {
+    if (this.step === 'done') return;
+    const cx = GAME_WIDTH / 2;
+    const panel = this.add
+      .rectangle(cx, 0, GAME_WIDTH - 56, 128, BG_PANEL, 0.97)
+      .setStrokeStyle(2, hexToNumber(GOLD));
+    this.coachTitle = this.add
+      .text(cx, -36, '', textStyle({ size: 24, color: GOLD, bold: true }))
+      .setOrigin(0.5);
+    this.coachBody = this.add
+      .text(cx, 6, '', textStyle({ size: 17, color: INK }))
+      .setOrigin(0.5)
+      .setAlign('center')
+      .setLineSpacing(6);
+    this.coach = this.add.container(0, 300, [panel, this.coachTitle, this.coachBody]).setDepth(95);
+
+    // 往下指的箭頭：文字說「拖到下面」，還是要有東西指著才不用猜是哪裡。
+    this.coachArrow = this.add
+      .text(cx, 392, '▼', textStyle({ size: 30, color: GOLD, bold: true }))
+      .setOrigin(0.5)
+      .setDepth(95);
+    this.tweens.add({
+      targets: this.coachArrow,
+      y: 408,
+      duration: 620,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  private refreshCoach(): void {
+    const copy = tutorialCopy(this.step);
+    this.coachTitle?.setText(copy.title);
+    this.coachBody?.setText(copy.body);
+    const visible = this.step !== 'done';
+    this.coach?.setVisible(visible);
+    this.coachArrow?.setVisible(visible);
+  }
+
+  /**
+   * 玩家做到了這一步要求的動作就往下走。
+   *
+   * 只在「真的做到」時前進，不用計時器——新手花多久摸索都可以，
+   * 而做完之後不必再等一段動畫才恢復操作。
+   */
+  private advanceTutorial(done: 'deploy' | 'merge'): void {
+    if (this.step !== done) return;
+    this.step = advanceStep(this.step);
+    this.refreshCoach();
+
+    if (this.step === 'watch') {
+      // 最後一段只是說明，不需要玩家做什麼：讀完就開打。
+      this.coachArrow?.setVisible(false);
+      this.time.delayedCall(3800, () => {
+        this.step = 'done';
+        this.refreshCoach();
+        this.finishTutorial();
+      });
+    }
+  }
+
+  private finishTutorial(): void {
+    const save = state();
+    if (markHintSeen(save, HINT_TUTORIAL)) persist();
+  }
+
+  /** 一次性提示：看過就不再出現，免得老玩家每一關都被同一句話打斷。 */
+  private showHintOnce(id: string, text: string, y: number): void {
+    const save = state();
+    if (!markHintSeen(save, id)) return;
+    persist();
+    const label = this.add
+      .text(GAME_WIDTH / 2, y, text, textStyle({ size: 19, color: GOLD, bold: true }))
+      .setOrigin(0.5)
+      .setStroke('#0b0f14', 6)
+      .setDepth(92);
+    fitText(label, GAME_WIDTH - 40);
+    this.tweens.add({ targets: label, alpha: 0, delay: 2600, duration: 600, onComplete: () => label.destroy() });
   }
 
   private showIntro(accentHex: string): void {

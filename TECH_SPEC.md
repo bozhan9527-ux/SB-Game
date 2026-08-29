@@ -39,8 +39,8 @@
 │   ├─ main.ts                    # 進入點
 │   ├─ art.ts                     # 美術資源載入
 │   ├─ state.ts                   # 執行期的存檔單例
-│   ├─ scenes/                    # Boot / Title / Sect / Run / Result / Upgrade / Achievement
-│   ├─ systems/                   # 法寶符 / 防守戰 / 境界 / 升級 / 成就 / 開局配置
+│   ├─ scenes/                    # Boot / Title / Sect / Run / Result / Upgrade / Achievement / Help
+│   ├─ systems/                   # 法寶符 / 防守戰 / 境界 / 升級 / 成就 / 教學 / 開局配置
 │   ├─ audio/                     # 音高、合成、播放與配樂排程
 │   ├─ data/                      # JSON 讀取與型別定義
 │   ├─ save/                      # 存檔、遷移

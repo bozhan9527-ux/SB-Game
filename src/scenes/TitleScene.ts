@@ -78,18 +78,26 @@ export class TitleScene extends Phaser.Scene {
       onClick: () => this.scene.start('Upgrade'),
     });
 
-    createButton(this, cx - 88, 812, {
-      width: 164,
+    // 三顆並排：540 寬放得下 3×112 加間距，比擠成兩排省一列高度。
+    createButton(this, cx - 118, 812, {
+      width: 112,
+      height: 58,
+      label: '玩法說明',
+      fontSize: 20,
+      onClick: () => this.scene.start('Help'),
+    });
+    createButton(this, cx, 812, {
+      width: 112,
       height: 58,
       label: '仙途錄',
-      fontSize: 22,
+      fontSize: 20,
       onClick: () => this.scene.start('Achievements'),
     });
-    createButton(this, cx + 88, 812, {
-      width: 164,
+    createButton(this, cx + 118, 812, {
+      width: 112,
       height: 58,
-      label: hasSect ? '更換門派' : '門派介紹',
-      fontSize: 22,
+      label: hasSect ? '換門派' : '門派',
+      fontSize: 20,
       onClick: () => this.scene.start('Sect'),
     });
 

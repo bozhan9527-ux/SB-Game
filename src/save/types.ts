@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -38,6 +38,11 @@ export interface PlayerState {
   upgrades: Record<string, number>;
   /** 已達成的成就 id。 */
   achievements: string[];
+  /**
+   * 已經看過的教學與提示 id（見 src/systems/tutorial.ts）。
+   * 只存「看過什麼」，不存「現在教到第幾步」——教學進度是單場的事，不該進存檔。
+   */
+  hints: string[];
   stats: StatsState;
 }
 

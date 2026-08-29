@@ -10,6 +10,7 @@ import { RunScene } from './scenes/RunScene';
 import { ResultScene } from './scenes/ResultScene';
 import { UpgradeScene } from './scenes/UpgradeScene';
 import { AchievementScene } from './scenes/AchievementScene';
+import { HelpScene } from './scenes/HelpScene';
 
 // 瀏覽器要求先有使用者手勢才能發聲。解鎖時才讀存檔裡的音效開關
 // （走 state() 而非直接碰 localStorage，見 TECH_SPEC 第 9.2 節）。
@@ -32,5 +33,5 @@ new Phaser.Game({
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
   },
-  scene: [BootScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene],
+  scene: [BootScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene],
 });

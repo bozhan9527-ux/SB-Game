@@ -21,6 +21,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       wallet: { gold: 0 },
       upgrades,
       achievements: [],
+      hints: [],
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0 },
@@ -44,6 +45,9 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const achievements = Array.isArray(player['achievements'])
     ? (player['achievements'] as unknown[]).filter((id): id is string => typeof id === 'string')
     : [];
+  const hints = Array.isArray(player['hints'])
+    ? (player['hints'] as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
   const clearedSects = Array.isArray(stats['clearedSects'])
     ? (stats['clearedSects'] as unknown[]).filter((id): id is string => typeof id === 'string')
     : [];
@@ -63,6 +67,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       wallet: { gold: Math.max(0, Math.floor(asNumber(wallet['gold'], 0))) },
       upgrades: merged,
       achievements,
+      hints,
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),
