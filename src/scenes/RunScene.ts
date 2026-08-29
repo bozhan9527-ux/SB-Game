@@ -15,6 +15,7 @@ import {
 } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
+import type { MobTrait } from '../data/types';
 import { persist, state } from '../state';
 import type { Card } from '../systems/deck';
 import { cardDef, fieldDps, maxTierForStage } from '../systems/deck';
@@ -141,6 +142,19 @@ type DragSource = CardSlot;
 
 /** 妖魔的身體本體。受擊白閃與倒下都動它，不動外層容器（容器的位置由模擬決定）。 */
 type EnemyBody = Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
+
+/**
+ * 習性的標記：一個字加一個顏色。
+ *
+ * 習性若看不出來，它就只是「這一關比較難」——玩家學不到「該換哪張符」，
+ * 而那正是加習性的全部理由。一個字是刻意的：妖魔只有 46px 寬，
+ * 多一個字就會蓋住牠自己。
+ */
+const TRAIT_MARK: Record<Exclude<MobTrait, 'none'>, { text: string; color: string }> = {
+  armor: { text: '甲', color: '#b8c4d0' },
+  swift: { text: '疾', color: '#7fd8ff' },
+  split: { text: '裂', color: '#c79cf0' },
+};
 
 /**
  * 山門防守戰。
@@ -1317,6 +1331,18 @@ export class RunScene extends Phaser.Scene {
       const bar = this.add.rectangle(-23, -46, 46, 5, 0xd8434f, 1).setOrigin(0, 0.5);
       container.add([barBg, bar]);
       container.setData('bar', bar);
+    }
+
+    if (enemy.trait !== 'none') {
+      const mark = TRAIT_MARK[enemy.trait];
+      // 貼在血條右端，不是頭頂上：頭頂在剛出場時會落在 HUD 底下被蓋掉，
+      // 而妖魔剛出場正是玩家最需要知道「這一波是什麼」的時候。
+      container.add(
+        this.add
+          .text(26, -46, mark.text, textStyle({ size: 15, color: mark.color, bold: true }))
+          .setOrigin(0, 0.5)
+          .setStroke('#0b0f14', 5),
+      );
     }
 
     // 減速與灼燒的標記。特效若看不見，玩家就沒有理由相信寒冰符真的有用——

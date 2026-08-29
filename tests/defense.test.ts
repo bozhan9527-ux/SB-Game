@@ -74,6 +74,8 @@ function mob(over: Partial<ActiveEnemy> = {}): ActiveEnemy {
     slowPercent: 0,
     burnRemaining: 0,
     burnPerMs: 0,
+    trait: 'none',
+    spawnedBySplit: false,
     ...over,
   };
 }

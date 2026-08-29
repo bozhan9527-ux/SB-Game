@@ -9,7 +9,7 @@
  * 四種符的取捨因此是從規則長出來的，不是寫死在說明文字裡。
  */
 import { BALANCE, ENEMIES } from '../data';
-import type { BossArt, BossDef, MobArt } from '../data/types';
+import type { BossArt, BossDef, MobArt, MobTrait } from '../data/types';
 import type { Card } from './deck';
 import { cardDamage, cardDef, cardInterval, drawCard, maxTierForStage } from './deck';
 import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from './board';
@@ -37,6 +37,10 @@ export interface ActiveEnemy {
   /** 尚未燒完的灼燒總量，以及每毫秒燒多少。 */
   burnRemaining: number;
   burnPerMs: number;
+  /** 習性（見 data/types.ts 的 MobTrait）。首領一律 'none'。 */
+  trait: MobTrait;
+  /** 已經是分裂出來的小妖：牠死掉不會再裂，否則一隻會炸成無限多隻。 */
+  spawnedBySplit: boolean;
 }
 
 interface SpawnEntry {
@@ -48,6 +52,7 @@ interface SpawnEntry {
   boss: boolean;
   hp: number;
   speed: number;
+  trait: MobTrait;
 }
 
 export type Outcome = 'running' | 'cleared' | 'defeated' | 'timeout';
@@ -220,6 +225,7 @@ export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[];
     // 攤開整波的出場時間，妖魔才是連續推進而不是一次湧出後空場。
     const gap = Math.max(cfg.minSpawnGapMs, (cfg.waveIntervalMs * cfg.waveSpread) / count);
     for (let i = 0; i < count; i += 1) {
+      const trait = mob?.trait ?? 'none';
       queue.push({
         atMs: (wave - 1) * cfg.waveIntervalMs + i * gap,
         lane: rng.int(0, LANES - 1),
@@ -227,8 +233,9 @@ export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[];
         art: mob?.art ?? 'bandit',
         bossArt: null,
         boss: false,
-        hp,
-        speed,
+        hp: hp * traitHpRatio(trait),
+        speed: trait === 'swift' ? speed * BALANCE.trait.swiftMultiplier : speed,
+        trait,
       });
     }
   }
@@ -242,10 +249,28 @@ export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[];
     boss: true,
     hp: bossHp(stage),
     speed: BALANCE.boss.speed,
+    // 首領不帶習性：牠已經有厚血、砸門與時限三件事，再加一層只會變得看不懂。
+    trait: 'none',
   });
 
   queue.sort((a, b) => a.atMs - b.atMs);
   return { queue, boss };
+}
+
+/**
+ * 帶習性的妖魔血量要打幾折。
+ *
+ * 習性換的是**形狀**不是難度：護甲讓小傷害吃虧、疾行壓縮你的反應時間、
+ * 分裂把一隻變成三隻，但三者的總工作量都與素面的一隻相當。
+ * 少了這個折扣，習性就只是「這一關的敵人變硬了」——那不叫行為，那叫調數值，
+ * 而且實測會直接把最弱的那一副牌組卡死在第 78 關。
+ */
+function traitHpRatio(trait: MobTrait): number {
+  const cfg = BALANCE.trait;
+  if (trait === 'armor') return cfg.armorHpRatio;
+  if (trait === 'swift') return cfg.swiftHpRatio;
+  if (trait === 'split') return cfg.splitParentHpRatio;
+  return 1;
 }
 
 /** 妖魔可以走的縱列數。畫面上是五條路，決定的是視覺分佈而非數值。 */
@@ -503,6 +528,18 @@ function fireOnce(
     damage += carried;
     carried = 0;
 
+    // 護甲：每一發都削掉一截。
+    //
+    // 削的是「該隻自身血量的百分比」而不是固定值——血量是指數成長的，
+    // 固定值在第 5 關能擋死人、到第 50 關等於不存在。
+    // 但最多只削掉這一發的 armorMaxCut，任何一發都還打得進去一部分：
+    // 完全免疫會讓某些牌組直接卡死一整關，而習性要造成的是「比較吃力」，
+    // 不是「打不動」。
+    if (target.trait === 'armor') {
+      const { armorPercentOfMaxHp, armorMaxCut } = BALANCE.trait;
+      damage -= Math.min(target.maxHp * armorPercentOfMaxHp, damage * armorMaxCut);
+    }
+
     target.hp -= damage;
 
     // 玄冥符：殘血直接收走。首領免疫——否則關底會變成一發定生死。
@@ -610,6 +647,8 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       slowPercent: 0,
       burnRemaining: 0,
       burnPerMs: 0,
+      trait: next.trait,
+      spawnedBySplit: false,
     };
     state.nextId += 1;
     state.enemies.push(enemy);
@@ -651,7 +690,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     state.cooldowns[slot] = remaining;
   }
 
-  // 5. 收屍與發金幣
+  // 5. 收屍、分裂與發金幣
   const survivors: ActiveEnemy[] = [];
   for (const enemy of state.enemies) {
     if (enemy.hp > 0) {
@@ -667,6 +706,39 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       state.disciples = Math.min(state.maxDisciples, state.disciples + 1);
     }
     report.kills.push({ enemyId: enemy.id, boss: enemy.boss, gold });
+
+    // 分裂：死掉的地方裂出兩隻小的，繼承母體的位置與縱列，往前走得更快。
+    //
+    // 小妖身上的旗標保證牠不會再裂——沒有這條，一隻母體會炸成無限多隻，
+    // 一場的計算量在幾秒內爆掉。
+    if (enemy.trait === 'split' && !enemy.spawnedBySplit) {
+      const { splitCount, splitHpRatio, splitSpeedMultiplier } = BALANCE.trait;
+      for (let i = 0; i < splitCount; i += 1) {
+        const hp = Math.max(1, enemy.maxHp * splitHpRatio);
+        const child: ActiveEnemy = {
+          id: state.nextId,
+          name: enemy.name,
+          art: enemy.art,
+          bossArt: null,
+          boss: false,
+          hp,
+          maxHp: hp,
+          y: enemy.y,
+          // 兩隻分到相鄰的縱列，不然牠們會完全重疊，畫面上看起來只有一隻。
+          lane: Math.max(0, Math.min(LANES - 1, enemy.lane + (i === 0 ? -1 : 1))),
+          speed: enemy.speed * splitSpeedMultiplier,
+          slowUntilMs: 0,
+          slowPercent: 0,
+          burnRemaining: 0,
+          burnPerMs: 0,
+          trait: 'split',
+          spawnedBySplit: true,
+        };
+        state.nextId += 1;
+        survivors.push(child);
+        report.spawned.push(child);
+      }
+    }
   }
   state.enemies = survivors;
 

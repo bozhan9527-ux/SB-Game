@@ -45,6 +45,17 @@
     "leakCostBase": 1,
     "leakCostGrowth": 1.02
   },
+  "trait": {
+    "armorPercentOfMaxHp": 0.02,
+    "armorMaxCut": 0.5,
+    "armorHpRatio": 0.62,
+    "swiftMultiplier": 1.35,
+    "swiftHpRatio": 0.85,
+    "splitParentHpRatio": 0.6,
+    "splitCount": 2,
+    "splitHpRatio": 0.24,
+    "splitSpeedMultiplier": 1.15
+  },
   "sect": {
     "clearsPerMastery": 5,
     "maxMasteryTier": 4,

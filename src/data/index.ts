@@ -24,6 +24,7 @@ import type {
   CardEffect,
   FormationTierBalance,
   MobArt,
+  MobTrait,
   EnemyBook,
   MobDef,
   LessonDef,
@@ -69,6 +70,7 @@ const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial',
 ];
+const MOB_TRAITS: readonly MobTrait[] = ['none', 'armor', 'swift', 'split'];
 
 function parseFormationTier(raw: unknown, path: string): FormationTierBalance {
   return {
@@ -83,6 +85,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const formation = obj(raw, 'formation', path);
   const wave = obj(raw, 'wave', path);
   const power = obj(raw, 'power', path);
+  const trait = obj(raw, 'trait', path);
   const sect = obj(raw, 'sect', path);
   const boss = obj(raw, 'boss', path);
   const gold = obj(raw, 'gold', path);
@@ -129,6 +132,17 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       trackPx: p(wave, 'trackPx', 'wave'),
       leakCostBase: p(wave, 'leakCostBase', 'wave'),
       leakCostGrowth: p(wave, 'leakCostGrowth', 'wave'),
+    },
+    trait: {
+      armorPercentOfMaxHp: p(trait, 'armorPercentOfMaxHp', 'trait'),
+      armorMaxCut: p(trait, 'armorMaxCut', 'trait'),
+      armorHpRatio: p(trait, 'armorHpRatio', 'trait'),
+      swiftMultiplier: p(trait, 'swiftMultiplier', 'trait'),
+      swiftHpRatio: p(trait, 'swiftHpRatio', 'trait'),
+      splitParentHpRatio: p(trait, 'splitParentHpRatio', 'trait'),
+      splitCount: p(trait, 'splitCount', 'trait'),
+      splitHpRatio: p(trait, 'splitHpRatio', 'trait'),
+      splitSpeedMultiplier: p(trait, 'splitSpeedMultiplier', 'trait'),
     },
     sect: {
       clearsPerMastery: p(sect, 'clearsPerMastery', 'sect'),
@@ -339,6 +353,7 @@ export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
     realm: str(item, 'realm', p),
     name: str(item, 'name', p),
     art: oneOf(item, 'art', p, MOB_ARTS),
+    trait: oneOf(item, 'trait', p, MOB_TRAITS),
   }));
   const bosses: BossDef[] = list(field(raw, 'bosses', path), `${path}.bosses`, (item, p) => ({
     id: str(item, 'id', p),

@@ -170,6 +170,39 @@ export interface SectBalance {
   switchCostPerClear: number;
 }
 
+/**
+ * 妖魔習性的數值。
+ *
+ * 護甲用的是「該隻自身血量的百分比」而不是固定值：血量是指數成長的，
+ * 固定值在第 5 關能擋死人、到第 50 關等於不存在。同時再夾一個上限比例，
+ * 保證任何一發都至少打得進去一部分——完全免疫會讓某些牌組直接卡死一整關，
+ * 而習性要造成的是「這套牌組比較吃力」，不是「這套牌組打不動」。
+ */
+export interface TraitBalance {
+  /** 每次命中扣掉的傷害，佔該隻最大血量的比例。 */
+  armorPercentOfMaxHp: number;
+  /** 但最多只能削掉這一發傷害的這個比例。 */
+  armorMaxCut: number;
+  /**
+   * 帶習性的妖魔血量要打折。
+   *
+   * **這幾個係數是整個習性系統成不成立的關鍵。** 習性若只是「多一層防禦」，
+   * 那就不是行為而是難度——實測全輔助那一副在第 78 關直接卡死，
+   * 因為護甲對它等於一律扣掉三成五的輸出。血量打折之後，
+   * 護甲改變的是「誰打它比較有效率」而不是「大家都打不動」：
+   * 總工作量相當，分佈換了一個形狀。疾行與分裂同理。
+   */
+  armorHpRatio: number;
+  swiftMultiplier: number;
+  swiftHpRatio: number;
+  /** 會分裂的母體血量打折，因為牠死後還會留下兩隻。 */
+  splitParentHpRatio: number;
+  splitCount: number;
+  /** 分裂出來的小妖血量，佔母體最大血量的比例。 */
+  splitHpRatio: number;
+  splitSpeedMultiplier: number;
+}
+
 /** 山門的耐久（弟子數）。 */
 export interface PowerBalance {
   baseDisciples: number;
@@ -215,6 +248,7 @@ export interface Balance {
   field: FieldBalance;
   formation: FormationBalance;
   wave: WaveBalance;
+  trait: TraitBalance;
   sect: SectBalance;
   power: PowerBalance;
   boss: BossBalance;
@@ -375,11 +409,28 @@ export type MobArt =
   | 'demon'
   | 'celestial';
 
+/**
+ * 妖魔的習性。
+ *
+ * 原本全部的妖魔只有一種行為：直線往下走、有血量。這是符籙選擇空間窄的根源——
+ * 面對只會走路的目標，二十張符全部塌成同一個問題「每秒打多少」，
+ * 於是永遠有一個最優解，其餘十六張是裝飾。
+ *
+ * 三種習性刻意互為剋制，各自對上一種符的原型：
+ * - 護甲：每一下都被削掉一截，**多發小傷害**吃虧（風刃、萬劍），大單發划算（天雷、驚雷）。
+ * - 疾行：走得快，拖延型的價值被壓縮，**減速**（寒冰、鎮魔）與秒殺（玄冥）翻身。
+ * - 分裂：死掉會裂成兩隻，**單體高傷**吃虧，範圍與灼燒（風刃、焚天、萬劍）翻身。
+ *
+ * 護甲與分裂互為反面：同一套牌組不可能同時最擅長兩者，這才逼出「帶哪四張」的取捨。
+ */
+export type MobTrait = 'none' | 'armor' | 'swift' | 'split';
+
 export interface MobDef {
   id: string;
   realm: string;
   name: string;
   art: MobArt;
+  trait: MobTrait;
 }
 
 /** 首領的造型，對應 public/art/boss-*.svg。 */
