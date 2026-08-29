@@ -1840,6 +1840,8 @@ export class RunScene extends Phaser.Scene {
       goldCollected: Math.round(this.run.gold),
       goldReward: victory ? clearReward(this.run) : defeatReward(this.run),
       defeatReason: reason,
+      telemetry: this.run.telemetry,
+      elapsedMs: this.run.elapsedMs,
     };
 
     fadeToScene(this, 'Result', result);

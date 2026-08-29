@@ -1,8 +1,16 @@
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { GAME_WIDTH } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { CARDS } from '../data';
 import { addGold, recordClear, recordDefeat } from '../save';
 import { claimAchievements } from '../systems/achievements';
+import type { RunTelemetry } from '../systems/defense';
+import {
+  averageDps,
+  averageFormationBonus,
+  damageShares,
+  dpsCurve,
+} from '../systems/telemetry';
 import { persist, state } from '../state';
 import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
@@ -14,6 +22,7 @@ import { fadeIn, fadeToScene } from '../ui/transition';
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
 export class ResultScene extends Phaser.Scene {
   private result!: RunResultData;
+  private report: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super('Result');
@@ -21,6 +30,8 @@ export class ResultScene extends Phaser.Scene {
 
   init(data: RunResultData): void {
     this.result = data;
+    // Phaser 會重用 Scene 實例：上一場的戰報面板已經被銷毀，不清成 null 就會拿到空殼。
+    this.report = null;
   }
 
   create(): void {
@@ -99,12 +110,22 @@ export class ResultScene extends Phaser.Scene {
       fontSize: 24,
       onClick: () => fadeToScene(this, 'Upgrade'),
     });
-    createButton(this, cx, 926, {
-      width: 340,
+    createButton(this, cx - 92, 926, {
+      width: 156,
       height: 52,
       label: '回主畫面',
       fontSize: 20,
       onClick: () => fadeToScene(this, 'Title'),
+    });
+    // 戰報放在一層蓋上去的面板裡，不是塞進結算表。
+    // 結算表要在兩秒內讀完（守下來沒、拿多少錢、下一關是誰），戰報是給想深究的人看的，
+    // 兩者混在同一頁只會讓前者變慢。
+    createButton(this, cx + 92, 926, {
+      width: 156,
+      height: 52,
+      label: '戰報',
+      fontSize: 20,
+      onClick: () => this.showReport(),
     });
 
     if (unlocked.length > 0) this.showAchievements(unlocked);
@@ -200,5 +221,191 @@ export class ResultScene extends Phaser.Scene {
         .text(cx + width / 2 - 24, y, row[1], textStyle({ size: 24, color: row[2], bold: true }))
         .setOrigin(1, 0.5);
     });
+  }
+
+  /**
+   * 戰報：這一場「為什麼」是這個結果。
+   *
+   * 三件事，都是重度玩家實際會拿來做決定的：
+   * 哪張符真的在輸出（決定下次帶哪四張）、陣法整場平均加了多少
+   * （決定值不值得花時間排）、以及輸出曲線（看得出是前期就崩還是關底才卡）。
+   * 這些數字 tickCombat 本來就算過，只是以前沒有人收。
+   */
+  private showReport(): void {
+    if (this.report !== null) {
+      this.report.setVisible(true);
+      return;
+    }
+    const cx = GAME_WIDTH / 2;
+    const result = this.result;
+    const telemetry = result.telemetry;
+    const parts: Phaser.GameObjects.GameObject[] = [];
+
+    parts.push(
+      // 幾乎不透明：戰報是一張要逐行讀的表，底下的結算數字透上來會直接讓它讀不動。
+      // setInteractive 用來吃掉輸入，否則會點到底下的按鈕。
+      this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0b0f14, 0.985).setInteractive(),
+    );
+    parts.push(
+      this.add.text(cx, 70, '戰　報', textStyle({ size: 38, color: GOLD, bold: true })).setOrigin(0.5),
+    );
+    parts.push(
+      this.add
+        .text(
+          cx,
+          112,
+          `第 ${result.stage} 關　共 ${(result.elapsedMs / 1000).toFixed(0)} 秒　` +
+            `平均每秒 ${formatNumber(averageDps(telemetry, result.elapsedMs))}`,
+          textStyle({ size: 17, color: INK_DIM }),
+        )
+        .setOrigin(0.5),
+    );
+
+    parts.push(...this.buildDamageBars(cx, 150, telemetry));
+    parts.push(...this.buildFormationLine(cx, 470, telemetry));
+    parts.push(...this.buildCurve(cx, 540, telemetry));
+
+    const close = createButton(this, cx, 880, {
+      width: 300,
+      height: 64,
+      label: '關閉',
+      fontSize: 24,
+      onClick: () => this.report?.setVisible(false),
+    });
+    parts.push(close.container);
+
+    // 要壓過成就浮窗（depth 90／91），否則跨境界那一場的戰報會被蓋掉一角。
+    this.report = this.add.container(0, 0, parts).setDepth(200);
+  }
+
+  /** 各符種的傷害貢獻，由多到少的橫條。 */
+  private buildDamageBars(
+    cx: number,
+    top: number,
+    telemetry: RunTelemetry,
+  ): Phaser.GameObjects.GameObject[] {
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    const width = GAME_WIDTH - 72;
+    const left = cx - width / 2;
+    const shares = damageShares(telemetry);
+
+    parts.push(
+      this.add.text(left, top, '符籙貢獻', textStyle({ size: 20, color: INK, bold: true })),
+    );
+    if (shares.length === 0) {
+      parts.push(
+        this.add.text(left, top + 34, '這一場一發都沒打出去', textStyle({ size: 17, color: INK_DIM })),
+      );
+      return parts;
+    }
+
+    const best = shares[0]?.damage ?? 1;
+    shares.forEach((entry, index) => {
+      const y = top + 40 + index * 54;
+      const def = CARDS.find((card) => card.id === entry.type);
+      const color = def?.color ?? INK;
+      parts.push(
+        this.add.text(left, y, def?.name ?? entry.type, textStyle({ size: 18, color, bold: true })),
+      );
+      parts.push(
+        this.add
+          .text(
+            left + width,
+            y,
+            `${formatNumber(entry.damage)}　${Math.round(entry.share * 100)}%`,
+            textStyle({ size: 17, color: INK_DIM }),
+          )
+          .setOrigin(1, 0),
+      );
+      // 條長按「相對第一名」而不是「佔總量」：後者在四張符平均出力時全部擠成一團短棒，
+      // 前者一眼就看得出第二名差第一名多少——那才是換牌時要判斷的事。
+      parts.push(this.add.rectangle(left, y + 30, width, 10, LINE, 0.35).setOrigin(0, 0.5));
+      parts.push(
+        this.add
+          .rectangle(left, y + 30, Math.max(2, width * (entry.damage / best)), 10, hexToNumber(color), 0.95)
+          .setOrigin(0, 0.5),
+      );
+    });
+    return parts;
+  }
+
+  private buildFormationLine(
+    cx: number,
+    top: number,
+    telemetry: RunTelemetry,
+  ): Phaser.GameObjects.GameObject[] {
+    const width = GAME_WIDTH - 72;
+    const left = cx - width / 2;
+    const bonus = averageFormationBonus(telemetry);
+    return [
+      this.add.text(left, top, '陣法', textStyle({ size: 20, color: INK, bold: true })),
+      this.add.text(
+        left,
+        top + 30,
+        `整場平均 +${Math.round(bonus * 100)}%　最多同時 ${telemetry.peakFormationLines} 條`,
+        textStyle({ size: 18, color: bonus > 0 ? JADE : INK_DIM }),
+      ),
+    ];
+  }
+
+  /** 輸出曲線。看得出是一開始就打不動，還是撐到關底才卡住。 */
+  private buildCurve(
+    cx: number,
+    top: number,
+    telemetry: RunTelemetry,
+  ): Phaser.GameObjects.GameObject[] {
+    const width = GAME_WIDTH - 72;
+    const height = 190;
+    const left = cx - width / 2;
+    const parts: Phaser.GameObjects.GameObject[] = [
+      this.add.text(left, top, '輸出曲線', textStyle({ size: 20, color: INK, bold: true })),
+    ];
+
+    const curve = dpsCurve(telemetry);
+    const peak = curve.reduce((max, value) => Math.max(max, value), 0);
+    const chartTop = top + 34;
+    parts.push(
+      this.add.rectangle(cx, chartTop + height / 2, width, height, BG_PANEL, 0.7).setStrokeStyle(2, LINE),
+    );
+    if (curve.length < 2 || peak <= 0) {
+      parts.push(
+        this.add
+          .text(cx, chartTop + height / 2, '資料不足', textStyle({ size: 17, color: INK_DIM }))
+          .setOrigin(0.5),
+      );
+      return parts;
+    }
+
+    const g = this.add.graphics();
+    const xAt = (i: number): number => left + (width * i) / (curve.length - 1);
+    const yAt = (v: number): number => chartTop + height - (height - 16) * (v / peak) - 8;
+    g.fillStyle(hexToNumber(GOLD), 0.16);
+    g.beginPath();
+    g.moveTo(left, chartTop + height);
+    for (let i = 0; i < curve.length; i += 1) g.lineTo(xAt(i), yAt(curve[i] ?? 0));
+    g.lineTo(left + width, chartTop + height);
+    g.closePath();
+    g.fillPath();
+    g.lineStyle(2, hexToNumber(GOLD), 0.95);
+    g.beginPath();
+    g.moveTo(xAt(0), yAt(curve[0] ?? 0));
+    for (let i = 1; i < curve.length; i += 1) g.lineTo(xAt(i), yAt(curve[i] ?? 0));
+    g.strokePath();
+    parts.push(g);
+
+    parts.push(
+      this.add
+        .text(left + 8, chartTop + 6, `峰值 ${formatNumber(peak)} / 秒`, textStyle({ size: 15, color: GOLD }))
+        .setOrigin(0, 0),
+    );
+    parts.push(
+      this.add
+        .text(left + width - 8, chartTop + height - 6, '關底', textStyle({ size: 14, color: INK_DIM }))
+        .setOrigin(1, 1),
+    );
+    parts.push(
+      this.add.text(left + 8, chartTop + height - 6, '開場', textStyle({ size: 14, color: INK_DIM })).setOrigin(0, 1),
+    );
+    return parts;
   }
 }

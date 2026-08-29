@@ -12,7 +12,9 @@ import { BALANCE, ENEMIES } from '../data';
 import type { BossArt, BossDef, MobArt, MobTrait } from '../data/types';
 import type { Card } from './deck';
 import { cardDamage, cardDef, cardInterval, drawCard, maxTierForStage } from './deck';
+import type { SlotBonus } from './board';
 import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from './board';
+import { activeFormations } from './formation';
 import type { Loadout } from './loadout';
 import { realmForStage, realmIndexForStage } from './realms';
 import type { Rng } from './rng';
@@ -37,6 +39,8 @@ export interface ActiveEnemy {
   /** 尚未燒完的灼燒總量，以及每毫秒燒多少。 */
   burnRemaining: number;
   burnPerMs: number;
+  /** 是誰點的火。灼燒的傷害要記回那張符頭上，否則焚天符的戰績永遠是零。 */
+  burnSource: string | null;
   /** 習性（見 data/types.ts 的 MobTrait）。首領一律 'none'。 */
   trait: MobTrait;
   /** 已經是分裂出來的小妖：牠死掉不會再裂，否則一隻會炸成無限多隻。 */
@@ -102,6 +106,28 @@ export interface DefenseState {
   merges: number;
   peakTier: number;
   outcome: Outcome;
+  /**
+   * 這一場的戰績。
+   *
+   * 資料本來就從 tickCombat 手上經過，只是沒有人收——重度玩家要靠這些做決策
+   * （哪張符真的在輸出、陣法到底加了多少），而現在他們只能猜。
+   * 全部是純累加，不影響任何判定。
+   */
+  telemetry: RunTelemetry;
+}
+
+/** 一場的戰績。只累加原始事實，衍生值（佔比、平均）交給呈現端算。 */
+export interface RunTelemetry {
+  /** 各符種造成的總傷害。key 是符種 id，不是陣位——玩家問的是「哪張符」。 */
+  damageByType: Record<string, number>;
+  /** 每一秒的總傷害，索引就是第幾秒。用來畫輸出曲線。 */
+  damagePerSecond: number[];
+  /** 陣法加成的時間加權累計：sum((平均倍率 - 1) × 該拍毫秒數)。 */
+  formationBonusMs: number;
+  /** 場上有符的總時間，formationBonusMs 的分母。 */
+  formationActiveMs: number;
+  /** 場上同時成立的陣法條數，取整場最大值。 */
+  peakFormationLines: number;
 }
 
 export interface ShotEvent {
@@ -316,6 +342,13 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     merges: 0,
     peakTier: 0,
     outcome: 'running',
+    telemetry: {
+      damageByType: {},
+      damagePerSecond: [],
+      formationBonusMs: 0,
+      formationActiveMs: 0,
+      peakFormationLines: 0,
+    },
   };
   state.peakTier = highestTier(state);
   return state;
@@ -562,10 +595,11 @@ function fireOnce(
     if (target.hp > 0) {
       if (effect.slowPercent > 0) applySlow(state, target, effect.slowPercent, effect.slowMs);
       if (effect.burnPercent > 0 && effect.burnMs > 0) {
-        applyBurn(target, damage * effect.burnPercent, effect.burnMs);
+        applyBurn(target, damage * effect.burnPercent, effect.burnMs, card.type);
       }
     }
 
+    creditDamage(state, card.type, damage);
     report.shots.push({ slot, enemyId: target.id, damage, killed: target.hp <= 0 });
   }
 }
@@ -592,10 +626,54 @@ function applySlow(
  * 用「剩餘總量 + 每毫秒燒多少」而不是一疊獨立的層數：層數會在密集命中時無限成長，
  * 每一拍都要走一遍全部層數；這個寫法只有兩個數字，而且總傷害完全一樣。
  */
-function applyBurn(enemy: ActiveEnemy, amount: number, durationMs: number): void {
+function applyBurn(
+  enemy: ActiveEnemy,
+  amount: number,
+  durationMs: number,
+  source: string,
+): void {
   if (amount <= 0) return;
   enemy.burnRemaining += amount;
   enemy.burnPerMs = Math.max(enemy.burnPerMs, amount / durationMs);
+  // 最後點火的那張符收下這份帳。多張符同時燒同一隻在實戰裡很少見，
+  // 而為了精確分帳去記一串來源，換來的資訊量遠不如那份複雜度。
+  enemy.burnSource = source;
+}
+
+/**
+ * 記下這一拍的陣法加成，做成時間加權的平均。
+ *
+ * 用時間加權而不是「結束時看一眼」：陣法是整場都在變的東西，
+ * 結束那一瞬間的盤面完全代表不了整場。分母只算「場上有符」的時間，
+ * 開場那幾秒空盤不該把平均拉低。
+ */
+function recordFormation(state: DefenseState, bonuses: readonly SlotBonus[], deltaMs: number): void {
+  let filled = 0;
+  let sum = 0;
+  for (let i = 0; i < state.field.length; i += 1) {
+    if (state.field[i] == null) continue;
+    const bonus = bonuses[i] ?? NO_SLOT_BONUS;
+    filled += 1;
+    sum += bonus.damage * bonus.fireRate;
+  }
+  if (filled === 0) return;
+  const telemetry = state.telemetry;
+  telemetry.formationActiveMs += deltaMs;
+  telemetry.formationBonusMs += (sum / filled - 1) * deltaMs;
+  telemetry.peakFormationLines = Math.max(
+    telemetry.peakFormationLines,
+    activeFormations(state.field).length,
+  );
+}
+
+/** 把傷害記到某張符頭上，同時記進當秒的輸出曲線。 */
+function creditDamage(state: DefenseState, type: string, amount: number): void {
+  if (amount <= 0) return;
+  const telemetry = state.telemetry;
+  telemetry.damageByType[type] = (telemetry.damageByType[type] ?? 0) + amount;
+  const second = Math.floor(state.elapsedMs / 1000);
+  while (telemetry.damagePerSecond.length <= second) telemetry.damagePerSecond.push(0);
+  telemetry.damagePerSecond[second] = (telemetry.damagePerSecond[second] ?? 0) + amount;
 }
 
 /**
@@ -647,6 +725,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       slowPercent: 0,
       burnRemaining: 0,
       burnPerMs: 0,
+      burnSource: null,
       trait: next.trait,
       spawnedBySplit: false,
     };
@@ -665,10 +744,12 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     const tick = Math.min(enemy.burnRemaining, enemy.burnPerMs * deltaMs);
     enemy.burnRemaining -= tick;
     enemy.hp -= tick;
+    if (enemy.burnSource !== null) creditDamage(state, enemy.burnSource, tick);
   }
 
   // 4. 法寶開火。陣法與光環每一拍重算一次——玩家隨時可能把符搬到別格。
   const bonuses = boardBonuses(state.field);
+  recordFormation(state, bonuses, deltaMs);
   for (let slot = 0; slot < state.field.length; slot += 1) {
     const card = state.field[slot];
     if (card === undefined || card === null) continue;
@@ -731,6 +812,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
           slowPercent: 0,
           burnRemaining: 0,
           burnPerMs: 0,
+          burnSource: null,
           trait: 'split',
           spawnedBySplit: true,
         };
