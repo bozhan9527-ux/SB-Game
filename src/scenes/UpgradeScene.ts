@@ -10,7 +10,7 @@ import { upgradeAmount, upgradeCost } from '../systems/upgrades';
 import type { Button } from '../ui/button';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, formatNumber, textStyle, wrapText } from '../ui/theme';
+import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, textStyle } from '../ui/theme';
 import { realmForStage } from '../systems/realms';
 
 interface Row {
@@ -40,14 +40,17 @@ export class UpgradeScene extends Phaser.Scene {
     this.add.text(cx, 56, '洞府', textStyle({ size: 42, color: INK, bold: true })).setOrigin(0.5);
     this.goldText = this.add.text(cx, 104, '', textStyle({ size: 26, color: GOLD })).setOrigin(0.5);
 
-    const rowHeight = 122;
-    const top = 146;
+    // 六條線 + 摘要 + 兩顆按鈕要塞進 960，因此列高與間距是算過的：
+    // 140 起、每列 96 高、間距 8，最後一列底緣落在 756，剛好把 770 以下讓給摘要與按鈕。
+    const rowHeight = 96;
+    const rowGap = 8;
+    const top = 140;
     UPGRADES.forEach((track, index) => {
-      this.buildRow(track, cx, top + index * (rowHeight + 10) + rowHeight / 2, rowHeight);
+      this.buildRow(track, cx, top + index * (rowHeight + rowGap) + rowHeight / 2, rowHeight);
     });
 
     this.summaryText = this.add
-      .text(cx, 832, '', textStyle({ size: 17, color: INK_DIM }))
+      .text(cx, 806, '', textStyle({ size: 16, color: INK_DIM }))
       .setOrigin(0.5)
       .setAlign('center')
       .setLineSpacing(6);
@@ -79,16 +82,17 @@ export class UpgradeScene extends Phaser.Scene {
     const textWidth = width - 176;
 
     this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(2, LINE);
-    this.add.text(left, top + 10, track.name, textStyle({ size: 26, color: INK, bold: true }));
-    const level = this.add.text(left + 146, top + 16, '', textStyle({ size: 19, color: JADE }));
-    this.add
-      .text(left, top + 48, wrapText(track.desc, textWidth, 16), textStyle({ size: 16, color: INK_DIM }))
-      .setLineSpacing(3);
-    const effect = this.add.text(left, top + 92, '', textStyle({ size: 18, color: INK }));
+    this.add.text(left, top + 8, track.name, textStyle({ size: 25, color: INK, bold: true }));
+    const level = this.add.text(left + 140, top + 14, '', textStyle({ size: 17, color: JADE }));
+    // 說明固定一行：列高只有 96，換行會把下面的效果數字擠出面板。
+    // 資料裡的說明都寫得夠短，這裡再用 fitText 當保險。
+    const desc = this.add.text(left, top + 42, track.desc, textStyle({ size: 15, color: INK_DIM }));
+    fitText(desc, textWidth);
+    const effect = this.add.text(left, top + 66, '', textStyle({ size: 17, color: INK }));
 
     const button = createButton(this, cx + width / 2 - 76, cy, {
       width: 128,
-      height: 62,
+      height: 58,
       label: '',
       fontSize: 20,
       onClick: () => this.purchase(track),
@@ -127,6 +131,9 @@ export class UpgradeScene extends Phaser.Scene {
           ? `目前 +${current}${row.track.unit}（已滿級）`
           : `目前 +${current}${row.track.unit} → +${next}${row.track.unit}`,
       );
+      // 後期等級的百分比會變成四位數，超寬就等比縮小而不是壓到按鈕上。
+      row.effect.setScale(1);
+      fitText(row.effect, GAME_WIDTH - 40 - 176);
 
       if (cost === null) {
         row.button.setLabel('已滿級');
@@ -137,7 +144,9 @@ export class UpgradeScene extends Phaser.Scene {
       }
     }
 
+    this.summaryText.setScale(1);
     this.summaryText.setText(this.summary());
+    fitText(this.summaryText, GAME_WIDTH - 32);
   }
 
   /** 讓玩家看得到升級實際反映在下一關的乘區上。 */

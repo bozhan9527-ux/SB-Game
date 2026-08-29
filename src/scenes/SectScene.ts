@@ -35,16 +35,18 @@ export class SectScene extends Phaser.Scene {
       .text(cx, 118, '門派決定你的起手牌，隨時可回來更換', textStyle({ size: 19, color: INK_DIM }))
       .setOrigin(0.5);
 
-    const cardHeight = 178;
+    // 四張卡 + 底部兩顆按鈕要塞進 960：140 起、每張 168 高、間距 6，
+    // 最後一張底緣落在 830，把 855 以下留給按鈕。卡片內容的行數是算過的（見 buildCard）。
+    const cardHeight = 168;
     const gap = 6;
-    const top = 146;
+    const top = 140;
 
     SECTS.forEach((sect, index) => {
       const y = top + index * (cardHeight + gap) + cardHeight / 2;
       this.buildCard(sect, cx, y, cardHeight);
     });
 
-    const confirm = createButton(this, cx, 900, {
+    const confirm = createButton(this, cx, 892, {
       width: 340,
       height: 70,
       label: '確定入門',
@@ -59,7 +61,7 @@ export class SectScene extends Phaser.Scene {
     });
     confirm.setEnabled(this.selected !== null);
 
-    createButton(this, 74, 900, {
+    createButton(this, 74, 892, {
       width: 96,
       height: 70,
       label: '返回',
@@ -88,19 +90,21 @@ export class SectScene extends Phaser.Scene {
       .setStrokeStyle(2, LINE)
       .setInteractive({ useHandCursor: true });
 
-    this.add.text(left, top + 12, sect.name, textStyle({ size: 28, color: sect.color, bold: true }));
-    this.add.text(left + 132, top + 19, sect.path, textStyle({ size: 19, color: INK }));
+    // 版面依「說明兩行、被動一行、數值一行」排。sects.json 的說明都寫得夠短，
+    // 若之後把說明寫長就會擠出卡片——所以說明的長度是有上限的資料約束，不是隨意欄位。
+    this.add.text(left, top + 10, sect.name, textStyle({ size: 27, color: sect.color, bold: true }));
+    this.add.text(left + 128, top + 17, sect.path, textStyle({ size: 18, color: INK }));
     this.add
-      .text(cx + width / 2 - 20, top + 20, `「${sect.motto}」`, textStyle({ size: 16, color: INK_DIM }))
+      .text(cx + width / 2 - 20, top + 17, `「${sect.motto}」`, textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(1, 0);
     this.add
-      .text(left, top + 52, wrapText(sect.desc, textWidth, 18), textStyle({ size: 18, color: INK }))
+      .text(left, top + 46, wrapText(sect.desc, textWidth, 17), textStyle({ size: 17, color: INK }))
       .setLineSpacing(4);
     this.add
-      .text(left, top + 96, wrapText(`【被動】${sect.passive}`, textWidth, 16), textStyle({ size: 16, color: '#e8c46a' }))
+      .text(left, top + 98, wrapText(`【被動】${sect.passive}`, textWidth, 16), textStyle({ size: 16, color: '#e8c46a' }))
       .setLineSpacing(4);
     this.add
-      .text(left, top + 128, wrapText(this.statLine(sect), textWidth, 15), textStyle({ size: 15, color: INK_DIM }))
+      .text(left, top + 130, wrapText(this.statLine(sect), textWidth, 15), textStyle({ size: 15, color: INK_DIM }))
       .setLineSpacing(4);
 
     // 左側色條，讓門派在視覺上一眼可辨。
@@ -124,7 +128,12 @@ export class SectScene extends Phaser.Scene {
     if (favored !== undefined && sect.favoredDamageMultiplier !== 1) {
       parts.push(`${favored.name}×${sect.favoredDamageMultiplier}`);
     }
-    return parts.join(' ');
+    if (sect.leakImmunityCount > 0) parts.push(`免傷 ${sect.leakImmunityCount} 次`);
+    // 符修的乘區全是 1，沒有這一行的話它的卡片會空一塊，看起來像沒寫完。
+    if (sect.mergeRefundChance > 0) {
+      parts.push(`合成保留 ${Math.round(sect.mergeRefundChance * 100)}%`);
+    }
+    return parts.join('　');
   }
 
   private refresh(setConfirmEnabled: (enabled: boolean) => void): void {

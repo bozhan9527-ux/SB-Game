@@ -7,7 +7,7 @@ import { persist, state } from '../state';
 import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, formatNumber, hexToNumber, textStyle, wrapText } from '../ui/theme';
+import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, hexToNumber, textStyle, wrapText } from '../ui/theme';
 import type { RunResultData } from './types';
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
@@ -108,35 +108,61 @@ export class ResultScene extends Phaser.Scene {
     if (unlocked.length > 0) this.showAchievements(unlocked);
   }
 
-  /** 達成成就時蓋一層提示，逐條浮現後淡出。 */
+  /**
+   * 達成成就時蓋一層提示。
+   *
+   * **一次只顯示一條、逐條輪播**，不是同時往下疊。一口氣解鎖五、六條在跨境界時很常見，
+   * 疊起來會把整張結算表蓋掉——這正是玩家最想看清楚的畫面。
+   * 位置固定在標題上方的空白帶，任何數量都不會蓋到下面的內容。
+   */
   private showAchievements(unlocked: readonly { name: string; desc: string; reward: number }[]): void {
     const cx = GAME_WIDTH / 2;
-    unlocked.forEach((item, index) => {
-      const y = 130 + index * 64;
-      const panel = this.add
-        .rectangle(cx, y, GAME_WIDTH - 80, 56, BG_PANEL, 0.96)
-        .setStrokeStyle(2, hexToNumber(GOLD))
-        .setDepth(90)
-        .setAlpha(0);
-      const label = this.add
-        .text(cx, y - 10, `成就達成　${item.name}`, textStyle({ size: 21, color: GOLD, bold: true }))
-        .setOrigin(0.5)
-        .setDepth(91)
-        .setAlpha(0);
-      const sub = this.add
-        .text(cx, y + 14, `${item.desc}　獎勵 ${formatNumber(item.reward)} 金`, textStyle({ size: 16, color: INK_DIM }))
-        .setOrigin(0.5)
-        .setDepth(91)
-        .setAlpha(0);
+    const y = 66;
+    const panel = this.add
+      .rectangle(cx, y, GAME_WIDTH - 60, 58, BG_PANEL, 0.96)
+      .setStrokeStyle(2, hexToNumber(GOLD))
+      .setDepth(90)
+      .setAlpha(0);
+    const label = this.add
+      .text(cx, y - 11, '', textStyle({ size: 21, color: GOLD, bold: true }))
+      .setOrigin(0.5)
+      .setDepth(91)
+      .setAlpha(0);
+    const sub = this.add
+      .text(cx, y + 14, '', textStyle({ size: 15, color: INK_DIM }))
+      .setOrigin(0.5)
+      .setDepth(91)
+      .setAlpha(0);
+
+    const showNext = (index: number): void => {
+      const item = unlocked[index];
+      if (item === undefined) {
+        panel.destroy();
+        label.destroy();
+        sub.destroy();
+        return;
+      }
+      // 多條時標上序號，玩家才知道還有幾條在後面，而不是以為只有最後那一條。
+      const counter = unlocked.length > 1 ? `（${index + 1}/${unlocked.length}）` : '';
+      label.setText(`成就達成　${item.name}${counter}`);
+      sub.setText(`${item.desc}　獎勵 ${formatNumber(item.reward)} 金`);
+      fitText(label, GAME_WIDTH - 80);
+      fitText(sub, GAME_WIDTH - 80);
       this.tweens.add({
         targets: [panel, label, sub],
         alpha: 1,
-        duration: 260,
-        delay: 200 + index * 240,
-        hold: 2200,
+        duration: 220,
+        hold: unlocked.length > 3 ? 900 : 1500,
         yoyo: true,
+        onComplete: () => {
+          label.setScale(1);
+          sub.setScale(1);
+          showNext(index + 1);
+        },
       });
-    });
+    };
+
+    this.time.delayedCall(300, () => showNext(0));
   }
 
   private headline(result: RunResultData): string {

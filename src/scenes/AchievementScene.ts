@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { ACHIEVEMENTS } from '../data';
-import { state } from '../state';
-import { isUnlocked, progressOf } from '../systems/achievements';
+import { persist, state } from '../state';
+import { addGold } from '../save';
+import { claimAchievements, isUnlocked, progressOf } from '../systems/achievements';
 import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
@@ -16,6 +17,14 @@ export class AchievementScene extends Phaser.Scene {
 
   create(): void {
     const save = state();
+    // 條件已經滿足卻還沒發放的成就在這裡一併結算。
+    // 否則清單會出現「進度 7/6」卻標成未達成，看起來像壞掉。
+    const claimed = claimAchievements(save);
+    if (claimed.length > 0) {
+      for (const item of claimed) addGold(save, item.reward);
+      persist();
+    }
+
     const realm = realmForStage(save.world.stage);
     drawBackdrop(this, realm.color, realm.scenery);
 
