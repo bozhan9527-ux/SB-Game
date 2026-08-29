@@ -260,6 +260,29 @@ export interface BossBalance {
 }
 
 /**
+ * 閉關（離線收益）。
+ *
+ * **它取代的是「掃蕩」，而且是刻意不做掃蕩。** 這一場的勝負來自即時排陣，
+ * 不是來自 build——實測模擬 AI 在第 140 關勝率 100%，同一組數值下
+ * 1500ms 操作速度的真人只有 25%。掃蕩若是「跑模擬拿結果」，
+ * 那它不是省時間，是比親手打更強，整個陣法與合成層立刻變成可選的。
+ *
+ * 真正該消掉的體力活是「回頭重刷已經通關的關卡換金幣」。
+ * 閉關給的是「你不在的時候的收益」，不是「替你打」，完全不碰技術門檻。
+ *
+ * 速率刻意低於實際遊玩：一場 60–105 秒，一小時打得完三十幾場，
+ * 而閉關只給十二場的份。它是為了讓你不必回頭刷，不是為了讓你不必玩。
+ */
+export interface RetreatBalance {
+  /** 離線收益最多累積幾小時。 */
+  maxHours: number;
+  /** 每小時折算成幾次通關的獎勵。 */
+  clearsPerHour: number;
+  /** 少於這麼多分鐘就不顯示——幾十金的提示只是雜訊。 */
+  minMinutes: number;
+}
+
+/**
  * 金幣產出。
  *
  * 獎勵採等比成長而非線性：升級花費是指數曲線，收入若是線性，
@@ -280,6 +303,7 @@ export interface Balance {
   wave: WaveBalance;
   trait: TraitBalance;
   rebirth: RebirthBalance;
+  retreat: RetreatBalance;
   sect: SectBalance;
   power: PowerBalance;
   boss: BossBalance;

@@ -140,6 +140,18 @@ const addKarma: Migration = (data) => {
   return { ...data, player: { ...player, karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 } } };
 };
 
+/**
+ * v11 → v12：加入閉關的起算時間。
+ *
+ * 沿用該存檔的 savedAt 當起點，而不是「現在」：舊玩家上次關掉遊戲的那一刻
+ * 本來就是他開始閉關的時刻，這樣他一回來就領得到，不必再等八小時。
+ */
+const addRetreat: Migration = (data) => {
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const savedAt = typeof data['savedAt'] === 'number' ? data['savedAt'] : 0;
+  return { ...data, world: { ...world, retreatAt: savedAt } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -152,6 +164,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addChallenges,
   addRecords,
   addKarma,
+  addRetreat,
 ];
 
 /**

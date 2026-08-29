@@ -92,6 +92,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const power = obj(raw, 'power', path);
   const trait = obj(raw, 'trait', path);
   const rebirth = obj(raw, 'rebirth', path);
+  const retreat = obj(raw, 'retreat', path);
   const sect = obj(raw, 'sect', path);
   const boss = obj(raw, 'boss', path);
   const gold = obj(raw, 'gold', path);
@@ -153,6 +154,11 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
     rebirth: {
       minStage: p(rebirth, 'minStage', 'rebirth'),
       stagesPerPoint: p(rebirth, 'stagesPerPoint', 'rebirth'),
+    },
+    retreat: {
+      maxHours: p(retreat, 'maxHours', 'retreat'),
+      clearsPerHour: p(retreat, 'clearsPerHour', 'retreat'),
+      minMinutes: p(retreat, 'minMinutes', 'retreat'),
     },
     sect: {
       clearsPerMastery: p(sect, 'clearsPerMastery', 'sect'),

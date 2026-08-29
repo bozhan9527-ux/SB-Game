@@ -1,26 +1,33 @@
 import Phaser from 'phaser';
 import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { addGold } from '../save';
 import { persist, state } from '../state';
 import type { SaveData } from '../save/types';
 import { sectById } from '../systems/loadout';
 import { TALISMAN_SLOTS, talismanDefs } from '../systems/talismans';
 import { activeChallenges, challengeGoldMultiplier } from '../systems/challenges';
 import { canRebirth } from '../systems/karma';
+import { formatDuration, resetRetreat, retreatOffer } from '../systems/retreat';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { GOLD, INK, INK_DIM, formatNumber, textStyle } from '../ui/theme';
+import { BG_PANEL, GOLD, INK, INK_DIM, formatNumber, hexToNumber, textStyle } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 標題畫面：顯示目前境界與金幣，通往挑戰、升級、換門派。 */
 export class TitleScene extends Phaser.Scene {
+  /** 金幣那一行。領走閉關所得之後要當場更新，否則玩家會以為沒領到。 */
+  private goldLine: Phaser.GameObjects.Text | undefined;
+
   constructor() {
     super('Title');
   }
 
   create(): void {
     fadeIn(this);
+    // Phaser 會重用 Scene 實例，上一次的 Text 已經被銷毀，不清成 undefined 會拿到空殼。
+    this.goldLine = undefined;
     const save = state();
     const realm = realmForStage(save.world.stage);
     const sect = sectById(save.player.sectId);
@@ -65,7 +72,7 @@ export class TitleScene extends Phaser.Scene {
         textStyle({ size: 22, color: sect === null ? INK_DIM : sect.color }),
       )
       .setOrigin(0.5);
-    this.add
+    this.goldLine = this.add
       .text(cx, 526, `金幣 ${formatNumber(save.player.wallet.gold)}`, textStyle({ size: 24, color: GOLD }))
       .setOrigin(0.5);
 
@@ -155,6 +162,8 @@ export class TitleScene extends Phaser.Scene {
       });
     }
 
+    this.showRetreat();
+
     // 音效開關。放在標題頁右上角，切換後立刻生效並寫進存檔。
     const soundButton = createButton(this, GAME_WIDTH - 82, 60, {
       width: 132,
@@ -181,6 +190,71 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     persist();
+  }
+
+  /**
+   * 閉關所得。
+   *
+   * 做成一層蓋上去的面板而不是常駐的一行：標題頁的版面已經排滿，
+   * 而這件事一場只會發生一次——它需要的是「被看見一次」，不是一直佔著位置。
+   *
+   * 沒有累積到足夠時間就完全不出現。幾十金的提示只是雜訊，
+   * 而每次開遊戲都跳一個要按掉的東西，很快就會變成玩家眼中的障礙物。
+   */
+  private showRetreat(): void {
+    const save = state();
+    const offer = retreatOffer(save, Date.now());
+    if (offer.gold <= 0) return;
+
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const veil = this.add
+      .rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.82)
+      .setInteractive();
+    const panel = this.add
+      .rectangle(cx, cy, GAME_WIDTH - 96, 300, BG_PANEL, 0.98)
+      .setStrokeStyle(2, hexToNumber(GOLD));
+    const title = this.add
+      .text(cx, cy - 108, '閉　關', textStyle({ size: 34, color: GOLD, bold: true }))
+      .setOrigin(0.5);
+    const body = this.add
+      .text(
+        cx,
+        cy - 46,
+        [
+          `閉關 ${formatDuration(offer.elapsedMs)}`,
+          offer.capped ? '（已達上限，再放也不會更多）' : '',
+        ]
+          .filter((line) => line.length > 0)
+          .join('\n'),
+        textStyle({ size: 19, color: INK_DIM }),
+      )
+      .setOrigin(0.5)
+      .setAlign('center')
+      .setLineSpacing(6);
+    const amount = this.add
+      .text(cx, cy + 16, `${formatNumber(offer.gold)} 金`, textStyle({ size: 40, color: GOLD, bold: true }))
+      .setOrigin(0.5);
+
+    const claim = createButton(this, cx, cy + 96, {
+      width: 260,
+      height: 60,
+      label: '收下',
+      fontSize: 24,
+      strokeColor: 0x6f8b7a,
+      onClick: () => {
+        addGold(save, offer.gold);
+        resetRetreat(save, Date.now());
+        persist();
+        overlay.destroy();
+        // 金幣那一行要當場更新，否則玩家會以為沒領到。
+        this.goldLine?.setText(`金幣 ${formatNumber(save.player.wallet.gold)}`);
+      },
+    });
+
+    const overlay = this.add
+      .container(0, 0, [veil, panel, title, body, amount, claim.container])
+      .setDepth(100);
   }
 }
 

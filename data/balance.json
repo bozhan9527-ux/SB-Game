@@ -79,6 +79,11 @@
     "timeLimitMs": 60000,
     "goldBonus": 2
   },
+  "retreat": {
+    "maxHours": 8,
+    "clearsPerHour": 12,
+    "minMinutes": 10
+  },
   "gold": {
     "clearBase": 40,
     "clearGrowth": 1.12,
