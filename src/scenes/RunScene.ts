@@ -328,8 +328,13 @@ export class RunScene extends Phaser.Scene {
 
   private buildFieldSlots(): void {
     const count = this.run.field.length;
+    // Phaser 會重用同一個 Scene 實例，上一關的物件在 shutdown 時已經被銷毀，
+    // 但陣列若不清空，這些空殼會留下來——下一關繪製時就會炸在 glTexture 上，畫面直接卡死。
+    // 凡是在 build* 裡 push 的陣列，都必須在同一個地方清空。
     this.fieldViews = [];
     this.fieldSlotY = [];
+    this.fieldBonusLabels = [];
+    this.fieldHighlights = [];
     for (let i = 0; i < count; i += 1) {
       const row = Math.floor(i / FIELD_COLUMNS);
       const col = i % FIELD_COLUMNS;
@@ -369,6 +374,7 @@ export class RunScene extends Phaser.Scene {
     const count = this.run.hand.length;
     const startX = GAME_WIDTH / 2 - ((count - 1) * HAND_STEP) / 2;
     this.handViews = [];
+    this.handHighlights = [];
     for (let i = 0; i < count; i += 1) {
       const x = startX + i * HAND_STEP;
       const view = createCardView(this, x, HAND_Y);
