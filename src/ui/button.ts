@@ -14,6 +14,9 @@ export interface ButtonOptions {
   fillColor?: number;
   strokeColor?: number;
   textColor?: string;
+  /** 文字左邊的圖示（貼圖 key）。圖示與文字會被當成一組置中。 */
+  icon?: string;
+  iconSize?: number;
 }
 
 export interface Button {
@@ -40,7 +43,23 @@ export function createButton(
     .text(0, 0, options.label, textStyle({ size: options.fontSize ?? 26, color: options.textColor ?? INK }))
     .setOrigin(0.5);
 
-  const container = scene.add.container(x, y, [background, text]);
+  const children: Phaser.GameObjects.GameObject[] = [background, text];
+
+  // 圖示與文字當成**一組**置中，不是圖示靠左、文字置中。
+  // 後者在窄按鈕上會讓圖示貼著邊，看起來像沒對齊；而這一組的重心
+  // 要落在按鈕中央，眼睛才不會覺得歪。
+  if (options.icon !== undefined && scene.textures.exists(options.icon)) {
+    const iconSize = options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15);
+    const gap = 10;
+    const groupWidth = iconSize + gap + text.width;
+    const icon = scene.add
+      .image(-groupWidth / 2 + iconSize / 2, 0, options.icon)
+      .setDisplaySize(iconSize, iconSize);
+    text.setX(groupWidth / 2 - text.width / 2);
+    children.push(icon);
+  }
+
+  const container = scene.add.container(x, y, children);
   container.setSize(width, height);
 
   let enabled = true;

@@ -183,6 +183,38 @@ function drawScenery(g: G, scenery: Scenery, accent: number): void {
 }
 
 /** 依境界色調畫一層背景。回傳的容器已置於最底層。 */
+/**
+ * 明月的貼圖：一張放射漸層。
+ *
+ * 產生一次就快取在 Phaser 的貼圖管理員裡，之後每個場景共用同一張。
+ * 取不到 2D context 時回 null，呼叫端就不畫月亮——少一顆月亮不影響任何玩法，
+ * 但為了它讓開場崩掉就太蠢了。
+ */
+function moonTexture(scene: Phaser.Scene): string | null {
+  const key = 'backdrop-moon';
+  if (scene.textures.exists(key)) return key;
+
+  const size = 256;
+  const canvas = scene.textures.createCanvas(key, size, size);
+  if (canvas === null || canvas === undefined) return null;
+  const ctx = canvas.getContext();
+  if (ctx === null || ctx === undefined) return null;
+
+  const half = size / 2;
+  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+  gradient.addColorStop(0, 'rgba(250, 246, 235, 0.95)');
+  gradient.addColorStop(0.36, 'rgba(246, 241, 228, 0.88)');
+  // 這一段是月盤的邊緣：從 0.88 掉到 0.2 只花 4% 的半徑，所以看得出是一顆球，
+  // 而不是一團霧。之後那一段才是光暈。
+  gradient.addColorStop(0.4, 'rgba(238, 232, 214, 0.2)');
+  gradient.addColorStop(0.62, 'rgba(226, 220, 202, 0.06)');
+  gradient.addColorStop(1, 'rgba(226, 220, 202, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  canvas.refresh();
+  return key;
+}
+
 export function drawBackdrop(
   scene: Phaser.Scene,
   accentHex: string,
@@ -200,15 +232,45 @@ export function drawBackdrop(
   g.fillStyle(accent, 0.04);
   g.fillRect(0, GAME_HEIGHT * 0.55, GAME_WIDTH, GAME_HEIGHT * 0.45);
 
-  // 明月
-  g.fillStyle(0xf4efe0, 0.16);
-  g.fillCircle(GAME_WIDTH * 0.74, GAME_HEIGHT * 0.16, 74);
-  g.fillStyle(0xf4efe0, 0.5);
-  g.fillCircle(GAME_WIDTH * 0.74, GAME_HEIGHT * 0.16, 52);
-
   drawScenery(g, scenery, accent);
 
+  // 由下而上的暗幕。
+  //
+  // 沒有它的話，遠山會一路頂到按鈕底下，而按鈕是半透明的——結果按鈕看起來像
+  // 浮在山上，而不是一層介面。壓暗下半部之後，UI 自然就「浮」起來了。
+  // 用二十段矩形疊出漸層，不需要漸層貼圖。
+  const scrimTop = GAME_HEIGHT * 0.42;
+  const bands = 20;
+  for (let i = 0; i < bands; i += 1) {
+    const t = (i + 1) / bands;
+    g.fillStyle(0x070a0e, 0.5 * t * t);
+    g.fillRect(
+      0,
+      scrimTop + ((GAME_HEIGHT - scrimTop) * i) / bands,
+      GAME_WIDTH,
+      (GAME_HEIGHT - scrimTop) / bands + 1,
+    );
+  }
+
   layer.add(g);
+
+  // 明月。
+  //
+  // 位置與畫法都重來過兩次。原本落在 (0.74, 0.16)、亮度 0.5，正好壓在標題的
+  // 筆畫上；移開之後改用幾圈遞減透明度的實心圓堆柔邊，結果在深色背景上看得到
+  // 一圈一圈的階梯——**堆疊的圓做不出柔邊，只會做出年輪**。
+  //
+  // 現在畫成一張放射漸層貼圖，一次產生、全遊戲共用。位置放在頂列與資訊面板之間
+  // 那一段空白裡：那裡本來就沒有東西，而月亮不該和任何一個要點的東西搶地方。
+  const moon = moonTexture(scene);
+  if (moon !== null) {
+    layer.add(
+      scene.add
+        .image(GAME_WIDTH * 0.71, GAME_HEIGHT * 0.215, moon)
+        .setDisplaySize(224, 224)
+        .setAlpha(0.9),
+    );
+  }
 
   // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。
   const clouds: { y: number; scale: number; alpha: number; duration: number }[] = [

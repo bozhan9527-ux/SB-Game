@@ -175,6 +175,17 @@ const addLeaderboardFields: Migration = (data) => {
   return { ...data, player: { ...player, name: '', distribution: null } };
 };
 
+/**
+ * v15 → v16：音效與配樂拆成兩條音量。
+ *
+ * 舊存檔一律給滿——他們原本聽到的就是滿音量，把任何人的音量調小都是
+ * 「改制順便動了玩家已經有的東西」。原本的 sound 保留成總開關，語意不變。
+ */
+const addVolumes: Migration = (data) => {
+  const settings = (data['settings'] ?? {}) as Record<string, unknown>;
+  return { ...data, settings: { ...settings, sfxVolume: 1, musicVolume: 1 } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -191,6 +202,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addTelemetrySetting,
   addCloudIdentity,
   addLeaderboardFields,
+  addVolumes,
 ];
 
 /**

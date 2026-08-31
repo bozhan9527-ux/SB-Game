@@ -42,7 +42,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0, retreatAt: now },
-    settings: { sound: true, speed: 1, telemetry: true },
+    settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1 },
   };
 }
 
@@ -51,6 +51,11 @@ function asNumber(value: unknown, fallback: number): number {
 }
 
 /** 分布快取：壞掉就當作沒有，下次連上伺服器再拿一份。 */
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(1, Math.max(0, value));
+}
+
 function normalizeDistribution(raw: unknown): DistributionCache | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const source = raw as Record<string, unknown>;
@@ -191,6 +196,8 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       // 只收 1／2／3，其他一律當 1——存檔被手改成 99 倍不該讓遊戲失控。
       speed: [1, 2, 3].includes(asNumber(settings['speed'], 1)) ? asNumber(settings['speed'], 1) : 1,
       telemetry: settings['telemetry'] !== false,
+      sfxVolume: clamp01(asNumber(settings['sfxVolume'], 1)),
+      musicVolume: clamp01(asNumber(settings['musicVolume'], 1)),
     },
   };
 }

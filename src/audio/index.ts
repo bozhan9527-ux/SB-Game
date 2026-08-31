@@ -61,6 +61,11 @@ function resolveAudioContext(): AudioContextCtor | null {
   return scope.AudioContext ?? scope.webkitAudioContext ?? null;
 }
 
+function clampVolume(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(1, Math.max(0, value));
+}
+
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -74,6 +79,15 @@ class AudioEngine {
   /** 目前排到整段四小節裡的第幾節。 */
   private musicBar = 0;
   private enabled = true;
+  /**
+   * 兩軌各自的音量（0～1）。
+   *
+   * 和總開關是兩層，實際增益 = 總開關 × 該軌音量。分開的理由寫在
+   * SettingsState：會膩的是配樂，不是音效，只給一個開關會讓玩家為了關掉
+   * 其中一個而連另一個一起關掉。
+   */
+  private sfxVolume = 1;
+  private musicVolume = 1;
 
   /** 使用者是否開著音效。關閉時不只靜音，也停掉配樂排程。 */
   get soundEnabled(): boolean {
@@ -84,6 +98,28 @@ class AudioEngine {
     this.enabled = value;
     if (this.master !== null) this.master.gain.value = value ? MASTER_GAIN : 0;
     if (!value) this.stopMusic();
+  }
+
+  setSfxVolume(value: number): void {
+    this.sfxVolume = clampVolume(value);
+    if (this.sfxBus !== null) this.sfxBus.gain.value = SFX_GAIN * this.sfxVolume;
+  }
+
+  /**
+   * 配樂音量。歸零時停掉排程而不只是靜音——排程會一直往前算拍點，
+   * 靜音只是聽不見，機器仍在做完全沒有用的工作。
+   */
+  setMusicVolume(value: number): void {
+    this.musicVolume = clampVolume(value);
+    if (this.musicBus !== null) this.musicBus.gain.value = MUSIC_GAIN * this.musicVolume;
+    if (this.musicVolume <= 0) this.stopMusic();
+  }
+
+  /** 一次套用存檔裡的三個設定。開場與改設定都走這裡，不必記得呼叫三次。 */
+  applySettings(settings: { sound: boolean; sfxVolume: number; musicVolume: number }): void {
+    this.setSfxVolume(settings.sfxVolume);
+    this.setMusicVolume(settings.musicVolume);
+    this.setEnabled(settings.sound);
   }
 
   /** 必須在使用者手勢中呼叫，否則瀏覽器不給發聲。重複呼叫安全。 */
@@ -102,11 +138,11 @@ class AudioEngine {
       master.connect(ctx.destination);
 
       const music = ctx.createGain();
-      music.gain.value = MUSIC_GAIN;
+      music.gain.value = MUSIC_GAIN * this.musicVolume;
       music.connect(master);
 
       const sfx = ctx.createGain();
-      sfx.gain.value = SFX_GAIN;
+      sfx.gain.value = SFX_GAIN * this.sfxVolume;
       sfx.connect(master);
 
       this.ctx = ctx;
@@ -272,7 +308,9 @@ class AudioEngine {
 
   /** 切換配樂。同一個境界重複呼叫不會重來。 */
   playMusic(realmIndex: number): void {
-    if (!this.enabled || this.ctx === null) return;
+    // 音量歸零時不排程。靜音只是聽不見，但排拍點的工作照做——那是純粹的浪費，
+    // 而且玩家把配樂關掉的意思本來就是「別再做這件事」。
+    if (!this.enabled || this.musicVolume <= 0 || this.ctx === null) return;
     if (this.musicRealm === realmIndex && this.musicTimer !== null) return;
 
     this.stopMusic();

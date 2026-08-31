@@ -13,6 +13,31 @@ export const ART = {
   slash: 'slash',
 } as const;
 
+/**
+ * 介面圖示。
+ *
+ * 按鈕原本只有文字，而「洞府」「符籙譜」「試煉」對第一次玩的人來說都是
+ * 陌生的詞——文字要讀完才知道是什麼，圖示是先看到形狀再對上詞。
+ * 兩個一起放，第二次之後就只靠圖示認得出來了。
+ */
+export const ICON_NAMES = [
+  'cave',
+  'scroll',
+  'sect',
+  'trial',
+  'rank',
+  'music',
+  'record',
+  'save',
+  'help',
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];
+
+export function iconTexture(name: IconName): string {
+  return `icon-${name}`;
+}
+
 /** 法寶符牌上的圖騰，用來一眼分辨符種。 */
 export function glyphTexture(art: string): string {
   return `glyph-${art}`;
@@ -114,6 +139,13 @@ const SVGS: readonly SvgSpec[] = [
     file: `glyph-${art}.svg`,
     width: 64,
     height: 80,
+  })),
+  ...ICON_NAMES.map((name) => ({
+    key: iconTexture(name),
+    file: `icon-${name}.svg`,
+    // 兩倍尺寸點陣化再縮小，和門人圖同一個理由：手機的 DPR 多半是 2 或 3。
+    width: 64,
+    height: 64,
   })),
   { key: ART.cloud, file: 'cloud.svg', width: 240, height: 76 },
   { key: ART.slash, file: 'slash.svg', width: 240, height: 240 },

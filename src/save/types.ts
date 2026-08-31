@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -183,6 +183,18 @@ export interface SettingsState {
    * 不是送出去再由伺服器丟掉。
    */
   telemetry: boolean;
+  /**
+   * 音效與配樂各自的音量（0～1）。
+   *
+   * 分成兩條而不是一個總開關：這兩件事的失敗方式完全不同——配樂會膩、音效不會，
+   * 而在公車上想關掉的通常是配樂而不是打擊聲。只給一個開關的話，
+   * 玩家為了關掉其中一個，會連另一個一起關掉，然後就再也不打開了。
+   *
+   * sound 保留成總開關（戰鬥中暫停畫面那一顆），和音量是兩層：
+   * 實際增益 = 總開關 × 該軌音量。
+   */
+  sfxVolume: number;
+  musicVolume: number;
 }
 
 export interface SaveData {
