@@ -18,6 +18,7 @@ import { BALANCE, CARDS } from '../data';
 import type { MobTrait } from '../data/types';
 import { persist, state } from '../state';
 import { activeChallenges } from '../systems/challenges';
+import { track } from '../telemetry';
 import type { Card } from '../systems/deck';
 import { cardDef, fieldDps, maxTierForStage } from '../systems/deck';
 import type { ActiveEnemy, CardSlot, DefenseState, TickReport } from '../systems/defense';
@@ -274,6 +275,8 @@ export class RunScene extends Phaser.Scene {
 
     // 教學要換掉起手牌，必須在建立牌位之前決定，否則陣位數會對不上。
     this.step = shouldRunTutorial(save) ? 'deploy' : 'done';
+    // 起點也要報，否則分母不存在——只有「走到第二步」的人數是算不出完成率的。
+    if (this.step === 'deploy') track('tutorial_step', { step: 'deploy' });
     if (this.step !== 'done') {
       this.run.field = tutorialField(this.run.field.length);
       this.run.hand = tutorialHand(this.run.hand.length, this.run.loadout.talismans[0]?.id ?? 'flame');
@@ -297,6 +300,21 @@ export class RunScene extends Phaser.Scene {
     this.updateHud();
     if (this.step === 'done') this.showIntro(realm.color);
     else this.refreshCoach();
+
+    // 與 stage_end 成對。兩者的差就是中離——沒有它，「第幾關流失」只看得到一半。
+    track('stage_start', {
+      stage,
+      realm: realm.id,
+      sect: save.player.sectId,
+      // 排序過才聚合得起來：同樣四張符換個順序不該變成兩種組合。
+      talismans: [...save.player.talismans].sort().join(','),
+      challenges: activeChallenges(save)
+        .map((item) => item.id)
+        .sort()
+        .join(','),
+      speed: this.speed,
+      field_slots: this.run.field.length,
+    });
   }
 
   private ensureSparkTexture(): void {
@@ -1700,6 +1718,9 @@ export class RunScene extends Phaser.Scene {
     if (this.step !== done) return;
     this.step = advanceStep(this.step);
     this.refreshCoach();
+    // 每走一步報一次。完成率就是 watch 的人數除以 deploy 的人數——
+    // 教學做完之後沒有人知道有幾個人看完第一課，這一行就是為了答那一題。
+    track('tutorial_step', { step: this.step });
 
     if (this.step === 'watch') {
       // 最後一段只是說明，不需要玩家做什麼：讀完就開打。

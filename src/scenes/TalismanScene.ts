@@ -8,6 +8,7 @@ import type { Loadout } from '../systems/loadout';
 import { buildLoadout, sectById } from '../systems/loadout';
 import { cardDps } from '../systems/deck';
 import { realmForStage } from '../systems/realms';
+import { track } from '../telemetry';
 import type { TalismanCategory, TalismanSort } from '../systems/talismans';
 import {
   TALISMAN_CATEGORIES,
@@ -156,6 +157,12 @@ export class TalismanScene extends Phaser.Scene {
       onClick: () => {
         save.player.talismans = [...this.chosen];
         persist();
+        // 排序過才聚合得起來：同樣四張換個順序不該被算成兩種組合。
+        track('loadout_set', {
+          talismans: [...this.chosen].sort().join(','),
+          sect: save.player.sectId,
+          highest_stage: save.world.highestStage,
+        });
         fadeToScene(this, 'Title');
       },
     });

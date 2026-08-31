@@ -14,6 +14,7 @@ import { adoptSave } from '../save';
 import { exportCode, importCode } from '../save/archive';
 import { persist, replaceState, state } from '../state';
 import { realmForStage } from '../systems/realms';
+import { setTelemetryEnabled } from '../telemetry';
 import { recordLines } from '../systems/records';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
@@ -41,6 +42,8 @@ export class ArchiveScene extends Phaser.Scene {
 
     this.buildRecords(cx, 96);
     this.buildArchive(cx, 452);
+
+    this.buildPrivacy(cx, 800);
 
     createButton(this, cx, 916, {
       width: 340,
@@ -118,6 +121,40 @@ export class ArchiveScene extends Phaser.Scene {
       .text(cx, top + 186, '', textStyle({ size: 13, color: INK_DIM }))
       .setOrigin(0.5)
       .setAlign('center');
+  }
+
+  /**
+   * 匿名統計的開關。
+   *
+   * 送出去的只有五個事件、不含任何可辨識個人的資料，而且沒有帳號可以連——
+   * 但「有沒有得選」本身就是該給的東西，而且要給在玩家找得到的地方。
+   * 放在存檔頁是因為這一頁回答的就是「我的資料在哪裡」。
+   */
+  private buildPrivacy(cx: number, top: number): void {
+    const save = state();
+    const label = (): string => (save.settings.telemetry ? '匿名統計 開' : '匿名統計 關');
+    const button = createButton(this, cx + 92, top, {
+      width: 168,
+      height: 52,
+      label: label(),
+      fontSize: 18,
+      onClick: () => {
+        save.settings.telemetry = !save.settings.telemetry;
+        setTelemetryEnabled(save.settings.telemetry);
+        persist();
+        button.setLabel(label());
+      },
+    });
+    this.add
+      .text(
+        cx - 92,
+        top,
+        wrapText('送出關卡進度等匿名統計，幫助調整難度。不含任何個人資料。', 168, 13),
+        textStyle({ size: 13, color: INK_DIM }),
+      )
+      .setOrigin(0.5)
+      .setAlign('center')
+      .setLineSpacing(3);
   }
 
   private async doExport(): Promise<void> {

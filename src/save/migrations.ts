@@ -152,6 +152,12 @@ const addRetreat: Migration = (data) => {
   return { ...data, world: { ...world, retreatAt: savedAt } };
 };
 
+/** v12 → v13：加入匿名遊玩統計的開關。舊存檔預設開啟，和新檔一致。 */
+const addTelemetrySetting: Migration = (data) => {
+  const settings = (data['settings'] ?? {}) as Record<string, unknown>;
+  return { ...data, settings: { ...settings, telemetry: true } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -165,6 +171,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addRecords,
   addKarma,
   addRetreat,
+  addTelemetrySetting,
 ];
 
 /**

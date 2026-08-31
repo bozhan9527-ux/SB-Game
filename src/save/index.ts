@@ -39,7 +39,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0, retreatAt: now },
-    settings: { sound: true, speed: 1 },
+    settings: { sound: true, speed: 1, telemetry: true },
   };
 }
 
@@ -160,8 +160,14 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       sound: settings['sound'] !== false,
       // 只收 1／2／3，其他一律當 1——存檔被手改成 99 倍不該讓遊戲失控。
       speed: [1, 2, 3].includes(asNumber(settings['speed'], 1)) ? asNumber(settings['speed'], 1) : 1,
+      telemetry: settings['telemetry'] !== false,
     },
   };
+}
+
+/** 這台裝置上有沒有存檔。用來分辨「第一次開遊戲」與「回來玩」。 */
+export function hasSave(storage: Storage = defaultStorage()): boolean {
+  return storage.read(SAVE_KEY) !== null;
 }
 
 export function loadSave(storage: Storage = defaultStorage(), now: number = Date.now()): SaveData {

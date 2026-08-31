@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { preloadArt } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { hasSave } from '../save';
 import { initState } from '../state';
+import { initTelemetry, setTelemetryEnabled, track } from '../telemetry';
 import { BG_PANEL, DANGER, INK, INK_DIM, JADE, hexToNumber, textStyle, wrapText } from '../ui/theme';
 
 /**
@@ -30,7 +32,22 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     try {
-      initState();
+      // 是不是全新的一台裝置，要在 initState() 之前問——它會建立一份預設存檔。
+      const fresh = !hasSave();
+      const save = initState();
+      setTelemetryEnabled(save.settings.telemetry);
+      // 不 await：遙測載入失敗或很慢都不該擋住開場。
+      void initTelemetry().then(() => {
+        track('app_open', {
+          stage: save.world.stage,
+          highest_stage: save.world.highestStage,
+          clears: save.world.clears,
+          runs: save.world.runs,
+          sect: save.player.sectId,
+          rebirths: save.player.karma.rebirths,
+          is_new: fresh,
+        });
+      });
       this.scene.start('Title');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

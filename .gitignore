@@ -3,3 +3,8 @@ dist/
 *.local
 .DS_Store
 .vite/
+
+# 本機的遙測設定（.env.example 是範本，這幾個不進版控）
+.env
+.env.local
+.env.*.local

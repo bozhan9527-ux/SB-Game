@@ -36,7 +36,14 @@ jobs:
       - name: Test
         run: npm test
 
+      # 遙測的 project key。PostHog 的 project key 本來就是公開的（它會出現在前端的
+      # JS 裡），放進 secret 不是為了保密，是為了讓不同的部署指向不同的專案。
+      # 沒設定時 build 出來的版本完全不連網：posthog-js 被切成獨立的 chunk，
+      # 沒有金鑰就永遠不會被下載。
       - name: Build
+        env:
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
         run: npm run build
 
       # 註：不使用 enablement: true 自動啟用 Pages。實測 GITHUB_TOKEN 無此權限

@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -143,6 +143,14 @@ export interface SettingsState {
    * 每一關都要他重按一次是在懲罰他做過的選擇。
    */
   speed: number;
+  /**
+   * 是否允許送出匿名的遊玩統計。
+   *
+   * 預設開啟，但一定要給得起關——遊戲沒有帳號、送的也只有五個不含個資的事件，
+   * 可是「有沒有得選」本身就是該給的東西。關掉之後 track() 直接不做事，
+   * 不是送出去再由伺服器丟掉。
+   */
+  telemetry: boolean;
 }
 
 export interface SaveData {

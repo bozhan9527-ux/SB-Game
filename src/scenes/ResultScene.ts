@@ -5,6 +5,7 @@ import { CARDS } from '../data';
 import { addGold, recordClear, recordDefeat } from '../save';
 import { claimAchievements } from '../systems/achievements';
 import { activeChallenges, recordChallengeClears } from '../systems/challenges';
+import { track } from '../telemetry';
 import { updateRecords } from '../systems/records';
 import type { RunTelemetry } from '../systems/defense';
 import {
@@ -63,6 +64,22 @@ export class ResultScene extends Phaser.Scene {
       elapsedMs: result.elapsedMs,
       challengeCount: activeChallenges(save).length,
     });
+    // 流失漏斗與難度曲線都靠這一個事件。stage 報的是剛剛打的那一關，
+    // 不是存檔已經推進到的下一關。
+    track('stage_end', {
+      stage: result.stage,
+      victory: result.victory,
+      reason: result.defeatReason,
+      duration_ms: Math.round(result.elapsedMs),
+      leaks: result.leaks,
+      kills: result.kills,
+      peak_tier: result.peakTier,
+      merges: result.merges,
+      boss_killed: result.bossKilled,
+      dps: Math.round(averageDps(result.telemetry, result.elapsedMs)),
+      formation_bonus: Number(averageFormationBonus(result.telemetry).toFixed(3)),
+    });
+
     const unlocked = claimAchievements(save);
     for (const item of unlocked) addGold(save, item.reward);
     persist();
