@@ -14,78 +14,78 @@
     "repeatable": false,
     "floors": [
       {
-        "stage": 2,
+        "stage": 1,
         "minStage": 1,
         "talisman": "frost"
       },
       {
-        "stage": 4,
-        "minStage": 4,
+        "stage": 2,
+        "minStage": 6,
         "talisman": "pyre"
       },
       {
-        "stage": 7,
-        "minStage": 8,
+        "stage": 4,
+        "minStage": 10,
         "talisman": "pierce"
       },
       {
-        "stage": 10,
-        "minStage": 12,
+        "stage": 7,
+        "minStage": 14,
         "talisman": "fortune"
       },
       {
-        "stage": 13,
-        "minStage": 16,
+        "stage": 10,
+        "minStage": 18,
         "talisman": "soul"
       },
       {
-        "stage": 16,
-        "minStage": 20,
+        "stage": 13,
+        "minStage": 22,
         "talisman": "breaker"
       },
       {
-        "stage": 20,
-        "minStage": 25,
+        "stage": 17,
+        "minStage": 27,
         "talisman": "abyss"
       },
       {
-        "stage": 24,
-        "minStage": 30,
+        "stage": 21,
+        "minStage": 32,
         "talisman": "spirit"
       },
       {
-        "stage": 28,
-        "minStage": 35,
+        "stage": 25,
+        "minStage": 37,
         "talisman": "gale"
       },
       {
-        "stage": 32,
-        "minStage": 40,
+        "stage": 29,
+        "minStage": 42,
         "talisman": "tempest"
       },
       {
-        "stage": 36,
-        "minStage": 46,
+        "stage": 33,
+        "minStage": 48,
         "talisman": "bastion"
       },
       {
-        "stage": 37,
-        "minStage": 52,
+        "stage": 36,
+        "minStage": 54,
         "talisman": "taiyi"
       },
       {
         "stage": 40,
-        "minStage": 58,
+        "minStage": 60,
         "talisman": "slayer"
       },
       {
         "stage": 44,
-        "minStage": 64,
+        "minStage": 66,
         "talisman": "myriad"
       },
       {
         "stage": 48,
-        "minStage": 72,
+        "minStage": 73,
         "talisman": "grand"
       },
       {
@@ -93,7 +93,8 @@
         "minStage": 81,
         "talisman": "seal"
       }
-    ]
+    ],
+    "endless": false
   },
   {
     "id": "cliff",
@@ -110,26 +111,27 @@
     "repeatable": false,
     "floors": [
       {
-        "stage": 10,
+        "stage": 8,
         "minStage": 28,
         "mastery": 3
       },
       {
-        "stage": 24,
+        "stage": 18,
         "minStage": 45,
         "mastery": 3
       },
       {
-        "stage": 33,
+        "stage": 26,
         "minStage": 64,
         "mastery": 3
       },
       {
-        "stage": 39,
+        "stage": 32,
         "minStage": 81,
         "mastery": 3
       }
-    ]
+    ],
+    "endless": false
   },
   {
     "id": "pagoda",
@@ -170,41 +172,16 @@
         "minStage": 78,
         "karma": 2
       }
-    ]
-  },
-  {
-    "id": "arena",
-    "name": "試劍台",
-    "icon": "sect",
-    "minStage": 45,
-    "desc": "漏掉任何一隻立刻失守",
-    "detail": "不是扣耐久，是直接結束。這是一場純粹的排陣考試，所以回報就給排陣本身——**一次多一整列**。陣法是三欄的格狀，一次只給一格會排出九格、十格、十一格這種湊不成矩形的盤面。",
-    "reward": "陣法格位",
-    "rules": [
-      "noLeak"
     ],
-    "goldMultiplier": 2.0,
-    "repeatable": false,
-    "floors": [
-      {
-        "stage": 42,
-        "minStage": 45,
-        "fieldSlot": 3
-      },
-      {
-        "stage": 60,
-        "minStage": 75,
-        "fieldSlot": 3
-      }
-    ]
+    "endless": false
   },
   {
     "id": "trove",
     "name": "聚寶洞",
     "icon": "cave",
     "minStage": 30,
-    "desc": "首領時限砍半，金幣加倍",
-    "detail": "唯一可以重複打的副本。深度跟著你的最高關卡走——刷金幣永遠要付出和你現在實力相稱的難度，不會有「回頭打簡單關領倍率」這種事。",
+    "desc": "首領時限砍半，一路打到守不住",
+    "detail": "唯一可以重複打的副本，也是唯一沒有終點的：打完一關就接著下一關，深度一路往上加，直到山門守不住為止。走多深就拿多少——起點跟著你的最高關卡走，所以刷金幣永遠要付出和你現在實力相稱的難度。",
     "reward": "金幣",
     "rules": [
       "hasteBoss"
@@ -216,6 +193,7 @@
         "stageRatio": 0.95,
         "minStage": 30
       }
-    ]
+    ],
+    "endless": true
   }
 ]

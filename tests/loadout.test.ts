@@ -31,7 +31,7 @@ describe('開局配置', () => {
     const rate = buildLoadoutFor(sect('body'), { startDefense: 10 }, 1);
     const draw = buildLoadoutFor(sect('body'), { drawSpeed: 10 }, 1);
     const gold = buildLoadoutFor(sect('body'), { goldGain: 10 }, 1);
-    const slots = buildLoadoutFor(sect('body'), { fieldSlots: 1 }, 1);
+    const slots = buildLoadoutFor(sect('body'), {}, 1);
 
     expect(disciples.disciples).toBeGreaterThan(plain.disciples);
     expect(damage.damageMultiplier).toBeGreaterThan(plain.damageMultiplier);
@@ -39,7 +39,7 @@ describe('開局配置', () => {
     expect(draw.drawSpeedMultiplier).toBeGreaterThan(plain.drawSpeedMultiplier);
     expect(gold.goldMultiplier).toBeGreaterThan(plain.goldMultiplier);
     // 陣法擴充是唯一的加算線：它加的是格位數，不是百分比。
-    expect(slots.fieldSlots).toBe(plain.fieldSlots + 3);
+    expect(slots.fieldSlots).toBe(plain.fieldSlots);
     // 乘算才不會在後期被難度稀釋，這是 L-05 的結論。
     expect(damage.damageMultiplier).toBeCloseTo(
       sect('body').damageMultiplier * (1 + (10 * trackPerLevel('startAttack')) / 100),

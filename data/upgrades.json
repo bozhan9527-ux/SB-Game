@@ -48,15 +48,5 @@
     "baseCost": 70,
     "costGrowth": 1.28,
     "maxLevel": 100
-  },
-  {
-    "id": "fieldSlots",
-    "name": "陣法擴充",
-    "desc": "場上多一整列法寶位。買滿之後是 3×3 的正方形，對角線陣法在這時才成立。",
-    "unit": "格",
-    "perLevel": 3,
-    "baseCost": 26000,
-    "costGrowth": 6,
-    "maxLevel": 1
   }
 ]

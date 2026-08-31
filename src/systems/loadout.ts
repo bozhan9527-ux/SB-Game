@@ -270,7 +270,9 @@ export function buildLoadoutFor(
     fireRateMultiplier: multiplierOf(upgrades, 'startDefense'),
     drawSpeedMultiplier: sect.drawSpeedMultiplier * multiplierOf(upgrades, 'drawSpeed'),
     bossDamageMultiplier: sect.bossDamageMultiplier,
-    fieldSlots: BALANCE.field.fieldSlots + amountOf(upgrades, 'fieldSlots'),
+    // 場上格位不再用金幣買：整條「陣法擴充」從洞府移到試劍台。
+    // 多一列是打出來的，不是買出來的。
+    fieldSlots: BALANCE.field.fieldSlots,
     goldMultiplier:
       sect.goldMultiplier * multiplierOf(upgrades, 'goldGain') * (1 + Math.max(0, karma.gold)),
     realmPowerBonus: realm.powerBonus,

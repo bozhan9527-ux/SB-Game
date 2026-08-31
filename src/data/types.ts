@@ -608,6 +608,13 @@ export interface DungeonDef {
   goldMultiplier: number;
   /** 可以重複打嗎。只有聚寶洞是 true。 */
   repeatable: boolean;
+  /**
+   * 無限模式：打完一關直接接下一關，沒有終點，直到守不住為止。
+   *
+   * 這種副本不談「第幾層」——層數是一個有終點的說法，而它沒有終點。
+   * 畫面上要說的是「你走了多深」。
+   */
+  endless: boolean;
   floors: DungeonFloor[];
 }
 

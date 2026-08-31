@@ -152,8 +152,8 @@ describe('副本的結構', () => {
   it('整個副本要到打得動第一層才出現，新玩家不會看到五個打不動的入口', () => {
     const rookie = saveAt(2);
     const veteran = saveAt(999);
-    expect(dungeonAvailable(rookie, dungeon('arena'))).toBe(false);
-    expect(dungeonAvailable(veteran, dungeon('arena'))).toBe(true);
+    expect(dungeonAvailable(rookie, dungeon('pagoda'))).toBe(false);
+    expect(dungeonAvailable(veteran, dungeon('pagoda'))).toBe(true);
   });
 
   it('每個副本的回報都真的寫進存檔', () => {
@@ -168,26 +168,21 @@ describe('副本的結構', () => {
     grantFloor(save, dungeon('pagoda'), 1);
     expect(save.player.karma.points).toBeGreaterThan(0);
 
-    grantFloor(save, dungeon('arena'), 1);
-    // 一次給一整列，不是一格——陣法是 3 欄的格狀，多兩格排不成矩形。
-    expect(save.player.dungeonFieldSlots).toBe(3);
-    expect(buildLoadoutFromSpec(loadoutSpecOf(save, 30)).fieldSlots).toBeGreaterThan(
-      buildLoadoutFromSpec(loadoutSpecOf(saveAt(), 30)).fieldSlots,
-    );
   });
 
   it('已經通過的層不再發獎勵——重打同一層不是無限產出', () => {
-    // 真實故障：試劍台打完之後，每通一關就多一格陣法格位。
+    // 真實故障：副本打完之後，每通一關就再發一次獎勵。
     // 原因是這裡不管那一層是不是已經過了，一律照發。
     const save = saveAt();
     save.player.dungeons = {};
-    save.player.dungeonFieldSlots = 0;
-    const arena = dungeon('arena');
-    expect(grantFloor(save, arena, 1).lines.length).toBeGreaterThan(0);
-    expect(save.player.dungeonFieldSlots).toBe(3);
-    // 再打一次同一層：沒有回報，也不會再加格位。
-    expect(grantFloor(save, arena, 1).lines).toEqual([]);
-    expect(save.player.dungeonFieldSlots).toBe(3);
+    save.player.karma.points = 0;
+    const pagoda = dungeon('pagoda');
+    expect(grantFloor(save, pagoda, 1).lines.length).toBeGreaterThan(0);
+    const after = save.player.karma.points;
+    expect(after).toBeGreaterThan(0);
+    // 再打一次同一層：沒有回報，點數也不會再加。
+    expect(grantFloor(save, pagoda, 1).lines).toEqual([]);
+    expect(save.player.karma.points).toBe(after);
   });
 
   it('可重複的副本不留進度，一次性的會留', () => {

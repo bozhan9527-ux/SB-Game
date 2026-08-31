@@ -475,6 +475,7 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
       }),
       goldMultiplier: num(source, 'goldMultiplier', p),
       repeatable: bool(source, 'repeatable', p),
+      endless: bool(source, 'endless', p),
       floors,
     };
   });
@@ -485,6 +486,10 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
     // 倍率小於 1 的副本等於懲罰玩家進來，那個副本就不會有人打。
     if (dungeon.goldMultiplier < 1) {
       throw new DataError(path, `${dungeon.id} 的 goldMultiplier 不得小於 1`);
+    }
+    // 無限模式一定要可重複：它沒有終點，「通關一次就結束」對它沒有意義。
+    if (dungeon.endless && !dungeon.repeatable) {
+      throw new DataError(path, `${dungeon.id} 是無限模式，必須可重複`);
     }
     // 可重複的副本不得發放一次性的回報，否則就是無限產出。
     if (dungeon.repeatable) {

@@ -1,6 +1,6 @@
 {
   "field": {
-    "fieldSlots": 6,
+    "fieldSlots": 9,
     "handSlots": 5,
     "startingHand": 3,
     "startingField": 3,
@@ -73,7 +73,7 @@
     "maxDisciples": 999
   },
   "boss": {
-    "hpBase": 3000,
+    "hpBase": 5000,
     "hpGrowth": 1.148,
     "speed": 30,
     "gateHitMultiplier": 3,

@@ -48,7 +48,7 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
 
   it('升級線正好是要求的六項', () => {
     expect(UPGRADES.map((u) => u.id).sort()).toEqual(
-      ['drawSpeed', 'fieldSlots', 'goldGain', 'startAttack', 'startDefense', 'startDisciples'].sort(),
+      ['drawSpeed', 'goldGain', 'startAttack', 'startDefense', 'startDisciples'].sort(),
     );
   });
 

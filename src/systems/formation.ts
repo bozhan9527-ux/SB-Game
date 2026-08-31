@@ -97,8 +97,11 @@ export function activeFormations(field: readonly (Card | null)[]): FormationLine
   const found: FormationLine[] = [];
 
   const push = (kind: FormationKind, slots: number[]): void => {
-    // 一條線一律要滿 columns 格才算數：兩格的「不同種」太容易湊到，等於白送。
+    // 一條線一律是 columns 格（也就是三格）。兩格的「不同種」太容易湊到，等於白送，
     // 因此六格的場上只有兩條橫陣，要有縱陣與斜陣得先把陣法擴充買起來。
+    //
+    // 這個長度固定，不隨盤面變高而變長：一條線的難度不該因為你多買了一列而改變，
+    // 改變的應該是「線的數量」。
     if (slots.length !== columns) return;
     if (slots.some((slot) => slot >= field.length)) return;
     const pattern = patternOf(field, slots);
@@ -108,12 +111,21 @@ export function activeFormations(field: readonly (Card | null)[]): FormationLine
   for (let row = 0; row < rows; row += 1) {
     push('row', Array.from({ length: columns }, (_, col) => row * columns + col));
   }
-  for (let col = 0; col < columns; col += 1) {
-    push('column', Array.from({ length: rows }, (_, row) => row * columns + col));
-  }
-  if (rows === columns && rows >= 3) {
-    push('diagonal', Array.from({ length: rows }, (_, i) => i * columns + i));
-    push('diagonal', Array.from({ length: rows }, (_, i) => i * columns + (columns - 1 - i)));
+  // 直行與斜線都以「連續 columns 列」為一個窗格往上滑動。
+  //
+  // 原本寫的是「整根直行」與「rows === columns 才有斜線」，那在 3×3 之外全部失效：
+  // 買到四列之後直行變成四格（長度不等於三而被丟掉），斜線則因為湊不出正方形
+  // 而整個消失——**多買一列反而讓陣法變少**，那顯然是錯的。
+  // 三列時仍然是 3 橫 + 3 直 + 2 斜 = 八條，和最初推導 484 種解時完全相同。
+  for (let top = 0; top + columns <= rows; top += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      push('column', Array.from({ length: columns }, (_, i) => (top + i) * columns + col));
+    }
+    push('diagonal', Array.from({ length: columns }, (_, i) => (top + i) * columns + i));
+    push(
+      'diagonal',
+      Array.from({ length: columns }, (_, i) => (top + i) * columns + (columns - 1 - i)),
+    );
   }
   return found;
 }

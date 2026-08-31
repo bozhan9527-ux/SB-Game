@@ -234,9 +234,11 @@ describe('金幣升級', () => {
 
   it('滿級後無法再買', () => {
     const save = createDefaultSave();
-    const track = trackById('fieldSlots');
+    // 「陣法擴充」那條已經整條移出洞府（格位改成固定的 3×3），
+    // 所以這裡改用還在的一條線。
+    const track = trackById('startAttack');
     save.player.upgrades[track.id] = track.maxLevel;
-    addGold(save, 10_000_000);
+    addGold(save, 1e18);
     const result = buyUpgrade(save, track.id);
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('maxed');
