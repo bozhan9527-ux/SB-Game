@@ -44,6 +44,16 @@ jobs:
       - name: Test
         run: npm test
 
+      # schema.sql 全部是 CREATE ... IF NOT EXISTS，重複跑是安全的。
+      # 放在部署前面：先確保資料表在，Worker 上線的那一刻就是可用的。
+      - name: Apply schema
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
+          command: d1 execute sb-game --remote --file=schema.sql --yes
+
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
