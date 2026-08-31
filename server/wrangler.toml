@@ -13,7 +13,7 @@ compatibility_date = "2026-08-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "sb-game"
-database_id = "local-placeholder"
+database_id = "ee71254c-afda-4dbe-b8a7-21e0dd465f92"
 
 [vars]
 # 允許哪些來源呼叫。部署到自己的網域時要改這裡。
