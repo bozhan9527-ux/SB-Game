@@ -150,8 +150,8 @@ describe('法寶符', () => {
 
 describe('山門防守', () => {
   it('開局有起始手牌與起始法寶，格位數由陣法擴充決定', () => {
-    const state = stateFor('body', 1, 1, { fieldSlots: 2 });
-    expect(state.field.length).toBe(BALANCE.field.fieldSlots + 2);
+    const state = stateFor('body', 1, 1, { fieldSlots: 1 });
+    expect(state.field.length).toBe(BALANCE.field.fieldSlots + 3);
     expect(state.hand.filter((c) => c !== null).length).toBe(BALANCE.field.startingHand);
     expect(state.field.filter((c) => c !== null).length).toBe(BALANCE.field.startingField);
   });

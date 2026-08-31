@@ -496,6 +496,7 @@ describe('副本難度', () => {
       rules: [...dungeon.rules],
       goldMultiplier: dungeon.goldMultiplier,
       extraFieldSlots: 0,
+      bankedStage: 0,
     });
     let wins = 0;
     const runs = 12;

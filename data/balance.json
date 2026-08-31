@@ -47,7 +47,9 @@
   },
   "rebirth": {
     "minStage": 82,
-    "stagesPerPoint": 6
+    "stagesPerPoint": 6,
+    "basePoints": 3,
+    "ascendThreatRatio": 0.35
   },
   "trait": {
     "armorPercentOfMaxHp": 0.02,
@@ -78,11 +80,6 @@
     "gateHitIntervalMs": 1800,
     "timeLimitMs": 60000,
     "goldBonus": 2
-  },
-  "retreat": {
-    "maxHours": 8,
-    "clearsPerHour": 12,
-    "minMinutes": 10
   },
   "gold": {
     "clearBase": 40,

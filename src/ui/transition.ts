@@ -28,7 +28,14 @@ export function fadeToScene(scene: Phaser.Scene, key: string, data?: object): vo
   if (camera.fadeEffect.isRunning) return;
   camera.fadeOut(FADE_MS, 0, 0, 0);
   camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-    if (data === undefined) scene.scene.start(key);
-    else scene.scene.start(key, data);
+    // **一定要傳一個物件，即使是空的。**
+    //
+    // Phaser 的 scene.start(key) 在沒有 data 時不會清掉 settings.data，
+    // 而是把上一次啟動時傳的那一份原封不動再交給 init()。於是「這一次沒有帶資料」
+    // 和「這一次帶了和上次一樣的資料」在 init() 裡完全分不出來。
+    //
+    // 這個陷阱真的咬過一次：打完副本之後，每一場正常關卡的 init() 都還收到
+    // 那份舊的 { dungeonId, floor }，於是每通一關就再發一次副本獎勵。
+    scene.scene.start(key, data ?? {});
   });
 }

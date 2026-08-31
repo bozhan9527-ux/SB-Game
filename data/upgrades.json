@@ -7,7 +7,7 @@
     "perLevel": 8,
     "baseCost": 45,
     "costGrowth": 1.28,
-    "maxLevel": 80
+    "maxLevel": 100
   },
   {
     "id": "startDefense",
@@ -17,7 +17,7 @@
     "perLevel": 6,
     "baseCost": 55,
     "costGrowth": 1.28,
-    "maxLevel": 80
+    "maxLevel": 100
   },
   {
     "id": "startAttack",
@@ -27,7 +27,7 @@
     "perLevel": 8,
     "baseCost": 60,
     "costGrowth": 1.28,
-    "maxLevel": 80
+    "maxLevel": 100
   },
   {
     "id": "drawSpeed",
@@ -37,7 +37,7 @@
     "perLevel": 6,
     "baseCost": 65,
     "costGrowth": 1.28,
-    "maxLevel": 80
+    "maxLevel": 100
   },
   {
     "id": "goldGain",
@@ -47,16 +47,16 @@
     "perLevel": 10,
     "baseCost": 70,
     "costGrowth": 1.28,
-    "maxLevel": 80
+    "maxLevel": 100
   },
   {
     "id": "fieldSlots",
     "name": "陣法擴充",
-    "desc": "多一個陣位，能同時多擺一張法寶符。",
+    "desc": "場上多一整列法寶位。買滿之後是 3×3 的正方形，對角線陣法在這時才成立。",
     "unit": "格",
-    "perLevel": 1,
-    "baseCost": 600,
+    "perLevel": 3,
+    "baseCost": 26000,
     "costGrowth": 6,
-    "maxLevel": 3
+    "maxLevel": 1
   }
 ]

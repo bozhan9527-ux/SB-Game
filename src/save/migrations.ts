@@ -227,6 +227,19 @@ const addAchievementClaims: Migration = (data) => {
   return { ...data, player: { ...player, achievementsClaimed: earned } };
 };
 
+/**
+ * v18 → v19：取消閉關（離線收益）。
+ *
+ * 只是把不再有意義的欄位拿掉。之所以還是要寫一支遷移而不是靜靜忽略它：
+ * 版本號與遷移鏈是一一對應的，缺一格之後每一支後續遷移都會對到錯的版本，
+ * 而那種錯不會當場爆炸，只會讓某個版本的存檔被套上別人的遷移。
+ */
+const dropRetreat: Migration = (data) => {
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const { retreatAt: _retreatAt, ...rest } = world;
+  return { ...data, world: rest };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -246,6 +259,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addVolumes,
   addDungeons,
   addAchievementClaims,
+  dropRetreat,
 ];
 
 /**

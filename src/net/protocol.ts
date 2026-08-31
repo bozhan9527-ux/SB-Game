@@ -90,6 +90,14 @@ export interface ScoreLoadout {
   rules: string[];
   goldMultiplier: number;
   extraFieldSlots: number;
+  /**
+   * 上一次轉世時已經走到的深度。飛升境的世界依它變硬——
+   * **少報會讓重播出一個比較好打的世界**。
+   *
+   * 和升級等級同一類的結構性限制：伺服器沒辦法確認這個數字。
+   * 夾上限擋得住「宣稱一萬關」，擋不住「宣稱零」。寫在 server/README。
+   */
+  bankedStage: number;
 }
 
 export interface ScoreSubmitResult {

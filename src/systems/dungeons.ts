@@ -88,9 +88,14 @@ export function grantFloor(save: SaveData, dungeon: DungeonDef, index: number): 
   const lines: string[] = [];
   if (floor === null) return { lines };
 
-  // 可重複的副本不記進度：它沒有「通到第幾層」這回事。
+  // **已經通過的層不再發獎勵。**
+  //
+  // 一次性的回報（符籙、修為、仙緣、格位）只能拿一次，否則重打同一層就是無限產出。
+  // 這條真的漏過一次：試劍台打完之後每通一關就多一格，因為這裡不管那一層
+  // 是不是已經過了，一律照發。
   if (!dungeon.repeatable) {
-    save.player.dungeons[dungeon.id] = Math.max(clearedFloors(save, dungeon.id), index);
+    if (index <= clearedFloors(save, dungeon.id)) return { lines };
+    save.player.dungeons[dungeon.id] = index;
   }
 
   if (floor.talisman !== undefined) {

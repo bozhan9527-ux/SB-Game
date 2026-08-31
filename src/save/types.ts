@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -172,15 +172,6 @@ export interface WorldState {
   /** 挑戰次數與通關次數，純統計。 */
   runs: number;
   clears: number;
-  /**
-   * 閉關的起算時間（Unix ms）。
-   *
-   * 用一個獨立欄位而不是沿用 savedAt：savedAt 每次存檔都會動，
-   * 而存檔在開場、改設定、換符時都會發生——沿用它的話，
-   * 玩家一回來隨手按個音效開關，八小時的閉關所得就無聲消失了。
-   * 這個欄位只在「領走閉關所得」與「打完一場」時前進。
-   */
-  retreatAt: number;
 }
 
 /** 玩家偏好。不是權威數值，純本機設定。 */

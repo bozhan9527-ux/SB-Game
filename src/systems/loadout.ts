@@ -41,6 +41,17 @@ export const NO_RULES: RunRules = {
 export interface Loadout {
   sect: Sect;
   stage: number;
+  /**
+   * 這一關的「威脅度」——妖魔強度、法寶階數上限與金幣都看它，不看 stage。
+   *
+   * 主線 81 關內兩者相同。飛升境則每轉一世往後推一段：**輪迴之後世界會變硬**。
+   * 沒有這個分別的話，仙緣買到的力量全部拿去把舊內容輾平，於是每轉一世
+   * 前面那幾百關就更空一次（實測滿級洞府第 82～180 關全部是 100% 勝率）。
+   *
+   * stage 仍然是真正的關卡數：境界名稱、紀錄、上榜都用它，
+   * 因為那是玩家認得的那個數字。
+   */
+  threat: number;
   /** 山門耐久：妖魔攻進山門就扣，歸零即失守。 */
   disciples: number;
   /** 所有法寶的傷害倍率（門派 × 淬鍊功法）。 */
@@ -108,6 +119,29 @@ export interface LoadoutSpec {
   goldMultiplier: number;
   /** 試劍台給的額外陣法格位。 */
   extraFieldSlots: number;
+  /**
+   * 上一次轉世時**已經走到的深度**。飛升境的世界依它按比例變硬。
+   *
+   * 用「已經走過多深」而不是「轉過幾世」：世界該對你的成就作出反應，
+   * 而不是對你按了幾次按鈕。而且比例小於 1，所以每一世的淨進度必然為正。
+   *
+   * 上報時它是**客戶端權威**的：少報會讓伺服器重播出一個比較好打的世界。
+   * 這是和升級等級同一類的結構性限制，寫在 server/README。
+   */
+  bankedStage: number;
+}
+
+/**
+ * 這一關實際的威脅度。
+ *
+ * 主線不動，飛升境每轉一世往後推一段——仙緣買到的力量要拿去抵銷它，
+ * 而不是把舊內容輾平。
+ */
+export function threatStage(stage: number, bankedStage: number): number {
+  const { minStage, ascendThreatRatio } = BALANCE.rebirth;
+  if (stage < minStage) return stage;
+  const banked = Math.max(0, Math.floor(bankedStage) - minStage);
+  return stage + Math.round(banked * ascendThreatRatio);
 }
 
 /** 把存檔攤平成一般關卡的 LoadoutSpec。上報成績時送的也是這一份。 */
@@ -124,6 +158,7 @@ export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
     rules: [],
     goldMultiplier: 1,
     extraFieldSlots: save.player.dungeonFieldSlots,
+    bankedStage: save.player.karma.claimedStage,
   };
 }
 
@@ -160,6 +195,7 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   if (has('thinGate')) {
     loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
   }
+  loadout.threat = threatStage(spec.stage, spec.bankedStage);
   loadout.fieldSlots += Math.max(0, Math.floor(spec.extraFieldSlots));
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   return loadout;
@@ -215,6 +251,8 @@ export function buildLoadoutFor(
   return {
     sect,
     stage,
+    // 沒有轉世資訊時威脅度就是關卡本身。平衡模擬與測試大多走這條路。
+    threat: stage,
     disciples: Math.max(
       1,
       Math.round(

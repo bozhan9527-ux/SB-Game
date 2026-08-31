@@ -99,11 +99,16 @@ describe('仙緣線', () => {
     save.player.karma.points = 0;
     expect(buyKarma(save, 'karmaPower')).toBe('poor');
 
-    save.player.karma.points = 999;
-    const track = karmaTrackById('karmaPower');
-    for (let i = 0; i < track.maxLevel; i += 1) expect(buyKarma(save, 'karmaPower')).toBe('ok');
-    expect(buyKarma(save, 'karmaPower')).toBe('maxed');
-    expect(karmaCost(track, track.maxLevel)).toBeNull();
+    // 三條乘區線改成無上限（成本指數成長自我節制），所以「買到滿級」
+    // 這件事只在有限的線上才成立——測試改成驗「點數不夠就買不動」。
+    save.player.karma.points = 20;
+    let bought = 0;
+    while (buyKarma(save, 'karmaPower') === 'ok') bought += 1;
+    expect(bought).toBeGreaterThan(0);
+    expect(buyKarma(save, 'karmaPower')).toBe('poor');
+    // 有上限的線（宿慧未泯以外都已無上限）仍然要在滿級時回 null。
+    const tier = karmaTrackById('karmaTier');
+    expect(karmaCost(tier, tier.maxLevel)).toBeNull();
   });
 
   it('買了之後真的進到 loadout：傷害、金幣、山門、階數上限', () => {

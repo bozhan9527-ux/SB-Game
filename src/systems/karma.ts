@@ -33,9 +33,28 @@ export function karmaPointsFor(stage: number): number {
   return Math.floor((stage - minStage) / stagesPerPoint) + 1;
 }
 
-/** 現在轉世能拿到幾點。只算「比上次換過的更深」的那一段。 */
+/**
+ * 現在轉世能拿到幾點。
+ *
+ * 兩部分相加：
+ * - **破紀錄的那一段**（比上次換過的更深）。這一項防止同一段進度被反覆刷。
+ * - **保底**：這一世走完主線就有的固定點數。
+ *
+ * 保底是後來補的，補的是一個真實的空窗：原本只有破紀錄才給點，
+ * 於是撞牆之後唯一的出路是轉世、而轉世的收益又綁在破紀錄上——
+ * 推不動的那段時間做什麼都沒有產出。世界會隨轉世變硬之後這條會更毒，
+ * 因為「破舊紀錄」本身就變難了。
+ *
+ * 保底看的是 world.stage（這一世走到哪）而不是 highestStage：
+ * 轉世會把 stage 歸零，所以每領一次保底就真的要再走一趟主線。
+ */
 export function pendingKarma(save: SaveData): number {
-  return Math.max(0, karmaPointsFor(save.world.highestStage) - karmaPointsFor(save.player.karma.claimedStage));
+  const record = Math.max(
+    0,
+    karmaPointsFor(save.world.highestStage) - karmaPointsFor(save.player.karma.claimedStage),
+  );
+  const base = save.world.stage >= BALANCE.rebirth.minStage ? BALANCE.rebirth.basePoints : 0;
+  return record + base;
 }
 
 export function canRebirth(save: SaveData): boolean {

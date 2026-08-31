@@ -32,6 +32,9 @@ const LIBRARY_FLOORS = DUNGEONS.find((item) => item.id === 'library')?.floors.le
 
 /** 副本能給的最高金幣倍率與最多額外格位，用來夾住客戶端上報的值。 */
 const MAX_GOLD_MULTIPLIER = Math.max(1, ...DUNGEONS.map((item) => item.goldMultiplier));
+/** 上一世深度的上限。夾住荒謬值即可——重點是它不能讓重播的世界無限硬。 */
+const MAX_BANKED_STAGE = 100_000;
+
 const MAX_EXTRA_SLOTS = DUNGEONS.flatMap((item) => item.floors)
   .map((floor) => floor.fieldSlot ?? 0)
   .reduce((sum, value) => sum + value, 0);
@@ -106,6 +109,9 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   // 倍率只影響金幣、不影響勝負；格位會影響，所以它的上限必須是真的。
   const gold = Number(record['goldMultiplier'] ?? 1);
   const slots = Number(record['extraFieldSlots'] ?? 0);
+  // 上一世的深度只夾上限。少報會讓重播出一個比較好打的世界，而伺服器沒辦法
+  // 確認——和升級等級同一類的結構性限制，見 README。
+  const banked = Number(record['bankedStage'] ?? 0);
 
   return {
     sectId,
@@ -121,6 +127,7 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
     extraFieldSlots: Number.isFinite(slots)
       ? Math.max(0, Math.min(MAX_EXTRA_SLOTS, Math.floor(slots)))
       : 0,
+    bankedStage: Number.isFinite(banked) ? Math.max(0, Math.min(MAX_BANKED_STAGE, Math.floor(banked))) : 0,
   };
 }
 

@@ -6,8 +6,8 @@
     "unit": "%",
     "perLevel": 8,
     "cost": 1,
-    "costGrowth": 1,
-    "maxLevel": 20
+    "costGrowth": 1.06,
+    "maxLevel": 999
   },
   {
     "id": "karmaGold",
@@ -16,8 +16,8 @@
     "unit": "%",
     "perLevel": 12,
     "cost": 1,
-    "costGrowth": 1,
-    "maxLevel": 20
+    "costGrowth": 1.06,
+    "maxLevel": 999
   },
   {
     "id": "karmaGate",
@@ -26,8 +26,8 @@
     "unit": "%",
     "perLevel": 10,
     "cost": 1,
-    "costGrowth": 1,
-    "maxLevel": 12
+    "costGrowth": 1.06,
+    "maxLevel": 999
   },
   {
     "id": "karmaTier",
@@ -36,7 +36,7 @@
     "unit": "階",
     "perLevel": 1,
     "cost": 6,
-    "costGrowth": 2,
-    "maxLevel": 3
+    "costGrowth": 1.6,
+    "maxLevel": 999
   }
 ]

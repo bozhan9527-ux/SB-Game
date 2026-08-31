@@ -44,7 +44,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       },
       stats: { maxTier: 0, totalKills: 0, perfectClears: 0, totalGoldEarned: 0, clearedSects: [] },
     },
-    world: { stage: 1, highestStage: 1, runs: 0, clears: 0, retreatAt: now },
+    world: { stage: 1, highestStage: 1, runs: 0, clears: 0},
     settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1 },
   };
 }
@@ -212,8 +212,6 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       highestStage,
       runs: Math.max(0, Math.floor(asNumber(world['runs'], 0))),
       clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
-      // 未來的時間一律夾回現在：手改存檔或裝置時鐘跑掉都不該產生負的閉關時數。
-      retreatAt: Math.min(now, Math.max(0, asNumber(world['retreatAt'], now))),
     },
     settings: {
       sound: settings['sound'] !== false,
@@ -320,7 +318,6 @@ export function recordClear(data: SaveData, gold: number): void {
   data.world.highestStage = Math.max(data.world.highestStage, data.world.stage);
   data.world.runs += 1;
   data.world.clears += 1;
-  data.world.retreatAt = Date.now();
 }
 
 /**
@@ -333,13 +330,10 @@ export function recordClear(data: SaveData, gold: number): void {
 export function recordDungeonRun(data: SaveData, gold: number): void {
   addGold(data, gold);
   data.world.runs += 1;
-  data.world.retreatAt = Date.now();
 }
 
 /** 失敗：停在原關卡，只給安慰獎。 */
 export function recordDefeat(data: SaveData, gold: number): void {
   addGold(data, gold);
   data.world.runs += 1;
-  // 輸了也算「人在場上」：閉關給的是不在的時候的收益，不是打輸的補償。
-  data.world.retreatAt = Date.now();
 }

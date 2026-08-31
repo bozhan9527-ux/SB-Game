@@ -64,6 +64,13 @@ export type Outcome = 'running' | 'cleared' | 'defeated' | 'timeout';
 export interface DefenseState {
   loadout: Loadout;
   stage: number;
+  /**
+   * 妖魔強度、階數上限與金幣看的關卡數。
+   *
+   * 主線內和 stage 相同；飛升境每轉一世往後推一段。stage 是玩家認得的那個
+   * 數字（境界、紀錄、上榜），threat 是這一場實際的難度。
+   */
+  threat: number;
   /** 山門耐久。 */
   disciples: number;
   maxDisciples: number;
@@ -216,14 +223,14 @@ export function bossHp(stage: number): number {
 /** 擊殺一隻妖魔的金幣。 */
 export function killGold(state: DefenseState, boss: boolean): number {
   const { gold } = BALANCE;
-  const base = gold.killBase * Math.pow(gold.killGrowth, state.stage - 1);
+  const base = gold.killBase * Math.pow(gold.killGrowth, state.threat - 1);
   return base * (boss ? BALANCE.boss.goldBonus : 1) * state.loadout.goldMultiplier;
 }
 
 export function clearReward(state: DefenseState): number {
   const { gold } = BALANCE;
   return Math.round(
-    gold.clearBase * Math.pow(gold.clearGrowth, state.stage - 1) * state.loadout.goldMultiplier,
+    gold.clearBase * Math.pow(gold.clearGrowth, state.threat - 1) * state.loadout.goldMultiplier,
   );
 }
 
@@ -304,21 +311,23 @@ export const LANES = 5;
 
 export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
   const { field } = BALANCE;
-  const { queue, boss } = buildSpawnQueue(loadout.stage, rng);
+  // 妖魔、階數上限與金幣全部看威脅度：飛升境每轉一世世界就更硬。
+  const { queue, boss } = buildSpawnQueue(loadout.threat, rng);
 
   const hand: (Card | null)[] = new Array<Card | null>(field.handSlots).fill(null);
   // 場上格位數受「陣法擴充」影響，因此看 loadout 而不是直接看 balance。
   const slots: (Card | null)[] = new Array<Card | null>(loadout.fieldSlots).fill(null);
   for (let i = 0; i < field.startingField && i < slots.length; i += 1) {
-    slots[i] = drawCard(loadout, loadout.stage, rng);
+    slots[i] = drawCard(loadout, loadout.threat, rng);
   }
   for (let i = 0; i < field.startingHand && i < hand.length; i += 1) {
-    hand[i] = drawCard(loadout, loadout.stage, rng);
+    hand[i] = drawCard(loadout, loadout.threat, rng);
   }
 
   const state: DefenseState = {
     loadout,
     stage: loadout.stage,
+    threat: loadout.threat,
     disciples: loadout.disciples,
     maxDisciples: loadout.disciples,
     gold: 0,
@@ -497,7 +506,7 @@ export function mergeInto(
 }
 
 function maxTier(state: DefenseState): number {
-  return maxTierForStage(state.stage, state.loadout.tierBonus);
+  return maxTierForStage(state.threat, state.loadout.tierBonus);
 }
 
 // ---------------------------------------------------------------- 每一拍
@@ -704,7 +713,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       report.drawLost = true;
       continue;
     }
-    state.hand[slot] = drawCard(state.loadout, state.stage, rng);
+    state.hand[slot] = drawCard(state.loadout, state.threat, rng);
     report.drawnSlot = slot;
   }
 
@@ -863,7 +872,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
       report.leaks.push({ enemyId: enemy.id, loss: 0, immune: true, boss: false });
       continue;
     }
-    const loss = leakCost(state.stage, enemy.boss);
+    const loss = leakCost(state.threat, enemy.boss);
     state.disciples = Math.max(0, state.disciples - loss);
     report.leaks.push({ enemyId: enemy.id, loss, immune: false, boss: false });
   }
@@ -876,7 +885,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     while (state.bossGateAccum >= BALANCE.boss.gateHitIntervalMs && boss !== undefined) {
       state.bossGateAccum -= BALANCE.boss.gateHitIntervalMs;
       state.leaks += 1;
-      const loss = leakCost(state.stage, true);
+      const loss = leakCost(state.threat, true);
       state.disciples = Math.max(0, state.disciples - loss);
       report.leaks.push({ enemyId: boss.id, loss, immune: false, boss: true });
     }
