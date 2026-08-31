@@ -8,6 +8,7 @@ import { sectById } from '../systems/loadout';
 import { TALISMAN_SLOTS, talismanDefs } from '../systems/talismans';
 import { activeChallenges, challengeGoldMultiplier } from '../systems/challenges';
 import { canRebirth } from '../systems/karma';
+import { cloudEnabled } from '../net/client';
 import { formatDuration, resetRetreat, retreatOffer } from '../systems/retreat';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
 import { createButton } from '../ui/button';
@@ -129,8 +130,9 @@ export class TitleScene extends Phaser.Scene {
       onClick: () => fadeToScene(this, 'Talisman'),
     });
 
-    // 五顆並排：540 寬放得下 5×102 加間距，比擠成兩排省一列高度。
-    // 字級縮到 17：這一排全是兩到四個字，縮了仍然讀得清楚。
+    // 這一排的顆數會隨功能開關變動，所以位置用算的，不寫死。
+    // 榜單只在有設定後端時才出現——一個按了會說「這個版本沒有連線功能」的按鈕，
+    // 比沒有那顆按鈕更糟。
     const minor: [string, string][] = [
       ['玩法說明', 'Help'],
       ['仙途錄', 'Achievements'],
@@ -138,12 +140,14 @@ export class TitleScene extends Phaser.Scene {
       ['試煉', 'Challenge'],
       ['存檔', 'Archive'],
     ];
+    if (cloudEnabled()) minor.push(['榜單', 'Leaderboard']);
+    const step = Math.floor((GAME_WIDTH - 16) / minor.length);
     minor.forEach(([label, target], index) => {
-      createButton(this, cx + (index - 2) * 104, 850, {
-        width: 100,
+      createButton(this, cx + (index - (minor.length - 1) / 2) * step, 850, {
+        width: step - 6,
         height: 56,
         label,
-        fontSize: 17,
+        fontSize: minor.length > 5 ? 15 : 17,
         onClick: () => fadeToScene(this, target),
       });
     });

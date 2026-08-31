@@ -169,6 +169,12 @@ const addCloudIdentity: Migration = (data) => {
   return { ...data, player: { ...player, cloud: null } };
 };
 
+/** v14 → v15：加入上榜名稱與關卡分布的快取。名字留空，第一次上榜時才問。 */
+const addLeaderboardFields: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, name: '', distribution: null } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -184,6 +190,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addRetreat,
   addTelemetrySetting,
   addCloudIdentity,
+  addLeaderboardFields,
 ];
 
 /**

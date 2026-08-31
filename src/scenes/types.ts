@@ -1,4 +1,17 @@
 import type { RunTelemetry } from '../systems/defense';
+import type { ReplayAction } from '../systems/replay';
+
+/**
+ * 上榜要用的原始資料。
+ *
+ * 教學那一場是 null——教學會改寫起手牌，光有種子重播不出同一場，
+ * 所以它不能上榜。這個欄位為 null 就代表「這一場不可驗證」。
+ */
+export interface RunSubmission {
+  runs: number;
+  steps: number;
+  actions: ReplayAction[];
+}
 
 /** 場景之間傳遞的資料結構。 */
 export interface RunResultData {
@@ -36,4 +49,6 @@ export interface RunResultData {
   telemetry: RunTelemetry;
   /** 這一場實際打了多久（ms），用來把總傷害換算成每秒。 */
   elapsedMs: number;
+  /** 上榜用的重播資料；不可驗證的一場為 null。 */
+  submission: RunSubmission | null;
 }

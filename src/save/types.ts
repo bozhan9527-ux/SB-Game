@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -52,6 +52,18 @@ export interface KarmaState {
    * 沒有它，轉世就從一個決定退化成一個必須重複執行的動作。
    */
   claimedStage: number;
+}
+
+/**
+ * 上次拿到的關卡分布，用來算「你超過幾成修士」。
+ *
+ * 快取進存檔是為了**離線與伺服器掛掉時還有東西可以顯示**——
+ * 百分位晚一天更新沒有人看得出來，但「這一格突然消失」很明顯。
+ */
+export interface DistributionCache {
+  buckets: number[];
+  total: number;
+  fetchedAt: number;
 }
 
 /**
@@ -126,8 +138,11 @@ export interface PlayerState {
   /** 曾經帶著這條挑戰通關過的 id。純紀錄，不影響任何數值。 */
   challengesDone: string[];
   records: RecordsState;
+  distribution: DistributionCache | null;
   karma: KarmaState;
   cloud: CloudIdentity | null;
+  /** 上榜用的名字。沒取過名字是空字串，第一次上榜時才問。 */
+  name: string;
   stats: StatsState;
 }
 

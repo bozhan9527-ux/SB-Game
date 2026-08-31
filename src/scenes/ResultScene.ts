@@ -6,6 +6,9 @@ import { addGold, recordClear, recordDefeat } from '../save';
 import { claimAchievements } from '../systems/achievements';
 import { activeChallenges, recordChallengeClears } from '../systems/challenges';
 import { track } from '../telemetry';
+import { cloudEnabled } from '../net/client';
+import { MAX_NAME_LENGTH } from '../net/protocol';
+import { percentileLine, refreshDistribution, submitRun } from '../systems/leaderboard';
 import { updateRecords } from '../systems/records';
 import type { RunTelemetry } from '../systems/defense';
 import {
@@ -26,6 +29,7 @@ import { fadeIn, fadeToScene } from '../ui/transition';
 export class ResultScene extends Phaser.Scene {
   private result!: RunResultData;
   private report: Phaser.GameObjects.Container | null = null;
+  private cloudLine: Phaser.GameObjects.Text | undefined;
 
   constructor() {
     super('Result');
@@ -35,6 +39,7 @@ export class ResultScene extends Phaser.Scene {
     this.result = data;
     // Phaser 會重用 Scene 實例：上一場的戰報面板已經被銷毀，不清成 null 就會拿到空殼。
     this.report = null;
+    this.cloudLine = undefined;
   }
 
   create(): void {
@@ -175,7 +180,48 @@ export class ResultScene extends Phaser.Scene {
       onClick: () => this.showReport(),
     });
 
+    // 上榜與百分位都在背景做：玩家剛通關，正在看結算表，
+    // 此時跳一個「連不上伺服器」只是掃興。成功才寫一行上去。
+    this.cloudLine = this.add
+      .text(cx, panelBottom + 42, '', textStyle({ size: 16, color: INK_DIM }))
+      .setOrigin(0.5);
+    void this.syncLeaderboard(result);
+
     if (unlocked.length > 0) this.showAchievements(unlocked);
+  }
+
+  /**
+   * 送出成績並更新百分位。
+   *
+   * 順序是「先送分、再抓分布」：剛通關的這一筆要先進到母體裡，
+   * 算出來的百分位才包含自己，不然玩家會看到一個比實際低的數字。
+   */
+  private async syncLeaderboard(result: RunResultData): Promise<void> {
+    if (!cloudEnabled()) return;
+    const save = state();
+
+    if (result.victory && result.submission !== null) {
+      // 第一次上榜才問名字。每次都問很煩，而且他多半只想看結算表。
+      if (save.player.name.length === 0) {
+        const typed = window.prompt('上榜要用什麼名字？（之後可以在「存檔」改）', '無名修士');
+        if (typed !== null) {
+          save.player.name = typed.slice(0, MAX_NAME_LENGTH);
+          persist();
+        }
+      }
+      const outcome = await submitRun(save, result.stage, result.submission);
+      if (outcome.kind === 'ok') {
+        persist();
+        this.cloudLine?.setText(`榜上第 ${outcome.rank} 名${outcome.best ? '（新猷）' : ''}`).setColor(GOLD);
+      } else if (outcome.kind === 'failed') {
+        this.cloudLine?.setText(outcome.reason).setColor(INK_DIM);
+      }
+    }
+
+    if (await refreshDistribution(save, Date.now())) persist();
+    const line = percentileLine(save, result.stage);
+    // 百分位比名次更值得佔那一行：名次只有前幾名的人在乎，百分位人人都有。
+    if (line !== null && result.victory) this.cloudLine?.setText(line).setColor(JADE);
   }
 
   /**

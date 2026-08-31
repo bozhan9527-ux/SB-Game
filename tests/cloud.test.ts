@@ -9,6 +9,11 @@ import { createDefaultSave } from '../src/save';
 import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
 import { percentileOf } from '../src/net/protocol';
+import {
+  MIN_SAMPLES_FOR_PERCENTILE,
+  loadoutFor,
+  percentileLine,
+} from '../src/systems/leaderboard';
 
 describe('雲端身分', () => {
   it('第一次呼叫才產生，之後一直是同一組', () => {
@@ -85,5 +90,39 @@ describe('百分位', () => {
     // 剛上線、還沒有任何人上傳過的時候會走到這條路。
     expect(percentileOf([], 10)).toBe(0);
     expect(percentileOf([0, 0, 0], 2)).toBe(0);
+  });
+});
+
+describe('上榜與百分位', () => {
+  it('樣本太少時不報百分位', () => {
+    // 三個人裡排第一寫成「超過 67%」只是誤導，那個數字要有意義得先有夠多人。
+    const save = createDefaultSave(1);
+    save.player.distribution = { buckets: [0, 0, 1, 2], total: 3, fetchedAt: 1 };
+    expect(percentileLine(save, 3)).toBeNull();
+  });
+
+  it('樣本夠多才報，而且數字對得上直方圖', () => {
+    const save = createDefaultSave(1);
+    const buckets = [0, 30, 30, 40];
+    save.player.distribution = { buckets, total: 100, fetchedAt: 1 };
+    expect(save.player.distribution.total).toBeGreaterThanOrEqual(MIN_SAMPLES_FOR_PERCENTILE);
+    expect(percentileLine(save, 3)).toContain('60%');
+  });
+
+  it('沒有快取時也不會炸——離線第一次進遊戲就是這個狀態', () => {
+    expect(percentileLine(createDefaultSave(1), 10)).toBeNull();
+  });
+
+  it('送給伺服器的配置只帶得動重播需要的東西', () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.sectClears = { sword: 12, body: 3 };
+    const loadout = loadoutFor(save);
+    expect(loadout.sectId).toBe('sword');
+    // 只帶「這一派」的修為，不是整份紀錄——伺服器重播只需要生效中的那一個。
+    expect(loadout.sectClears).toBe(12);
+    expect(Object.keys(loadout).sort()).toEqual(
+      ['karma', 'loadout', 'sectClears', 'sectId', 'talismans', 'upgrades'].filter((k) => k !== 'loadout'),
+    );
   });
 });

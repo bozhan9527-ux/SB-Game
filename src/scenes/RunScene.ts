@@ -19,7 +19,7 @@ import type { MobTrait } from '../data/types';
 import { persist, state } from '../state';
 import { activeChallenges } from '../systems/challenges';
 import type { ReplayAction, ReplayActionInput } from '../systems/replay';
-import { MAX_REPLAY_ACTIONS, MAX_STEPS_PER_FRAME, STEP_MS } from '../systems/replay';
+import { MAX_REPLAY_ACTIONS, MAX_STEPS_PER_FRAME, STEP_MS, runSeed } from '../systems/replay';
 import { track } from '../telemetry';
 import type { Card } from '../systems/deck';
 import { cardDef, fieldDps, maxTierForStage } from '../systems/deck';
@@ -249,6 +249,8 @@ export class RunScene extends Phaser.Scene {
   private actions: ReplayAction[] = [];
   /** 這一場跑過教學：起手牌被改寫過，重播不出來，因此不能上榜。 */
   private tutorialRun = false;
+  /** 這一場的種子用的 runs。上榜時要原封不動送出去，伺服器才重播得出同一場。 */
+  private seedRuns = 0;
 
   constructor() {
     super('Run');
@@ -265,7 +267,9 @@ export class RunScene extends Phaser.Scene {
     const stage = save.world.stage;
     const loadout = buildLoadout(save, stage);
     // 種子帶入挑戰次數：同一關重打會換一批妖魔與符，但單次進行中完全可重現。
-    this.rng = createRng(stage * 7919 + save.world.runs * 104729);
+    // 種子的另一半要當場記下來：結算頁會把 runs 加一，之後再去讀就不是這一場的種子了。
+    this.seedRuns = save.world.runs;
+    this.rng = createRng(runSeed(stage, this.seedRuns));
     this.run = createDefenseState(loadout, this.rng);
     this.over = false;
     this.enemySprites.clear();
@@ -1934,6 +1938,11 @@ export class RunScene extends Phaser.Scene {
       defeatReason: reason,
       telemetry: this.run.telemetry,
       elapsedMs: this.run.elapsedMs,
+      // 中途放棄的一場沒有上榜的意義，教學那一場則重播不出來。
+      submission:
+        this.tutorialRun || reason === 'abandon'
+          ? null
+          : { runs: this.seedRuns, steps: this.stepIndex, actions: this.actions },
     };
 
     fadeToScene(this, 'Result', result);

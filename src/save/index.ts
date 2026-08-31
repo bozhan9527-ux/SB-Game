@@ -8,7 +8,7 @@ import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { CloudIdentity, KarmaState, RecordsState, SaveData } from './types';
+import type { CloudIdentity, DistributionCache, KarmaState, RecordsState, SaveData } from './types';
 import { SAVE_KEY, SAVE_VERSION } from './types';
 
 export function createDefaultSave(now: number = Date.now()): SaveData {
@@ -30,6 +30,8 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
       cloud: null,
+      name: '',
+      distribution: null,
       records: {
         bestDps: 0,
         fastestClearMs: 0,
@@ -46,6 +48,19 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
 
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** 分布快取：壞掉就當作沒有，下次連上伺服器再拿一份。 */
+function normalizeDistribution(raw: unknown): DistributionCache | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const source = raw as Record<string, unknown>;
+  const buckets = source['buckets'];
+  if (!Array.isArray(buckets)) return null;
+  return {
+    buckets: buckets.map((value) => Math.max(0, Math.floor(asNumber(value, 0)))),
+    total: Math.max(0, Math.floor(asNumber(source['total'], 0))),
+    fetchedAt: Math.max(0, asNumber(source['fetchedAt'], 0)),
+  };
 }
 
 /** 雲端身分：欄位缺一不可，缺了就當作沒有——半組身分比沒有身分更糟。 */
@@ -153,6 +168,8 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       records: normalizeRecords(player['records']),
       karma: normalizeKarma(player['karma']),
       cloud: normalizeCloud(player['cloud']),
+      name: typeof player['name'] === 'string' ? player['name'].slice(0, 32) : '',
+      distribution: normalizeDistribution(player['distribution']),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),
