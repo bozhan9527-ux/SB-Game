@@ -1,21 +1,234 @@
 [
-  { "id": "first_clear",  "name": "初入仙門", "desc": "通過第 1 關",              "kind": "stage",    "value": 2,       "reward": 60 },
-  { "id": "realm_2",      "name": "築基有成", "desc": "抵達築基期",              "kind": "stage",    "value": 10,      "reward": 200 },
-  { "id": "realm_3",      "name": "金丹大道", "desc": "抵達金丹期",              "kind": "stage",    "value": 19,      "reward": 800 },
-  { "id": "realm_4",      "name": "元嬰出竅", "desc": "抵達元嬰期",              "kind": "stage",    "value": 28,      "reward": 3000 },
-  { "id": "realm_5",      "name": "神念化形", "desc": "抵達化神期",              "kind": "stage",    "value": 37,      "reward": 12000 },
-  { "id": "realm_7",      "name": "天人交感", "desc": "抵達合體期",              "kind": "stage",    "value": 55,      "reward": 160000 },
-  { "id": "realm_9",      "name": "雷劫加身", "desc": "抵達渡劫期",              "kind": "stage",    "value": 73,      "reward": 4000000 },
-  { "id": "ascend",       "name": "破碎虛空", "desc": "抵達飛升境",              "kind": "stage",    "value": 82,      "reward": 40000000 },
-  { "id": "tier_6",       "name": "六階法寶", "desc": "單場合成出六階法寶",      "kind": "maxTier",  "value": 6,       "reward": 500 },
-  { "id": "tier_9",       "name": "九階法寶", "desc": "單場合成出九階法寶",      "kind": "maxTier",  "value": 9,       "reward": 6000 },
-  { "id": "kills_5000",   "name": "斬妖萬千", "desc": "累計斬殺 5000 隻妖魔",    "kind": "kills",    "value": 5000,    "reward": 3000 },
-  { "id": "no_leak",      "name": "一夫當關", "desc": "單場零漏怪通關",          "kind": "perfect",  "value": 1,       "reward": 1500 },
-  { "id": "clears_25",    "name": "身經百戰", "desc": "累計通關 25 次",          "kind": "clears",   "value": 25,      "reward": 2000 },
-  { "id": "clears_100",   "name": "百戰不殆", "desc": "累計通關 100 次",         "kind": "clears",   "value": 100,     "reward": 30000 },
-  { "id": "gold_million", "name": "富甲一方", "desc": "累計獲得 100 萬金幣",     "kind": "gold",     "value": 1000000, "reward": 50000 },
-  { "id": "all_sects",    "name": "四道皆通", "desc": "以四個門派各通關至少一次", "kind": "sects",    "value": 4,       "reward": 3000 },
-  { "id": "sect_master",  "name": "一道通神", "desc": "單一門派修為練到四階",     "kind": "sectMastery", "value": 4,    "reward": 30000 },
-  { "id": "rebirth_1",    "name": "一世輪迴", "desc": "轉世重修一次",             "kind": "rebirths", "value": 1,    "reward": 100000 },
-  { "id": "rebirth_3",    "name": "三世輪迴", "desc": "轉世重修三次",             "kind": "rebirths", "value": 3,    "reward": 2000000 }
+  {
+    "id": "first_clear",
+    "name": "初入仙門",
+    "desc": "通過第 1 關",
+    "kind": "stage",
+    "value": 2,
+    "reward": 60
+  },
+  {
+    "id": "realm_2",
+    "name": "築基有成",
+    "desc": "抵達築基期",
+    "kind": "stage",
+    "value": 10,
+    "reward": 200
+  },
+  {
+    "id": "realm_3",
+    "name": "金丹大道",
+    "desc": "抵達金丹期",
+    "kind": "stage",
+    "value": 19,
+    "reward": 800
+  },
+  {
+    "id": "realm_4",
+    "name": "元嬰出竅",
+    "desc": "抵達元嬰期",
+    "kind": "stage",
+    "value": 28,
+    "reward": 3000
+  },
+  {
+    "id": "realm_5",
+    "name": "神念化形",
+    "desc": "抵達化神期",
+    "kind": "stage",
+    "value": 37,
+    "reward": 12000
+  },
+  {
+    "id": "realm_7",
+    "name": "天人交感",
+    "desc": "抵達合體期",
+    "kind": "stage",
+    "value": 55,
+    "reward": 160000
+  },
+  {
+    "id": "realm_9",
+    "name": "雷劫加身",
+    "desc": "抵達渡劫期",
+    "kind": "stage",
+    "value": 73,
+    "reward": 4000000
+  },
+  {
+    "id": "ascend",
+    "name": "破碎虛空",
+    "desc": "抵達飛升境",
+    "kind": "stage",
+    "value": 82,
+    "reward": 40000000
+  },
+  {
+    "id": "tier_6",
+    "name": "六階法寶",
+    "desc": "單場合成出六階法寶",
+    "kind": "maxTier",
+    "value": 6,
+    "reward": 500
+  },
+  {
+    "id": "tier_9",
+    "name": "九階法寶",
+    "desc": "單場合成出九階法寶",
+    "kind": "maxTier",
+    "value": 9,
+    "reward": 6000
+  },
+  {
+    "id": "kills_5000",
+    "name": "斬妖萬千",
+    "desc": "累計斬殺 5000 隻妖魔",
+    "kind": "kills",
+    "value": 5000,
+    "reward": 3000
+  },
+  {
+    "id": "no_leak",
+    "name": "一夫當關",
+    "desc": "單場零漏怪通關",
+    "kind": "perfect",
+    "value": 1,
+    "reward": 1500
+  },
+  {
+    "id": "clears_25",
+    "name": "身經百戰",
+    "desc": "累計通關 25 次",
+    "kind": "clears",
+    "value": 25,
+    "reward": 2000
+  },
+  {
+    "id": "clears_100",
+    "name": "百戰不殆",
+    "desc": "累計通關 100 次",
+    "kind": "clears",
+    "value": 100,
+    "reward": 30000
+  },
+  {
+    "id": "gold_million",
+    "name": "富甲一方",
+    "desc": "累計獲得 100 萬金幣",
+    "kind": "gold",
+    "value": 1000000,
+    "reward": 50000
+  },
+  {
+    "id": "all_sects",
+    "name": "四道皆通",
+    "desc": "以四個門派各通關至少一次",
+    "kind": "sects",
+    "value": 4,
+    "reward": 3000
+  },
+  {
+    "id": "sect_master",
+    "name": "一道通神",
+    "desc": "單一門派修為練到四階",
+    "kind": "sectMastery",
+    "value": 4,
+    "reward": 30000
+  },
+  {
+    "id": "rebirth_1",
+    "name": "一世輪迴",
+    "desc": "轉世重修一次",
+    "kind": "rebirths",
+    "value": 1,
+    "reward": 100000
+  },
+  {
+    "id": "rebirth_3",
+    "name": "三世輪迴",
+    "desc": "轉世重修三次",
+    "kind": "rebirths",
+    "value": 3,
+    "reward": 2000000
+  },
+  {
+    "id": "library_half",
+    "name": "半部經藏",
+    "desc": "藏經閣通關八層",
+    "kind": "libraryFloors",
+    "value": 8,
+    "reward": 8000
+  },
+  {
+    "id": "library_full",
+    "name": "藏經閣主",
+    "desc": "藏經閣十六層全通，二十張符盡入手",
+    "kind": "libraryFloors",
+    "value": 16,
+    "reward": 120000
+  },
+  {
+    "id": "dungeon_10",
+    "name": "闖蕩五地",
+    "desc": "五個副本累計通關十層",
+    "kind": "dungeonFloors",
+    "value": 10,
+    "reward": 20000
+  },
+  {
+    "id": "dungeon_all",
+    "name": "五地無雙",
+    "desc": "五個副本的每一層都通過",
+    "kind": "dungeonFloors",
+    "value": 27,
+    "reward": 600000
+  },
+  {
+    "id": "mastery_all",
+    "name": "四道並修",
+    "desc": "四個門派的修為都到二階",
+    "kind": "sectMasteryAll",
+    "value": 2,
+    "reward": 250000
+  },
+  {
+    "id": "karma_20",
+    "name": "夙願已償",
+    "desc": "仙緣累計買到二十級",
+    "kind": "karmaLevels",
+    "value": 20,
+    "reward": 800000
+  },
+  {
+    "id": "karma_50",
+    "name": "宿慧盡通",
+    "desc": "仙緣累計買到五十級",
+    "kind": "karmaLevels",
+    "value": 50,
+    "reward": 12000000
+  },
+  {
+    "id": "rebirth_5",
+    "name": "五世輪迴",
+    "desc": "轉世五次",
+    "kind": "rebirths",
+    "value": 5,
+    "reward": 20000000
+  },
+  {
+    "id": "stage_120",
+    "name": "飛升之外",
+    "desc": "推進到第 120 關",
+    "kind": "stage",
+    "value": 120,
+    "reward": 300000000
+  },
+  {
+    "id": "stage_200",
+    "name": "道之盡頭",
+    "desc": "推進到第 200 關",
+    "kind": "stage",
+    "value": 200,
+    "reward": 9000000000
+  }
 ]

@@ -23,6 +23,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       wallet: { gold: 0 },
       upgrades,
       achievements: [],
+      achievementsClaimed: [],
       hints: [],
       talismans: starterTalismans(),
       sectClears: {},
@@ -183,6 +184,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       wallet: { gold: Math.max(0, Math.floor(asNumber(wallet['gold'], 0))) },
       upgrades: merged,
       achievements,
+      achievementsClaimed: strings(player['achievementsClaimed']),
       hints,
       // 存檔可能引用到已改名或尚未解鎖的符，一律修補成一份能直接開場的四張。
       // 符籙的解鎖來源是藏經閣的層數，不是關卡進度（v17 起）。

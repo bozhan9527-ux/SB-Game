@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -151,6 +151,14 @@ export interface PlayerState {
    * 它不再由「推到第幾關」決定。改制時已解鎖的符一律換算成對應的層數，
    * 沒有人會因為改制少掉任何一張。
    */
+  /**
+   * 已經**領走獎勵**的成就。
+   *
+   * 和 achievements（已達成）分開記：達成是事實，領取是動作。
+   * 兩者合成一個欄位的話，「有東西可以領」這件事就沒有地方存——
+   * 而那正是這次改制要給玩家的東西。
+   */
+  achievementsClaimed: string[];
   dungeons: Record<string, number>;
   /** 試劍台給的額外陣法格位。和洞府那條升級線分開記，因為它不是用金幣買的。 */
   dungeonFieldSlots: number;

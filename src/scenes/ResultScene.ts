@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { CARDS } from '../data';
-import { addGold, recordClear, recordDefeat, recordDungeonRun } from '../save';
+import { recordClear, recordDefeat, recordDungeonRun } from '../save';
 import { dungeonById, grantFloor, nextFloor } from '../systems/dungeons';
-import { claimAchievements } from '../systems/achievements';
+import { detectAchievements } from '../systems/achievements';
 import { track } from '../telemetry';
 import { cloudEnabled } from '../net/client';
 import { MAX_NAME_LENGTH } from '../net/protocol';
@@ -97,8 +97,8 @@ export class ResultScene extends Phaser.Scene {
       formation_bonus: Number(averageFormationBonus(result.telemetry).toFixed(3)),
     });
 
-    const unlocked = claimAchievements(save);
-    for (const item of unlocked) addGold(save, item.reward);
+    // 只判定達成，不入帳——獎勵要玩家自己到仙途錄領。
+    const unlocked = detectAchievements(save);
     persist();
     const afterRealm = realmForStage(save.world.stage);
     const breakthrough = result.victory && afterRealm.id !== beforeRealm.id;

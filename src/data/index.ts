@@ -74,6 +74,10 @@ const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
   'stage', 'maxTier', 'kills', 'perfect', 'clears', 'gold', 'sects',
   'sectMastery',
   'rebirths',
+  'dungeonFloors',
+  'libraryFloors',
+  'sectMasteryAll',
+  'karmaLevels',
 ];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',

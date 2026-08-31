@@ -212,6 +212,21 @@ const addDungeons: Migration = (data) => {
   return { ...data, player: { ...player, dungeons, dungeonFieldSlots: 0 } };
 };
 
+/**
+ * v17 → v18：成就改成手動領取。
+ *
+ * **已經達成的一律標記為已領取。** 舊制是達成當下自動入帳，所以那些獎勵
+ * 玩家早就拿過了；不標記的話，改版之後他一進仙途錄就能把十九條全部再領一次。
+ * 這條遷移是為了不讓改制變成一次大放送。
+ */
+const addAchievementClaims: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const earned = Array.isArray(player['achievements'])
+    ? player['achievements'].filter((id): id is string => typeof id === 'string')
+    : [];
+  return { ...data, player: { ...player, achievementsClaimed: earned } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -230,6 +245,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addLeaderboardFields,
   addVolumes,
   addDungeons,
+  addAchievementClaims,
 ];
 
 /**

@@ -10,6 +10,7 @@ import type { SaveData } from '../save/types';
 import { sectById } from '../systems/loadout';
 import { talismanDefs } from '../systems/talismans';
 import { canRebirth } from '../systems/karma';
+import { detectAchievements, pendingAchievements } from '../systems/achievements';
 import { cloudEnabled } from '../net/client';
 import { formatDuration, resetRetreat, retreatOffer } from '../systems/retreat';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
@@ -52,6 +53,11 @@ export class TitleScene extends Phaser.Scene {
 
     const cx = GAME_WIDTH / 2;
     const hasSect = sect !== null;
+
+    // 達成判定要在這裡也跑一次。它原本只在結算畫面與仙途錄裡跑，
+    // 結果是「還沒打完下一場的人」看不到入口上的可領取數字——
+    // 對他來說改制等於獎勵消失了。判定是純函式，跑一次很便宜。
+    if (detectAchievements(save).length > 0) persist();
 
     this.buildTopBar(save);
 
@@ -159,9 +165,17 @@ export class TitleScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     hit.on('pointerup', () => {
       audio.play('ui');
+      // 有東西可領就標在入口上。不標的話，「達成之後要自己去領」
+      // 對玩家來說等於「獎勵消失了」——他根本不知道有東西在等他。
+      const pending = pendingAchievements(save).length;
       openMenu(this, [
         { label: '音　樂', icon: 'music' },
-        { label: '仙途錄', icon: 'record', scene: 'Achievements' },
+        {
+          label: '仙途錄',
+          icon: 'record',
+          scene: 'Achievements',
+          ...(pending > 0 ? { badge: `${pending} 可領取` } : {}),
+        },
         { label: '存　檔', icon: 'save', scene: 'Archive' },
         { label: '玩法說明', icon: 'help', scene: 'Help' },
       ]);

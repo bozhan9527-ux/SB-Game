@@ -532,7 +532,15 @@ export type AchievementKind =
   | 'gold'
   | 'sects'
   | 'sectMastery'
-  | 'rebirths';
+  | 'rebirths'
+  /** 五個副本累計通關幾層。 */
+  | 'dungeonFloors'
+  /** 藏經閣通關幾層——它同時是符籙的解鎖進度。 */
+  | 'libraryFloors'
+  /** 四個門派**全部**都到這個修為階數。和 sectMastery 的「任一派」是兩件事。 */
+  | 'sectMasteryAll'
+  /** 仙緣總共買了幾級。轉世之後唯一會繼續長的數字。 */
+  | 'karmaLevels';
 
 export interface Achievement {
   id: string;
