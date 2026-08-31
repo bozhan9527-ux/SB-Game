@@ -115,5 +115,11 @@ export function rebirth(save: SaveData): boolean {
   save.world.stage = 1;
   save.player.wallet.gold = 0;
   for (const track of UPGRADES) save.player.upgrades[track.id] = 0;
+  // 副本進度一起歸零：新的一世要重新爬。
+  //
+  // **這一條的代價要說清楚：藏經閣是符籙的解鎖來源**，所以轉世等於把
+  // 十六張非基礎符一起收回，下一世要重新打回來。這是製作人的決定——
+  // 它把「轉世之後沒事做」換成了「轉世之後有一整條路要重走」。
+  save.player.dungeons = {};
   return true;
 }

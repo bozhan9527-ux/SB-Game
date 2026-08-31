@@ -240,6 +240,19 @@ const dropRetreat: Migration = (data) => {
   return { ...data, world: rest };
 };
 
+/**
+ * v19 → v20：陣法格位固定成 3×3，額外格位的欄位整條拿掉。
+ *
+ * 這支遷移同時修一個真實的災情：試劍台曾經因為兩個 bug（場景資料沿用、
+ * 以及已通過的層重複發獎）不斷累加格位，製作人的存檔一度長到十八格。
+ * 欄位拿掉之後那些多出來的格位自然消失。
+ */
+const dropFieldSlots: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const { dungeonFieldSlots: _slots, ...rest } = player;
+  return { ...data, player: rest };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -260,6 +273,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addDungeons,
   addAchievementClaims,
   dropRetreat,
+  dropFieldSlots,
 ];
 
 /**

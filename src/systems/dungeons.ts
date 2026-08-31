@@ -111,10 +111,6 @@ export function grantFloor(save: SaveData, dungeon: DungeonDef, index: number): 
     save.player.karma.points += floor.karma;
     lines.push(`仙緣 +${floor.karma}`);
   }
-  if (floor.fieldSlot !== undefined) {
-    save.player.dungeonFieldSlots += floor.fieldSlot;
-    lines.push(`陣法格位 +${floor.fieldSlot}`);
-  }
   return { lines };
 }
 

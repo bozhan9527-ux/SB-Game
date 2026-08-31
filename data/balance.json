@@ -49,7 +49,9 @@
     "minStage": 82,
     "stagesPerPoint": 6,
     "basePoints": 3,
-    "ascendThreatRatio": 0.35
+    "ascendThreatRatio": 0.35,
+    "traitChancePerLife": 0.25,
+    "traitChanceMax": 0.9
   },
   "trait": {
     "armorPercentOfMaxHp": 0.02,

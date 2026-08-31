@@ -30,14 +30,14 @@ import { buildLoadoutFromSpec } from '../../src/systems/loadout';
 /** 藏經閣總層數，也就是符籙解鎖的上限。 */
 const LIBRARY_FLOORS = DUNGEONS.find((item) => item.id === 'library')?.floors.length ?? 0;
 
-/** 副本能給的最高金幣倍率與最多額外格位，用來夾住客戶端上報的值。 */
+/** 副本能給的最高金幣倍率，用來夾住客戶端上報的值。 */
 const MAX_GOLD_MULTIPLIER = Math.max(1, ...DUNGEONS.map((item) => item.goldMultiplier));
 /** 上一世深度的上限。夾住荒謬值即可——重點是它不能讓重播的世界無限硬。 */
 const MAX_BANKED_STAGE = 100_000;
 
-const MAX_EXTRA_SLOTS = DUNGEONS.flatMap((item) => item.floors)
-  .map((floor) => floor.fieldSlot ?? 0)
-  .reduce((sum, value) => sum + value, 0);
+/** 轉世次數的上限。習性機率本來就有上限，這裡只是擋住荒謬值。 */
+const MAX_REBIRTHS = 9_999;
+
 import type { ReplayAction } from '../../src/systems/replay';
 import { replayRun, validateReplay } from '../../src/systems/replay';
 
@@ -108,10 +108,10 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   const library = Number(record['libraryFloor'] ?? 0);
   // 倍率只影響金幣、不影響勝負；格位會影響，所以它的上限必須是真的。
   const gold = Number(record['goldMultiplier'] ?? 1);
-  const slots = Number(record['extraFieldSlots'] ?? 0);
   // 上一世的深度只夾上限。少報會讓重播出一個比較好打的世界，而伺服器沒辦法
   // 確認——和升級等級同一類的結構性限制，見 README。
   const banked = Number(record['bankedStage'] ?? 0);
+  const lives = Number(record['rebirths'] ?? 0);
 
   return {
     sectId,
@@ -124,10 +124,8 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
     sectClears: Number.isFinite(clears) ? Math.max(0, Math.floor(clears)) : 0,
     rules,
     goldMultiplier: Number.isFinite(gold) ? Math.max(1, Math.min(MAX_GOLD_MULTIPLIER, gold)) : 1,
-    extraFieldSlots: Number.isFinite(slots)
-      ? Math.max(0, Math.min(MAX_EXTRA_SLOTS, Math.floor(slots)))
-      : 0,
     bankedStage: Number.isFinite(banked) ? Math.max(0, Math.min(MAX_BANKED_STAGE, Math.floor(banked))) : 0,
+    rebirths: Number.isFinite(lives) ? Math.max(0, Math.min(MAX_REBIRTHS, Math.floor(lives))) : 0,
   };
 }
 

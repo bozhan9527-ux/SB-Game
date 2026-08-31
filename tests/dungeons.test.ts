@@ -123,7 +123,6 @@ describe('副本的結構', () => {
         expect(floor.talisman).toBeUndefined();
         expect(floor.mastery).toBeUndefined();
         expect(floor.karma).toBeUndefined();
-        expect(floor.fieldSlot).toBeUndefined();
       }
     }
   });

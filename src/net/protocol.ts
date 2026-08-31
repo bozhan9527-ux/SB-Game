@@ -89,7 +89,6 @@ export interface ScoreLoadout {
    */
   rules: string[];
   goldMultiplier: number;
-  extraFieldSlots: number;
   /**
    * 上一次轉世時已經走到的深度。飛升境的世界依它變硬——
    * **少報會讓重播出一個比較好打的世界**。
@@ -98,6 +97,8 @@ export interface ScoreLoadout {
    * 夾上限擋得住「宣稱一萬關」，擋不住「宣稱零」。寫在 server/README。
    */
   bankedStage: number;
+  /** 轉世次數。決定妖魔長出習性的機率——同樣是少報會讓重播變簡單的欄位。 */
+  rebirths: number;
 }
 
 export interface ScoreSubmitResult {

@@ -52,6 +52,13 @@ export interface Loadout {
    * 因為那是玩家認得的那個數字。
    */
   threat: number;
+  /**
+   * 原本素面的妖魔長出習性的機率。轉世次數越多越高。
+   *
+   * 習性帶血量折扣，所以它換的是打法不是總量——這正是它能當後期難度旋鈕的原因：
+   * 純粹調高血量會直接卡死輸出最低的那一副牌組。
+   */
+  traitChance: number;
   /** 山門耐久：妖魔攻進山門就扣，歸零即失守。 */
   disciples: number;
   /** 所有法寶的傷害倍率（門派 × 淬鍊功法）。 */
@@ -117,8 +124,6 @@ export interface LoadoutSpec {
   rules: readonly string[];
   /** 這一場的金幣倍率，同樣由副本帶進來。 */
   goldMultiplier: number;
-  /** 試劍台給的額外陣法格位。 */
-  extraFieldSlots: number;
   /**
    * 上一次轉世時**已經走到的深度**。飛升境的世界依它按比例變硬。
    *
@@ -129,6 +134,8 @@ export interface LoadoutSpec {
    * 這是和升級等級同一類的結構性限制，寫在 server/README。
    */
   bankedStage: number;
+  /** 轉世次數。決定妖魔長出習性的機率。 */
+  rebirths: number;
 }
 
 /**
@@ -157,8 +164,8 @@ export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
       save.player.sectId === null ? 0 : (save.player.sectClears[save.player.sectId] ?? 0),
     rules: [],
     goldMultiplier: 1,
-    extraFieldSlots: save.player.dungeonFieldSlots,
     bankedStage: save.player.karma.claimedStage,
+    rebirths: save.player.karma.rebirths,
   };
 }
 
@@ -196,7 +203,11 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
     loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
   }
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
-  loadout.fieldSlots += Math.max(0, Math.floor(spec.extraFieldSlots));
+  const { traitChancePerLife, traitChanceMax } = BALANCE.rebirth;
+  loadout.traitChance = Math.min(
+    traitChanceMax,
+    Math.max(0, Math.floor(spec.rebirths)) * traitChancePerLife,
+  );
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   return loadout;
 }
@@ -251,8 +262,10 @@ export function buildLoadoutFor(
   return {
     sect,
     stage,
-    // 沒有轉世資訊時威脅度就是關卡本身。平衡模擬與測試大多走這條路。
+    // 沒有轉世資訊時威脅度就是關卡本身、妖魔也不額外長習性。
+    // 平衡模擬與測試大多走這條路。
     threat: stage,
+    traitChance: 0,
     disciples: Math.max(
       1,
       Math.round(

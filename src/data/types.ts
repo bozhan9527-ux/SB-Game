@@ -239,6 +239,19 @@ export interface RebirthBalance {
    * 而轉世的收益又綁在破紀錄上——推不動的那段時間做什麼都沒有產出。
    */
   basePoints: number;
+  /**
+   * 每轉一世，原本沒有習性的妖魔有多少機率長出一個。
+   *
+   * **這是提高後期難度的正確旋鈕。** 純粹調高血量走不通：實測雜兵血量只要
+   * 超過基準值，最弱的那一副牌組（全輔助）就一定卡在第 78 關，而「沒有一副牌是
+   * 死路」是這個遊戲的底線。習性換的是**形狀**不是總量（帶習性的妖魔血量會打折），
+   * 所以它讓後期變難的方式是「你得換打法」，不是「你的輸出不夠」。
+   *
+   * 而且它只作用在轉過世的人身上——第一輪的主線一格都沒有動到。
+   */
+  traitChancePerLife: number;
+  /** 習性機率的上限。留一部分素面的妖魔，否則整場都在應付特效，反而看不出差別。 */
+  traitChanceMax: number;
 }
 
 /** 仙緣升級線。花的是轉世點數，不是金幣。 */
@@ -589,7 +602,6 @@ export interface DungeonFloor {
   talisman?: string;
   mastery?: number;
   karma?: number;
-  fieldSlot?: number;
 }
 
 export interface DungeonDef {

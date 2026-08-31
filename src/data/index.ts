@@ -163,6 +163,8 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       stagesPerPoint: p(rebirth, 'stagesPerPoint', 'rebirth'),
       ascendThreatRatio: p(rebirth, 'ascendThreatRatio', 'rebirth'),
       basePoints: p(rebirth, 'basePoints', 'rebirth'),
+      traitChancePerLife: p(rebirth, 'traitChancePerLife', 'rebirth'),
+      traitChanceMax: p(rebirth, 'traitChanceMax', 'rebirth'),
     },
     sect: {
       clearsPerMastery: p(sect, 'clearsPerMastery', 'sect'),
@@ -452,7 +454,6 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
       if (typeof floor['talisman'] === 'string') out.talisman = floor['talisman'];
       if (typeof floor['mastery'] === 'number') out.mastery = floor['mastery'];
       if (typeof floor['karma'] === 'number') out.karma = floor['karma'];
-      if (typeof floor['fieldSlot'] === 'number') out.fieldSlot = floor['fieldSlot'];
       if (typeof floor['minStage'] === 'number') out.minStage = floor['minStage'];
       const hasStage = out.stage !== undefined;
       const hasRatio = out.stageRatio !== undefined;
@@ -497,8 +498,7 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
         if (
           floor.talisman !== undefined ||
           floor.mastery !== undefined ||
-          floor.karma !== undefined ||
-          floor.fieldSlot !== undefined
+          floor.karma !== undefined
         ) {
           throw new DataError(path, `${dungeon.id} 可重複，不得發放一次性回報`);
         }

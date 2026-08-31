@@ -127,10 +127,10 @@ describe('上榜與百分位', () => {
     // 與開了試煉的人，成績會被自己的伺服器判定為造假。
     expect(Object.keys(loadout).sort()).toEqual([
       'bankedStage',
-      'extraFieldSlots',
       'goldMultiplier',
       'karma',
       'libraryFloor',
+      'rebirths',
       'rules',
       'sectClears',
       'sectId',

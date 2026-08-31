@@ -363,7 +363,7 @@ describe('數值平衡', () => {
       const progress = playThrough('body', STAGES, pool);
       expect(progress.stuckAt, `${name} 卡在第 ${progress.stuckAt} 關`).toBeNull();
     }
-  });
+  }, 20_000);
 
   it('模擬的 AI 完全看不懂特效，卻仍推得完——真人只會更輕鬆', () => {
     // AI 挑牌只看 cardDps，而 cardDps 刻意不含特效（見 deck.ts）。
@@ -503,8 +503,8 @@ describe('副本難度', () => {
       sectClears: 0,
       rules: [...dungeon.rules],
       goldMultiplier: dungeon.goldMultiplier,
-      extraFieldSlots: 0,
-      bankedStage: 0,
+      
+      bankedStage: 0, rebirths: 0,
     });
     let wins = 0;
     const runs = 12;

@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -160,8 +160,6 @@ export interface PlayerState {
    */
   achievementsClaimed: string[];
   dungeons: Record<string, number>;
-  /** 試劍台給的額外陣法格位。和洞府那條升級線分開記，因為它不是用金幣買的。 */
-  dungeonFieldSlots: number;
 }
 
 export interface WorldState {
