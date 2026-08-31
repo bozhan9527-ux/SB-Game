@@ -571,6 +571,15 @@ export interface EnemyBook {
 export interface DungeonFloor {
   stage?: number;
   stageRatio?: number;
+  /**
+   * 要推到主線第幾關才開得了這一層。
+   *
+   * **和 stage 是兩件事，而且這一層必須分開。** 「不合之道」對同深度的玩家
+   * 完全無解（實測任何深度都是 0%），因為它拿掉的正是這個遊戲唯一的指數成長。
+   * 唯一能救它的做法就是把關卡開得比玩家現在的進度淺得多——難的是打法，不是深度。
+   * 若只有一個數字，這種副本就不可能存在。
+   */
+  minStage?: number;
   talisman?: string;
   mastery?: number;
   karma?: number;
@@ -586,6 +595,8 @@ export interface DungeonDef {
   detail: string;
   /** 這個副本產出什麼，選擇畫面用一個詞說完。 */
   reward: string;
+  /** 整個副本要推到第幾關才出現。新玩家不該看到五個他一個都打不動的入口。 */
+  minStage: number;
   /** 這個副本套用哪幾條規則（沿用原本的試煉條件 id）。 */
   rules: string[];
   goldMultiplier: number;

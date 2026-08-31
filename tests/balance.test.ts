@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BALANCE, SECTS, UPGRADES } from '../src/data';
+import { BALANCE, DUNGEONS, SECTS, UPGRADES } from '../src/data';
 import { cardDps, fieldDps, maxTierForStage } from '../src/systems/deck';
 import type { Card } from '../src/systems/deck';
 import type { CardSlot, DefenseState } from '../src/systems/defense';
@@ -14,7 +14,7 @@ import {
   swapSlots,
   tickCombat,
 } from '../src/systems/defense';
-import { buildLoadoutFor } from '../src/systems/loadout';
+import { buildLoadoutFromSpec, buildLoadoutFor } from '../src/systems/loadout';
 import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
 import { trackById, upgradeCost } from '../src/systems/upgrades';
@@ -446,5 +446,102 @@ describe('數值平衡', () => {
     const plain = runOnce(5, {}, 'body', 4242).gold;
     const rich = runOnce(5, { goldGain: 10 }, 'body', 4242).gold;
     expect(rich).toBeGreaterThan(plain);
+  });
+});
+
+/**
+ * 副本的難度標準。
+ *
+ * 這一組存在的理由是**藏經閣現在是必經內容**：十六張非基礎符只有它產出，
+ * 所以它的每一層都必須是「爬到那一層的人都過得了」，不能用
+ * 「想找罪受的人才會來」的標準去調。另外四個副本是自願的，可以硬，
+ * 但硬到打不過就等於不存在。
+ *
+ * 量測的玩家是**剛好達到開放門檻的那一個**——那是會來打這一層的人裡最弱的一種。
+ * 升級等級不是猜的，是走一遍主線、每關打完就把金幣花掉之後真正會有的數字。
+ *
+ * 這一組擋下的是一個真實發生過的設計失誤：「不合之道」（拿掉合成）對
+ * **同深度**的玩家在任何關卡都是 0%，因為合成正是這個遊戲唯一的指數成長。
+ * 它唯一能存在的方式是把關卡開得比玩家的進度淺得多——難的是打法不是深度。
+ * 若哪天有人把 minStage 和 stage 合成一個數字，這一組就會紅。
+ */
+describe('副本難度', () => {
+  function progressionSnapshots(): Map<number, Record<string, number>> {
+    const levels: Record<string, number> = {};
+    let gold = 0;
+    const snaps = new Map<number, Record<string, number>>();
+    for (let stage = 1; stage <= 81; stage += 1) {
+      snaps.set(stage, { ...levels });
+      const result = runOnce(stage, levels, 'sword', 4000 + stage, undefined, 1000, true);
+      gold = spendGold(levels, gold + result.gold);
+    }
+    return snaps;
+  }
+
+  function clearRate(
+    dungeon: (typeof DUNGEONS)[number],
+    index: number,
+    upgrades: Record<string, number>,
+    stage: number,
+  ): number {
+    const loadout = buildLoadoutFromSpec({
+      sectId: 'sword',
+      stage,
+      // 藏經閣是符籙的來源，所以打第 N 層的人手上只有 N-1 張。
+      libraryFloor: dungeon.id === 'library' ? index : 16,
+      talismans: ['swordArray', 'flame', 'thunder', 'gale'],
+      upgrades,
+      karma: {},
+      sectClears: 0,
+      rules: [...dungeon.rules],
+      goldMultiplier: dungeon.goldMultiplier,
+      extraFieldSlots: 0,
+    });
+    let wins = 0;
+    const runs = 12;
+    for (let i = 0; i < runs; i += 1) {
+      const rng = createRng(900 + i);
+      const state = createDefenseState(loadout, rng);
+      let since = 0;
+      const hardLimit =
+        BALANCE.wave.wavesPerStage * BALANCE.wave.waveIntervalMs + BALANCE.boss.timeLimitMs + 30000;
+      while (state.outcome === 'running' && state.elapsedMs < hardLimit) {
+        tickCombat(state, TICK_MS, rng);
+        since += TICK_MS;
+        while (since >= 1000) {
+          since -= 1000;
+          playOneArrangingAction(state, rng);
+        }
+      }
+      if (state.outcome === 'cleared') wins += 1;
+    }
+    return wins / runs;
+  }
+
+  it('剛達到門檻的玩家，每一層都打得過——必經的藏經閣還要穩過', () => {
+    const snaps = progressionSnapshots();
+    for (const dungeon of DUNGEONS) {
+      dungeon.floors.forEach((floor, index) => {
+        const gate = floor.minStage ?? dungeon.minStage;
+        const stage = floor.stage ?? Math.round(gate * (floor.stageRatio ?? 1));
+        const upgrades = snaps.get(Math.min(81, Math.max(1, gate))) ?? {};
+        const rate = clearRate(dungeon, index, upgrades, stage);
+        // 藏經閣拿不到就等於少一張符，它的門檻要高得多。
+        const floorLabel = `${dungeon.name} 第 ${index + 1} 層（門檻 ${gate}、第 ${stage} 關）`;
+        expect(rate, floorLabel).toBeGreaterThanOrEqual(dungeon.id === 'library' ? 0.7 : 0.4);
+      });
+    }
+  });
+
+  it('開放門檻永遠比那一層的關卡深——副本難的是規則，不是深度', () => {
+    for (const dungeon of DUNGEONS) {
+      dungeon.floors.forEach((floor, index) => {
+        const gate = floor.minStage ?? dungeon.minStage;
+        const stage = floor.stage ?? Math.round(gate * (floor.stageRatio ?? 1));
+        // 唯一的例外是藏經閣最前面幾層：那時玩家還沒有進度可言。
+        if (dungeon.id === 'library' && index < 3) return;
+        expect(stage, `${dungeon.name} 第 ${index + 1} 層`).toBeLessThanOrEqual(gate);
+      });
+    }
   });
 });

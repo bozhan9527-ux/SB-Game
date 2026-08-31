@@ -20,6 +20,8 @@ import {
   clearedFloors,
   dungeonAvailable,
   floorAt,
+  floorGate,
+  floorOpen,
   floorStage,
   nextFloor,
 } from '../systems/dungeons';
@@ -120,15 +122,28 @@ export class DungeonScene extends Phaser.Scene {
     // 右邊那顆按鈕要先講深度再講層數：玩家要判斷的是「我現在打不打得動」。
     const floor = upcoming === null ? null : floorAt(dungeon, upcoming);
     const stage = floor === null ? 0 : floorStage(floor, save.world.highestStage);
-    const first = dungeon.floors[0];
-    const requirement = first === undefined ? 1 : floorStage(first, save.world.highestStage);
-
     if (!available) {
       this.add
         .text(
           cx + width / 2 - 20,
           top + CARD_HEIGHT / 2,
-          `推到第 ${requirement} 關\n才開放`,
+          `推到第 ${dungeon.minStage} 關\n才開放`,
+          textStyle({ size: 15, color: INK_DIM }),
+        )
+        .setOrigin(1, 0.5)
+        .setAlign('right')
+        .setLineSpacing(4);
+      return;
+    }
+
+    // 每一層有自己的門檻。**門檻永遠比那一層的關卡深**——副本難的是規則不是深度，
+    // 所以「你推到哪」才是真正的入場條件，「第幾關」只是它有多難。
+    if (upcoming !== null && !floorOpen(save, dungeon, upcoming)) {
+      this.add
+        .text(
+          cx + width / 2 - 20,
+          top + CARD_HEIGHT / 2,
+          `推到第 ${floorGate(dungeon, upcoming)} 關\n才開第 ${upcoming} 層`,
           textStyle({ size: 15, color: INK_DIM }),
         )
         .setOrigin(1, 0.5)

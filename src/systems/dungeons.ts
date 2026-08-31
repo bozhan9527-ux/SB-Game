@@ -139,7 +139,22 @@ export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number
  * 會看到五個他一個都打不動的入口。
  */
 export function dungeonAvailable(save: SaveData, dungeon: DungeonDef): boolean {
-  const first = dungeon.floors[0];
-  if (first === undefined) return false;
-  return save.world.highestStage >= floorStage(first, save.world.highestStage);
+  return save.world.highestStage >= dungeon.minStage;
+}
+
+/** 這一層的開放門檻（主線要推到第幾關）。 */
+export function floorGate(dungeon: DungeonDef, index: number): number {
+  return floorAt(dungeon, index)?.minStage ?? dungeon.minStage;
+}
+
+/**
+ * 這一層開得了嗎。
+ *
+ * 兩個條件：前一層過了，而且主線推得夠深。後者是這一套平衡的地基——
+ * 副本的關卡開得比玩家的進度淺，難的是規則不是深度，所以「你推到哪」
+ * 才是真正的門檻，「這一層第幾關」只是它有多難。
+ */
+export function floorOpen(save: SaveData, dungeon: DungeonDef, index: number): boolean {
+  if (clearedFloors(save, dungeon.id) < index - 1) return false;
+  return save.world.highestStage >= floorGate(dungeon, index);
 }

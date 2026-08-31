@@ -453,6 +453,7 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
       if (typeof floor['mastery'] === 'number') out.mastery = floor['mastery'];
       if (typeof floor['karma'] === 'number') out.karma = floor['karma'];
       if (typeof floor['fieldSlot'] === 'number') out.fieldSlot = floor['fieldSlot'];
+      if (typeof floor['minStage'] === 'number') out.minStage = floor['minStage'];
       const hasStage = out.stage !== undefined;
       const hasRatio = out.stageRatio !== undefined;
       if (hasStage === hasRatio) {
@@ -467,6 +468,7 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
       desc: str(source, 'desc', p),
       detail: str(source, 'detail', p),
       reward: str(source, 'reward', p),
+      minStage: num(source, 'minStage', p),
       rules: list(source['rules'], `${p}.rules`, (rule, rp) => {
         if (typeof rule !== 'string') throw new DataError(rp, '規則必須是字串');
         return rule;
@@ -497,14 +499,21 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
         }
       }
     }
-    // 固定深度的層要一層比一層深，否則「爬塔」在畫面上會忽上忽下。
+    // 固定深度的層要一層比一層深，開放門檻也要——否則「爬塔」在畫面上會忽上忽下。
     let previous = 0;
+    let previousGate = 0;
     for (const floor of dungeon.floors) {
-      if (floor.stage === undefined) continue;
-      if (floor.stage <= previous) {
-        throw new DataError(path, `${dungeon.id} 的層數深度必須遞增`);
+      if (floor.stage !== undefined) {
+        if (floor.stage <= previous) {
+          throw new DataError(path, `${dungeon.id} 的層數深度必須遞增`);
+        }
+        previous = floor.stage;
       }
-      previous = floor.stage;
+      const gate = floor.minStage ?? dungeon.minStage;
+      if (gate < previousGate) {
+        throw new DataError(path, `${dungeon.id} 的開放門檻必須遞增`);
+      }
+      previousGate = gate;
     }
   }
 

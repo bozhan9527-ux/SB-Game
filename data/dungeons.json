@@ -3,6 +3,7 @@
     "id": "library",
     "name": "藏經閣",
     "icon": "scroll",
+    "minStage": 1,
     "desc": "只帶一張符入場，把它學透",
     "detail": "抽符池縮成你帶的第一張。每一張都合得起來，階數衝得極快，但陣法只剩同心、特效完全沒有互補——這一層要的不是配招，是把一張符用到底。",
     "reward": "符籙",
@@ -13,67 +14,83 @@
     "repeatable": false,
     "floors": [
       {
-        "stage": 3,
+        "stage": 2,
+        "minStage": 1,
         "talisman": "frost"
       },
       {
-        "stage": 5,
+        "stage": 4,
+        "minStage": 4,
         "talisman": "pyre"
       },
       {
-        "stage": 8,
+        "stage": 7,
+        "minStage": 8,
         "talisman": "pierce"
       },
       {
         "stage": 10,
+        "minStage": 12,
         "talisman": "fortune"
       },
       {
         "stage": 13,
+        "minStage": 16,
         "talisman": "soul"
       },
       {
         "stage": 16,
+        "minStage": 20,
         "talisman": "breaker"
       },
       {
-        "stage": 19,
+        "stage": 20,
+        "minStage": 25,
         "talisman": "abyss"
       },
       {
-        "stage": 22,
+        "stage": 24,
+        "minStage": 30,
         "talisman": "spirit"
       },
       {
-        "stage": 25,
+        "stage": 28,
+        "minStage": 35,
         "talisman": "gale"
       },
       {
-        "stage": 29,
+        "stage": 32,
+        "minStage": 40,
         "talisman": "tempest"
       },
       {
-        "stage": 32,
+        "stage": 36,
+        "minStage": 46,
         "talisman": "bastion"
       },
       {
-        "stage": 36,
+        "stage": 37,
+        "minStage": 52,
         "talisman": "taiyi"
       },
       {
         "stage": 40,
+        "minStage": 58,
         "talisman": "slayer"
       },
       {
         "stage": 44,
+        "minStage": 64,
         "talisman": "myriad"
       },
       {
-        "stage": 49,
+        "stage": 48,
+        "minStage": 72,
         "talisman": "grand"
       },
       {
-        "stage": 54,
+        "stage": 52,
+        "minStage": 81,
         "talisman": "seal"
       }
     ]
@@ -82,8 +99,9 @@
     "id": "cliff",
     "name": "問心崖",
     "icon": "record",
+    "minStage": 28,
     "desc": "整場不能合成",
-    "detail": "拿掉這個遊戲唯一的指數成長。撐得過去靠的是門派的被動與陣法，而不是任何一張符——所以回報是門派修為。",
+    "detail": "拿掉這個遊戲唯一的指數成長。沒有合成，輸出只能靠格位數與陣法堆出來——所以它的關卡刻意開得比你現在的進度淺得多，難的不是深度，是打法。",
     "reward": "門派修為",
     "rules": [
       "noMerge"
@@ -92,19 +110,23 @@
     "repeatable": false,
     "floors": [
       {
-        "stage": 12,
+        "stage": 10,
+        "minStage": 28,
         "mastery": 3
       },
       {
-        "stage": 26,
+        "stage": 24,
+        "minStage": 45,
         "mastery": 3
       },
       {
-        "stage": 42,
+        "stage": 33,
+        "minStage": 64,
         "mastery": 3
       },
       {
-        "stage": 60,
+        "stage": 39,
+        "minStage": 81,
         "mastery": 3
       }
     ]
@@ -113,6 +135,7 @@
     "id": "pagoda",
     "name": "鎮妖塔",
     "icon": "trial",
+    "minStage": 24,
     "desc": "山門耐久只剩三成",
     "detail": "容錯幾乎歸零，漏一隻就可能結束。全遊戲最硬的一條，配上唯一能跨世帶走的東西。",
     "reward": "仙緣",
@@ -123,23 +146,28 @@
     "repeatable": false,
     "floors": [
       {
-        "stage": 20,
+        "stage": 23,
+        "minStage": 24,
         "karma": 2
       },
       {
-        "stage": 33,
+        "stage": 36,
+        "minStage": 38,
         "karma": 2
       },
       {
-        "stage": 46,
+        "stage": 48,
+        "minStage": 50,
         "karma": 2
       },
       {
-        "stage": 60,
+        "stage": 55,
+        "minStage": 58,
         "karma": 2
       },
       {
-        "stage": 75,
+        "stage": 62,
+        "minStage": 78,
         "karma": 2
       }
     ]
@@ -148,6 +176,7 @@
     "id": "arena",
     "name": "試劍台",
     "icon": "sect",
+    "minStage": 45,
     "desc": "漏掉任何一隻立刻失守",
     "detail": "不是扣耐久，是直接結束。這是一場純粹的排陣考試，所以回報就給排陣本身——場上多一格。",
     "reward": "陣法格位",
@@ -158,11 +187,13 @@
     "repeatable": false,
     "floors": [
       {
-        "stage": 45,
+        "stage": 42,
+        "minStage": 45,
         "fieldSlot": 1
       },
       {
-        "stage": 70,
+        "stage": 60,
+        "minStage": 75,
         "fieldSlot": 1
       }
     ]
@@ -171,6 +202,7 @@
     "id": "trove",
     "name": "聚寶洞",
     "icon": "cave",
+    "minStage": 30,
     "desc": "首領時限砍半，金幣加倍",
     "detail": "唯一可以重複打的副本。深度跟著你的最高關卡走——刷金幣永遠要付出和你現在實力相稱的難度，不會有「回頭打簡單關領倍率」這種事。",
     "reward": "金幣",
@@ -181,7 +213,8 @@
     "repeatable": true,
     "floors": [
       {
-        "stageRatio": 0.85
+        "stageRatio": 0.95,
+        "minStage": 30
       }
     ]
   }
