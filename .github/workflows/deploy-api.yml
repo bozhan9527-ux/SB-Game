@@ -1,0 +1,54 @@
+name: Deploy API
+
+# 後端（server/）的部署。和前端分開，因為兩者的變更頻率差很多，
+# 而且改一行遊戲數值不該連帶重新部署 Worker。
+#
+# 需要一個 repo secret：CLOUDFLARE_API_TOKEN
+# 建立方式見 server/README.md。權杖只存在 GitHub Secrets 裡，不進版控。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'src/systems/**'
+      - 'src/net/**'
+      - 'src/data/**'
+      - 'data/**'
+      - '.github/workflows/deploy-api.yml'
+  # 第一次部署、或改完 wrangler.toml 之後，可以在 Actions 頁手動觸發。
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Worker 會 import 遊戲的模擬程式（重播驗證要用同一份 tickCombat），
+      # 所以它的型別錯誤和前端一樣要在部署前擋下來。
+      - name: Typecheck server
+        run: npx tsc --noEmit -p server/tsconfig.json
+
+      # 重播的正確性是排行榜的地基，部署前一定要跑過。
+      - name: Test
+        run: npm test
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # 只有一個 Cloudflare 帳號時可以不填；有多個帳號時 wrangler 會要求指定，
+          # 那時再加一個 secret CLOUDFLARE_ACCOUNT_ID 就好（空值等於沒填）。
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
