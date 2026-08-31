@@ -19,8 +19,9 @@ export class BootScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 
-    this.add.text(cx, cy - 60, '問道飛升', textStyle({ size: 48, color: INK, bold: true })).setOrigin(0.5);
-    this.add.text(cx, cy - 12, '正在開啟山門…', textStyle({ size: 18, color: INK_DIM })).setOrigin(0.5);
+    // 載入畫面不寫標題——那是 Splash 的工作，而且它馬上就要演一次。
+    // 這裡只要回答「現在在做什麼」與「還要多久」。
+    this.add.text(cx, cy - 12, '正在開啟山門…', textStyle({ size: 20, color: INK_DIM })).setOrigin(0.5);
 
     const barWidth = 280;
     this.add.rectangle(cx, cy + 30, barWidth, 8, BG_PANEL, 1);
@@ -48,7 +49,7 @@ export class BootScene extends Phaser.Scene {
           is_new: fresh,
         });
       });
-      this.scene.start('Title');
+      this.scene.start('Splash');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.add

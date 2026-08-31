@@ -15,6 +15,7 @@ import { ChallengeScene } from './scenes/ChallengeScene';
 import { ArchiveScene } from './scenes/ArchiveScene';
 import { RebirthScene } from './scenes/RebirthScene';
 import { LeaderboardScene } from './scenes/LeaderboardScene';
+import { SplashScene } from './scenes/SplashScene';
 import { TalismanScene } from './scenes/TalismanScene';
 
 // 瀏覽器要求先有使用者手勢才能發聲。解鎖時才讀存檔裡的音效開關
@@ -38,5 +39,5 @@ new Phaser.Game({
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
   },
-  scene: [BootScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene, TalismanScene, ChallengeScene, ArchiveScene, RebirthScene, LeaderboardScene],
+  scene: [BootScene, SplashScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene, TalismanScene, ChallengeScene, ArchiveScene, RebirthScene, LeaderboardScene],
 });
