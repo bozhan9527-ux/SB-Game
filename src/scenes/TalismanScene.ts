@@ -15,6 +15,7 @@ import {
   TALISMAN_CATEGORIES,
   TALISMAN_SLOTS,
   TALISMAN_SORTS,
+  isUnlocked,
   matchesCategory,
   sortTalismans,
   effectLines,
@@ -138,7 +139,8 @@ export class TalismanScene extends Phaser.Scene {
         70,
         upcoming === null
           ? `二十張已全數參悟，每次帶 ${TALISMAN_SLOTS} 張入場`
-          : `每次帶 ${TALISMAN_SLOTS} 張入場　推到第 ${upcoming.unlockStage} 關可得「${upcoming.name}」`,
+          // 下一張要去哪裡拿——現在的答案是藏經閣，不是「再推幾關」。
+          : `每次帶 ${TALISMAN_SLOTS} 張入場　藏經閣第 ${highest + 1} 層可得「${upcoming.name}」`,
         textStyle({ size: 16, color: INK_DIM }),
       )
       .setOrigin(0.5);
@@ -153,7 +155,7 @@ export class TalismanScene extends Phaser.Scene {
     this.confirm = createButton(this, cx + 84, 878, {
       width: 208,
       height: 62,
-      label: '收妥　返回',
+      label: '收妥',
       fontSize: 24,
       strokeColor: 0x6f8b7a,
       onClick: () => {
@@ -258,27 +260,28 @@ export class TalismanScene extends Phaser.Scene {
       const row = Math.floor(index / GRID_COLUMNS);
       const x = left + col * (TILE_W + TILE_GAP);
       const y = GRID_TOP + TILE_H / 2 + row * (TILE_H + TILE_GAP);
-      const unlocked = def.unlockStage <= Math.max(1, highest);
+      // 解鎖看的是藏經閣的層數，不是關卡進度（v17 起）。
+      const unlocked = isUnlocked(def.id, highest);
 
       const background = this.add
         .rectangle(x, y, TILE_W, TILE_H, BG_PANEL, 0.92)
         .setStrokeStyle(2, LINE)
         .setInteractive({ useHandCursor: true });
+      // 圖騰放大成格子的主體。二十張符靠名字分辨要一個一個讀，
+      // 靠形狀是掃過去就認得——而這一頁的工作正是「比較」。
+      // 每張符的顏色也上到圖騰上，讓同一系的符在視覺上先聚成一群。
       const glyph = this.add
-        .image(x, y - 18, glyphTexture(def.art))
-        .setDisplaySize(24, 30)
-        .setAlpha(unlocked ? 1 : 0.3);
+        .image(x, y - 10, glyphTexture(def.art))
+        .setDisplaySize(34, 42)
+        .setAlpha(unlocked ? 1 : 0.22);
+      if (unlocked) glyph.setTint(hexToNumber(def.color));
       const name = this.add
-        .text(x, y + 10, def.name, textStyle({ size: 15, color: unlocked ? def.color : INK_DIM }))
+        .text(x, y + 23, def.name, textStyle({ size: 14, color: unlocked ? def.color : INK_DIM }))
         .setOrigin(0.5);
-      const note = this.add
-        .text(
-          x,
-          y + 29,
-          unlocked ? `${def.targets} 道` : `第 ${def.unlockStage} 關`,
-          textStyle({ size: 12, color: INK_DIM }),
-        )
-        .setOrigin(0.5);
+      // 原本這裡還有一行「N 道 / 第 N 關」。拿掉是為了把空間讓給圖騰——
+      // 那一行的資訊在下面的說明面板裡本來就有，而格子的工作是「認出是哪一張」，
+      // 不是「說完它的規格」。是否解鎖靠圖騰的明暗與名字的顏色就分得出來。
+      const note = this.add.text(x, y + 23, '', textStyle({ size: 12, color: INK_DIM })).setVisible(false);
       // 門派專精的那一張在格子上直接掛個記號，不必回選門派畫面對照。
       const mark =
         def.id === favoredId
