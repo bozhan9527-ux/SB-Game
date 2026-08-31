@@ -25,9 +25,7 @@ import type {
 } from '../../src/net/protocol';
 import { MAX_NAME_LENGTH } from '../../src/net/protocol';
 import { CARDS, KARMA, SECTS, UPGRADES } from '../../src/data';
-import { buildLoadoutFor } from '../../src/systems/loadout';
-import { karmaTrackById } from '../../src/systems/karma';
-import { talismanDefs } from '../../src/systems/talismans';
+import { buildLoadoutFromSpec } from '../../src/systems/loadout';
 import type { ReplayAction } from '../../src/systems/replay';
 import { replayRun, validateReplay } from '../../src/systems/replay';
 
@@ -86,12 +84,25 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   }
 
   const clears = Number(record['sectClears'] ?? 0);
+
+  // 試煉每一條都只讓這一場更難，所以不必夾——照收，否則開了試煉的玩家永遠驗不過。
+  const challengesRaw = record['challenges'];
+  const challenges: string[] = Array.isArray(challengesRaw)
+    ? challengesRaw.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  // 符籙的解鎖門檻看歷史最高關卡。宣稱得比實際高只會讓這一場更好打，
+  // 但成績仍然是「重播真的通關的那一關」，所以不是可以利用的破口。
+  const highest = Number(record['highestStage'] ?? 0);
+
   return {
     sectId,
+    highestStage: Number.isFinite(highest) ? Math.max(1, Math.floor(highest)) : 1,
     talismans,
     upgrades,
     karma,
     sectClears: Number.isFinite(clears) ? Math.max(0, Math.floor(clears)) : 0,
+    challenges,
   };
 }
 
@@ -137,21 +148,6 @@ function actionsOf(raw: unknown): ReplayAction[] | null {
 }
 
 /** 仙緣換算成乘區。和 src/systems/loadout.ts 的 karmaBonuses 是同一組公式。 */
-function karmaBonusOf(loadout: ScoreLoadout): {
-  damage: number;
-  gold: number;
-  disciples: number;
-  tierBonus: number;
-} {
-  const amount = (id: string): number => karmaTrackById(id).perLevel * (loadout.karma[id] ?? 0);
-  return {
-    damage: amount('karmaPower') / 100,
-    gold: amount('karmaGold') / 100,
-    disciples: amount('karmaGate') / 100,
-    tierBonus: amount('karmaTier'),
-  };
-}
-
 async function rankOf(env: Env, stage: number): Promise<number> {
   const row = await env.DB.prepare('SELECT COUNT(*) AS ahead FROM scores WHERE hidden = 0 AND stage > ?')
     .bind(stage)
@@ -201,20 +197,20 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   const rejection = validateReplay(input);
   if (rejection !== null) return fail('rejected', env, origin, rejection);
 
-  const sect = SECTS.find((item) => item.id === loadout.sectId);
-  if (sect === undefined) return fail('badRequest', env, origin, '門派不存在');
-
   // 重播。伺服器用自己算出來的結果，完全不採信客戶端宣稱的關卡。
+  //
+  // 組裝走的是遊戲**同一個** buildLoadoutFromSpec：修為、試煉、仙緣、符籙解鎖
+  // 全部在裡面。這裡若自己拼一份，只要漏掉一個乘區，重播的就是另一場仗——
+  // 而那個故障看起來會像「玩家作弊」，不像「伺服器算錯」。
+  //
+  // highestStage 夾在「不低於這一關」：剛通關第 N 關的人，歷史最高不可能低於 N。
+  // 這條同時接住舊版客戶端——它根本不送這個欄位。
   const replayed = replayRun(
-    buildLoadoutFor(
-      sect,
-      loadout.upgrades,
-      claimed,
-      talismanDefs(loadout.talismans, claimed),
-      0,
-      undefined,
-      karmaBonusOf(loadout),
-    ),
+    buildLoadoutFromSpec({
+      ...loadout,
+      stage: claimed,
+      highestStage: Math.max(loadout.highestStage, claimed),
+    }),
     input,
   );
 

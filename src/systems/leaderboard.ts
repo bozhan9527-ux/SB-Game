@@ -13,15 +13,23 @@ import type { ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
 import { ensureCloudIdentity } from './cloud';
+import { loadoutSpecOf } from './loadout';
 
-/** 把存檔裡的配置整理成伺服器重播要用的那一份。 */
+/**
+ * 把存檔裡的配置整理成伺服器重播要用的那一份。
+ *
+ * 直接沿用 loadoutSpecOf——伺服器收到之後補上關卡就是一份 LoadoutSpec，
+ * 和玩家這一場實際用的是同一個組裝函式。這裡若自己挑欄位，
+ * 兩邊遲早會走散，而症狀是「合法成績被退回」。
+ */
 export function loadoutFor(save: SaveData): ScoreLoadout {
+  const { stage: _stage, ...rest } = loadoutSpecOf(save, 1);
   return {
-    sectId: save.player.sectId ?? '',
-    talismans: [...save.player.talismans],
-    upgrades: { ...save.player.upgrades },
-    karma: { ...save.player.karma.spent },
-    sectClears: save.player.sectId === null ? 0 : (save.player.sectClears[save.player.sectId] ?? 0),
+    ...rest,
+    talismans: [...rest.talismans],
+    upgrades: { ...rest.upgrades },
+    karma: { ...rest.karma },
+    challenges: [...rest.challenges],
   };
 }
 

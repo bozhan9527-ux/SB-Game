@@ -42,11 +42,22 @@ export function sanitizeChallenges(chosen: readonly string[], highestStage: numb
   return out;
 }
 
-/** 這一場開啟的條件。 */
-export function activeChallenges(save: SaveData): ChallengeDef[] {
-  return sanitizeChallenges(save.player.challenges, save.world.highestStage)
+/**
+ * 這一場開啟的條件，由純資料算出。
+ *
+ * 伺服器重播時沒有存檔，只有玩家上報的清單——而條件會改變戰鬥規則，
+ * 少算一條就是重播另一場仗。上報條件不是作弊面：每一條都只讓這一場更難，
+ * 而且四條全部人人可開。
+ */
+export function challengeDefsOf(chosen: readonly string[], highestStage: number): ChallengeDef[] {
+  return sanitizeChallenges(chosen, highestStage)
     .map((id) => challengeById(id))
     .filter((item): item is ChallengeDef => item !== null);
+}
+
+/** 這一場開啟的條件。 */
+export function activeChallenges(save: SaveData): ChallengeDef[] {
+  return challengeDefsOf(save.player.challenges, save.world.highestStage);
 }
 
 export function hasChallenge(save: SaveData, id: string): boolean {

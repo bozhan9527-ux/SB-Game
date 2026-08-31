@@ -121,8 +121,18 @@ describe('上榜與百分位', () => {
     expect(loadout.sectId).toBe('sword');
     // 只帶「這一派」的修為，不是整份紀錄——伺服器重播只需要生效中的那一個。
     expect(loadout.sectClears).toBe(12);
-    expect(Object.keys(loadout).sort()).toEqual(
-      ['karma', 'loadout', 'sectClears', 'sectId', 'talismans', 'upgrades'].filter((k) => k !== 'loadout'),
-    );
+    // 這份清單是刻意釘死的：多一個欄位就是多送一份玩家的資料出去，
+    // 少一個欄位就是伺服器重播不出同一場仗。兩種錯都要當場紅。
+    // highestStage 與 challenges 是後來補的——少了它們，回頭打舊關卡的人
+    // 與開了試煉的人，成績會被自己的伺服器判定為造假。
+    expect(Object.keys(loadout).sort()).toEqual([
+      'challenges',
+      'highestStage',
+      'karma',
+      'sectClears',
+      'sectId',
+      'talismans',
+      'upgrades',
+    ]);
   });
 });

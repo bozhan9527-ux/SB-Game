@@ -24,11 +24,20 @@ export function sectClears(save: SaveData, sectId: string): number {
   return Math.max(0, save.player.sectClears[sectId] ?? 0);
 }
 
-/** 修為階數。到頂就不再長——它是一條有終點的曲線，不是無限疊加的雪球。 */
-export function masteryTier(save: SaveData, sectId: string): number {
+/**
+ * 修為階數。到頂就不再長——它是一條有終點的曲線，不是無限疊加的雪球。
+ *
+ * 吃的是次數而不是存檔：伺服器重播一場成績時沒有存檔，只有玩家上報的次數，
+ * 而它必須算出和玩家當時**完全相同**的階數，否則重播的是另一場仗。
+ */
+export function masteryTierFor(clears: number): number {
   const { clearsPerMastery, maxMasteryTier } = BALANCE.sect;
   if (clearsPerMastery <= 0) return 0;
-  return Math.min(maxMasteryTier, Math.floor(sectClears(save, sectId) / clearsPerMastery));
+  return Math.min(maxMasteryTier, Math.floor(Math.max(0, clears) / clearsPerMastery));
+}
+
+export function masteryTier(save: SaveData, sectId: string): number {
+  return masteryTierFor(sectClears(save, sectId));
 }
 
 /** 這一階修為給的法寶傷害加成（0.12 = +12%）。 */

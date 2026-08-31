@@ -74,10 +74,20 @@ export interface ScoreSubmitRequest extends Identity {
  */
 export interface ScoreLoadout {
   sectId: string;
+  /** 符籙的解鎖看的是歷史最高關卡，不是這一關。 */
+  highestStage: number;
   talismans: string[];
   upgrades: Record<string, number>;
   karma: Record<string, number>;
+  /** 門派修為的來源。漏掉它，重播出來的傷害就和玩家當時不一樣。 */
   sectClears: number;
+  /**
+   * 這一場開的試煉。
+   *
+   * 它不是作弊面：每一條都只讓這一場更難，而且人人可開。
+   * 漏掉它才是問題——開了試煉的玩家，成績會永遠驗不過。
+   */
+  challenges: string[];
 }
 
 export interface ScoreSubmitResult {

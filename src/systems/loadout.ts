@@ -11,9 +11,9 @@
 import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect } from '../data/types';
 import type { SaveData } from '../save/types';
-import { challengeGoldMultiplier, hasChallenge } from './challenges';
-import { karmaAmount } from './karma';
-import { masteryBonus, masteryTier } from './sects';
+import { challengeDefsOf } from './challenges';
+import { karmaAmountOf } from './karma';
+import { masteryBonus, masteryTierFor } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
 import { amountOf } from './upgrades';
@@ -76,37 +76,88 @@ export function sectById(id: string | null): Sect | null {
   return SECTS.find((sect) => sect.id === id) ?? null;
 }
 
-export function buildLoadout(save: SaveData, stage: number): Loadout {
-  const sect = sectById(save.player.sectId);
+/**
+ * 一場戰鬥的完整輸入，攤平成純資料。
+ *
+ * **這個型別存在的理由是「同一份配置不准被組兩次」。** 玩家的機器打完一場，
+ * 伺服器要用同一份 tickCombat 重跑一遍來驗證成績——兩邊若各自從各自手上的東西
+ * （一邊是存檔、一邊是上報的欄位）拼出 Loadout，只要漏掉一個乘區，
+ * 重播的就是另一場仗，而症狀是「合法的成績被當成造假退回」，
+ * 錯誤訊息還完全指不到原因。
+ *
+ * 所以組裝只有一份實作：buildLoadoutFromSpec。存檔那條路徑只是把存檔攤成這個型別。
+ */
+export interface LoadoutSpec {
+  sectId: string;
+  stage: number;
+  /** 帶哪四張符看的是**歷史最高關卡**而不是這一關：重打舊關卡時不該被沒收選擇。 */
+  highestStage: number;
+  talismans: readonly string[];
+  upgrades: Readonly<Record<string, number>>;
+  /** 仙緣各線的等級（不是換算後的數值）。 */
+  karma: Readonly<Record<string, number>>;
+  /** 這一派累積了幾次通關，決定修為階數。 */
+  sectClears: number;
+  challenges: readonly string[];
+}
+
+/** 把存檔攤平成 LoadoutSpec。上報成績時送的也是這一份。 */
+export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
+  return {
+    sectId: save.player.sectId ?? '',
+    stage,
+    highestStage: save.world.highestStage,
+    talismans: [...save.player.talismans],
+    upgrades: { ...save.player.upgrades },
+    karma: { ...save.player.karma.spent },
+    sectClears:
+      save.player.sectId === null ? 0 : (save.player.sectClears[save.player.sectId] ?? 0),
+    challenges: [...save.player.challenges],
+  };
+}
+
+export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
+  const sect = sectById(spec.sectId);
   if (sect === null) throw new Error('尚未選擇門派，無法開始挑戰');
-  // 帶哪四張符看的是**歷史最高關卡**而不是這一關：重打舊關卡時不該被沒收選擇。
-  const all = talismanDefs(save.player.talismans, save.world.highestStage);
+  const challenges = challengeDefsOf(spec.challenges, spec.highestStage);
+  const has = (id: string): boolean => challenges.some((item) => item.id === id);
+
+  const all = talismanDefs(spec.talismans, spec.highestStage);
   // 獨門一符：抽符池縮成第一張。每一張都合得起來，階數衝得極快，
   // 但陣法只剩同心、特效完全沒有互補。
-  const solo = hasChallenge(save, 'soloTalisman');
-  const talismans = solo ? all.slice(0, 1) : all;
-  const mastery = masteryBonus(masteryTier(save, sect.id));
+  const talismans = has('soloTalisman') ? all.slice(0, 1) : all;
+
   const loadout = buildLoadoutFor(
     sect,
-    save.player.upgrades,
-    stage,
+    spec.upgrades,
+    spec.stage,
     talismans,
-    mastery,
+    masteryBonus(masteryTierFor(spec.sectClears)),
     {
-      noMerge: hasChallenge(save, 'noMerge'),
-      suddenDeath: hasChallenge(save, 'noLeak'),
-      bossTimeMultiplier: hasChallenge(save, 'hasteBoss') ? 0.5 : 1,
+      noMerge: has('noMerge'),
+      suddenDeath: has('noLeak'),
+      bossTimeMultiplier: has('hasteBoss') ? 0.5 : 1,
     },
-    karmaBonuses(save),
+    {
+      damage: karmaAmountOf(spec.karma, 'karmaPower') / 100,
+      gold: karmaAmountOf(spec.karma, 'karmaGold') / 100,
+      disciples: karmaAmountOf(spec.karma, 'karmaGate') / 100,
+      tierBonus: karmaAmountOf(spec.karma, 'karmaTier'),
+    },
   );
   // 孤身守門：容錯幾乎歸零。放在這裡而不是 RunRules 裡，
   // 是因為它改的是一個既有的起始值，不是一條新規則。
-  if (hasChallenge(save, 'thinGate')) {
+  if (has('thinGate')) {
     loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
   }
-  loadout.goldMultiplier *= challengeGoldMultiplier(save);
+  loadout.goldMultiplier *= challenges.reduce((total, item) => total * item.goldMultiplier, 1);
   return loadout;
 }
+
+export function buildLoadout(save: SaveData, stage: number): Loadout {
+  return buildLoadoutFromSpec(loadoutSpecOf(save, stage));
+}
+
 
 /**
  * 仙緣帶來的跨世乘區。
@@ -122,15 +173,6 @@ export interface KarmaBonuses {
 }
 
 export const NO_KARMA: KarmaBonuses = { damage: 0, gold: 0, disciples: 0, tierBonus: 0 };
-
-function karmaBonuses(save: SaveData): KarmaBonuses {
-  return {
-    damage: karmaAmount(save, 'karmaPower') / 100,
-    gold: karmaAmount(save, 'karmaGold') / 100,
-    disciples: karmaAmount(save, 'karmaGate') / 100,
-    tierBonus: karmaAmount(save, 'karmaTier'),
-  };
-}
 
 /** 百分比升級換算成倍率。 */
 function multiplierOf(upgrades: Readonly<Record<string, number>>, id: string): number {

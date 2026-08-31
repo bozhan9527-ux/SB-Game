@@ -52,9 +52,17 @@ export function karmaLevel(save: SaveData, id: string): number {
   return Math.max(0, save.player.karma.spent[id] ?? 0);
 }
 
-/** 該線目前的累計數值（0 級為 0）。 */
+/**
+ * 該線目前的累計數值（0 級為 0）。
+ *
+ * 和修為同一個理由吃純資料：伺服器重播時只有玩家上報的等級表，沒有存檔。
+ */
+export function karmaAmountOf(spent: Readonly<Record<string, number>>, id: string): number {
+  return karmaTrackById(id).perLevel * Math.max(0, spent[id] ?? 0);
+}
+
 export function karmaAmount(save: SaveData, id: string): number {
-  return karmaTrackById(id).perLevel * karmaLevel(save, id);
+  return karmaAmountOf(save.player.karma.spent, id);
 }
 
 export type KarmaPurchase = 'ok' | 'maxed' | 'poor';
