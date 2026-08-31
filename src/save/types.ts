@@ -8,12 +8,28 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
   /** 權威數值集中於 wallet 之下（TECH_SPEC 第 9.3 節）。 */
   gold: number;
+}
+
+/**
+ * 雲端存檔的匿名身分。
+ *
+ * playerId 是「誰」，secret 證明「是他本人」。兩者都在存檔裡，所以
+ * **已經做好的存檔碼順便就是雲端身分的救援手段**——換裝置貼碼回來，身分跟著回來。
+ *
+ * 沒有用過雲端存檔的玩家是 null，不預先產生：產了卻沒用，只是讓每一份存檔碼
+ * 都多帶一組沒有意義的亂數。
+ */
+export interface CloudIdentity {
+  playerId: string;
+  secret: string;
+  /** 最後一次成功同步的時間（Unix ms）。從未同步為 0。 */
+  syncedAt: number;
 }
 
 /**
@@ -111,6 +127,7 @@ export interface PlayerState {
   challengesDone: string[];
   records: RecordsState;
   karma: KarmaState;
+  cloud: CloudIdentity | null;
   stats: StatsState;
 }
 

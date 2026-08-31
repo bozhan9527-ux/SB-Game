@@ -8,7 +8,7 @@ import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { KarmaState, RecordsState, SaveData } from './types';
+import type { CloudIdentity, KarmaState, RecordsState, SaveData } from './types';
 import { SAVE_KEY, SAVE_VERSION } from './types';
 
 export function createDefaultSave(now: number = Date.now()): SaveData {
@@ -29,6 +29,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       challenges: [],
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
+      cloud: null,
       records: {
         bestDps: 0,
         fastestClearMs: 0,
@@ -45,6 +46,17 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
 
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** 雲端身分：欄位缺一不可，缺了就當作沒有——半組身分比沒有身分更糟。 */
+function normalizeCloud(raw: unknown): CloudIdentity | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const source = raw as Record<string, unknown>;
+  const playerId = source['playerId'];
+  const secret = source['secret'];
+  if (typeof playerId !== 'string' || playerId.length === 0) return null;
+  if (typeof secret !== 'string' || secret.length === 0) return null;
+  return { playerId, secret, syncedAt: Math.max(0, asNumber(source['syncedAt'], 0)) };
 }
 
 /** 仙緣一律夾成非負整數，等級也夾在該線的上限之內。 */
@@ -140,6 +152,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       challengesDone: strings(player['challengesDone']),
       records: normalizeRecords(player['records']),
       karma: normalizeKarma(player['karma']),
+      cloud: normalizeCloud(player['cloud']),
       stats: {
         maxTier: Math.max(0, Math.floor(asNumber(stats['maxTier'], 0))),
         totalKills: Math.max(0, Math.floor(asNumber(stats['totalKills'], 0))),

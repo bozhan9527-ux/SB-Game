@@ -158,6 +158,17 @@ const addTelemetrySetting: Migration = (data) => {
   return { ...data, settings: { ...settings, telemetry: true } };
 };
 
+/**
+ * v13 → v14：加入雲端存檔的身分欄位。
+ *
+ * 補 null 而不是當場產一組：遷移是純函式，不該去碰 crypto，
+ * 而且沒用過雲端的人不需要那組亂數。第一次同步時才產生。
+ */
+const addCloudIdentity: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, cloud: null } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -172,6 +183,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addKarma,
   addRetreat,
   addTelemetrySetting,
+  addCloudIdentity,
 ];
 
 /**

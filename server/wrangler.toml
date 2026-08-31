@@ -1,0 +1,20 @@
+# Cloudflare Worker：雲端存檔、排行榜、百分位。
+#
+# 為什麼是 Cloudflare：這個專案本來就是一包靜態檔案，Workers 的免費額度
+# （每日十萬請求）在有遙測數字之前不可能用完，而存檔本來就是單一可序列化物件，
+# D1 一張表就裝得下（TECH_SPEC 第 9 節從第一天就是這樣設計的）。
+name = "sb-game-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# 部署前要先建資料庫並把 database_id 填進來：
+#   npx wrangler d1 create sb-game
+#   npx wrangler d1 execute sb-game --remote --file=server/schema.sql
+[[d1_databases]]
+binding = "DB"
+database_name = "sb-game"
+database_id = "local-placeholder"
+
+[vars]
+# 允許哪些來源呼叫。部署到自己的網域時要改這裡。
+ALLOWED_ORIGIN = "https://bozhan9527-ux.github.io"

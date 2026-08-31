@@ -8,3 +8,6 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Cloudflare Worker 的本機狀態
+server/.wrangler/
