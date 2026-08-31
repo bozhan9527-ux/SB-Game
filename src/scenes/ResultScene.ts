@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { audio } from '../audio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { CARDS } from '../data';
-import { addGold, recordClear, recordDefeat } from '../save';
+import { addGold, recordClear, recordDefeat, recordDungeonRun } from '../save';
+import { dungeonById, grantFloor, nextFloor } from '../systems/dungeons';
 import { claimAchievements } from '../systems/achievements';
-import { activeChallenges, recordChallengeClears } from '../systems/challenges';
 import { track } from '../telemetry';
 import { cloudEnabled } from '../net/client';
 import { MAX_NAME_LENGTH } from '../net/protocol';
@@ -30,6 +30,8 @@ export class ResultScene extends Phaser.Scene {
   private result!: RunResultData;
   private report: Phaser.GameObjects.Container | null = null;
   private cloudLine: Phaser.GameObjects.Text | undefined;
+  /** 這一層發了什麼。空陣列代表不是副本、或是沒過。 */
+  private dungeonRewards: string[] = [];
 
   constructor() {
     super('Result');
@@ -37,6 +39,7 @@ export class ResultScene extends Phaser.Scene {
 
   init(data: RunResultData): void {
     this.result = data;
+    this.dungeonRewards = [];
     // Phaser 會重用 Scene 實例：上一場的戰報面板已經被銷毀，不清成 null 就會拿到空殼。
     this.report = null;
     this.cloudLine = undefined;
@@ -54,12 +57,21 @@ export class ResultScene extends Phaser.Scene {
     stats.maxTier = Math.max(stats.maxTier, result.peakTier);
     stats.totalKills += result.kills;
     if (result.victory && result.leaks === 0) stats.perfectClears += 1;
-    if (result.victory) recordClear(save, result.goldCollected + result.goldReward);
-    else recordDefeat(save, result.goldCollected + result.goldReward);
+    const gold = result.goldCollected + result.goldReward;
+    const dungeon = result.dungeon === null ? null : dungeonById(result.dungeon.id);
+    // 副本的一場走另一條記帳：給錢、算次數，但不動主線進度。
+    if (result.dungeon !== null) recordDungeonRun(save, gold);
+    else if (result.victory) recordClear(save, gold);
+    else recordDefeat(save, gold);
 
-    // 試煉的達成紀錄要在成就結算之前寫入：日後若有「達成某條試煉」的成就，
-    // 順序反了就會慢一場才發。
-    const challenges = result.victory ? recordChallengeClears(save) : [];
+    // 副本的回報在通關時才發，而且發放與顯示走同一份資料——
+    // 兩邊各算一次的話，遲早會出現「畫面說給了、存檔裡沒有」。
+    this.dungeonRewards =
+      result.victory && dungeon !== null && result.dungeon !== null
+        ? grantFloor(save, dungeon, result.dungeon.floor).lines
+        : [];
+
+
     const beaten = updateRecords(save, {
       victory: result.victory,
       stage: result.stage,
@@ -67,7 +79,7 @@ export class ResultScene extends Phaser.Scene {
       dps: averageDps(result.telemetry, result.elapsedMs),
       formationBonus: averageFormationBonus(result.telemetry),
       elapsedMs: result.elapsedMs,
-      challengeCount: activeChallenges(save).length,
+      challengeCount: result.dungeon === null ? 0 : 1,
     });
     // 流失漏斗與難度曲線都靠這一個事件。stage 報的是剛剛打的那一關，
     // 不是存檔已經推進到的下一關。
@@ -132,8 +144,9 @@ export class ResultScene extends Phaser.Scene {
     // 但也不能各佔一行——突破境界那一場表格會往下長四十像素，
     // 兩行就會直接撞上「下一關」。合成一行再用 fitText 縮，任何組合都放得下。
     const highlights = [
+      // 副本的回報排在最前面：那是玩家進來的理由，而破紀錄只是順帶。
+      ...this.dungeonRewards,
       ...beaten.map((item) => `${item.label} ${item.text}`),
-      ...challenges.map((item) => `試煉達成 ${item.name}`),
     ];
     if (highlights.length > 0) {
       const line = this.add
@@ -142,18 +155,44 @@ export class ResultScene extends Phaser.Scene {
       fitText(line, GAME_WIDTH - 40);
     }
 
-    const nextStage = save.world.stage;
+    // 副本的一場不推進主線，所以這裡要講的是「這個副本接下來是第幾層」，
+    // 而不是「下一關是第幾關」——後者在副本裡是一個和剛剛那一場無關的數字。
+    const upcoming = dungeon === null ? null : nextFloor(save, dungeon);
     this.add
-      .text(cx, 724, `下一關：第 ${nextStage} 關 · ${realmTitle(nextStage)}`, textStyle({ size: 20, color: INK }))
+      .text(
+        cx,
+        724,
+        dungeon === null
+          ? `下一關：第 ${save.world.stage} 關 · ${realmTitle(save.world.stage)}`
+          : upcoming === null
+            ? `${dungeon.name} 已全部通過`
+            : `${dungeon.name} 第 ${upcoming} 層`,
+        textStyle({ size: 20, color: INK }),
+      )
       .setOrigin(0.5);
 
     createButton(this, cx, 784, {
       width: 340,
       height: 66,
-      label: result.victory ? '繼續挑戰' : '再戰一次',
+      label:
+        dungeon === null
+          ? (result.victory ? '繼續挑戰' : '再戰一次')
+          : upcoming === null
+            ? '回副本'
+            : `進第 ${upcoming} 層`,
       fontSize: 28,
       strokeColor: 0x6f8b7a,
-      onClick: () => fadeToScene(this, 'Run'),
+      onClick: () => {
+        if (dungeon === null) {
+          fadeToScene(this, 'Run');
+          return;
+        }
+        if (upcoming === null) {
+          fadeToScene(this, 'Dungeon');
+          return;
+        }
+        fadeToScene(this, 'Run', { dungeonId: dungeon.id, floor: upcoming });
+      },
     });
     createButton(this, cx, 856, {
       width: 340,

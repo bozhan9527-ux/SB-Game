@@ -74,20 +74,22 @@ export interface ScoreSubmitRequest extends Identity {
  */
 export interface ScoreLoadout {
   sectId: string;
-  /** 符籙的解鎖看的是歷史最高關卡，不是這一關。 */
-  highestStage: number;
+  /** 藏經閣通關層數。它決定抽符池——漏掉它，重播抽到的就不是同一組符。 */
+  libraryFloor: number;
   talismans: string[];
   upgrades: Record<string, number>;
   karma: Record<string, number>;
   /** 門派修為的來源。漏掉它，重播出來的傷害就和玩家當時不一樣。 */
   sectClears: number;
   /**
-   * 這一場開的試煉。
+   * 這一場的規則（副本帶進來的）。
    *
-   * 它不是作弊面：每一條都只讓這一場更難，而且人人可開。
-   * 漏掉它才是問題——開了試煉的玩家，成績會永遠驗不過。
+   * 它不是作弊面：每一條都只讓這一場更難，而且人人可打。
+   * 漏掉它才是問題——在副本裡通關的成績會永遠驗不過。
    */
-  challenges: string[];
+  rules: string[];
+  goldMultiplier: number;
+  extraFieldSlots: number;
 }
 
 export interface ScoreSubmitResult {

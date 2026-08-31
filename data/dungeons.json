@@ -1,0 +1,188 @@
+[
+  {
+    "id": "library",
+    "name": "藏經閣",
+    "icon": "scroll",
+    "desc": "只帶一張符入場，把它學透",
+    "detail": "抽符池縮成你帶的第一張。每一張都合得起來，階數衝得極快，但陣法只剩同心、特效完全沒有互補——這一層要的不是配招，是把一張符用到底。",
+    "reward": "符籙",
+    "rules": [
+      "soloTalisman"
+    ],
+    "goldMultiplier": 1.2,
+    "repeatable": false,
+    "floors": [
+      {
+        "stage": 3,
+        "talisman": "frost"
+      },
+      {
+        "stage": 5,
+        "talisman": "pyre"
+      },
+      {
+        "stage": 8,
+        "talisman": "pierce"
+      },
+      {
+        "stage": 10,
+        "talisman": "fortune"
+      },
+      {
+        "stage": 13,
+        "talisman": "soul"
+      },
+      {
+        "stage": 16,
+        "talisman": "breaker"
+      },
+      {
+        "stage": 19,
+        "talisman": "abyss"
+      },
+      {
+        "stage": 22,
+        "talisman": "spirit"
+      },
+      {
+        "stage": 25,
+        "talisman": "gale"
+      },
+      {
+        "stage": 29,
+        "talisman": "tempest"
+      },
+      {
+        "stage": 32,
+        "talisman": "bastion"
+      },
+      {
+        "stage": 36,
+        "talisman": "taiyi"
+      },
+      {
+        "stage": 40,
+        "talisman": "slayer"
+      },
+      {
+        "stage": 44,
+        "talisman": "myriad"
+      },
+      {
+        "stage": 49,
+        "talisman": "grand"
+      },
+      {
+        "stage": 54,
+        "talisman": "seal"
+      }
+    ]
+  },
+  {
+    "id": "cliff",
+    "name": "問心崖",
+    "icon": "record",
+    "desc": "整場不能合成",
+    "detail": "拿掉這個遊戲唯一的指數成長。撐得過去靠的是門派的被動與陣法，而不是任何一張符——所以回報是門派修為。",
+    "reward": "門派修為",
+    "rules": [
+      "noMerge"
+    ],
+    "goldMultiplier": 1.8,
+    "repeatable": false,
+    "floors": [
+      {
+        "stage": 12,
+        "mastery": 3
+      },
+      {
+        "stage": 26,
+        "mastery": 3
+      },
+      {
+        "stage": 42,
+        "mastery": 3
+      },
+      {
+        "stage": 60,
+        "mastery": 3
+      }
+    ]
+  },
+  {
+    "id": "pagoda",
+    "name": "鎮妖塔",
+    "icon": "trial",
+    "desc": "山門耐久只剩三成",
+    "detail": "容錯幾乎歸零，漏一隻就可能結束。全遊戲最硬的一條，配上唯一能跨世帶走的東西。",
+    "reward": "仙緣",
+    "rules": [
+      "thinGate"
+    ],
+    "goldMultiplier": 1.6,
+    "repeatable": false,
+    "floors": [
+      {
+        "stage": 20,
+        "karma": 2
+      },
+      {
+        "stage": 33,
+        "karma": 2
+      },
+      {
+        "stage": 46,
+        "karma": 2
+      },
+      {
+        "stage": 60,
+        "karma": 2
+      },
+      {
+        "stage": 75,
+        "karma": 2
+      }
+    ]
+  },
+  {
+    "id": "arena",
+    "name": "試劍台",
+    "icon": "sect",
+    "desc": "漏掉任何一隻立刻失守",
+    "detail": "不是扣耐久，是直接結束。這是一場純粹的排陣考試，所以回報就給排陣本身——場上多一格。",
+    "reward": "陣法格位",
+    "rules": [
+      "noLeak"
+    ],
+    "goldMultiplier": 2.0,
+    "repeatable": false,
+    "floors": [
+      {
+        "stage": 45,
+        "fieldSlot": 1
+      },
+      {
+        "stage": 70,
+        "fieldSlot": 1
+      }
+    ]
+  },
+  {
+    "id": "trove",
+    "name": "聚寶洞",
+    "icon": "cave",
+    "desc": "首領時限砍半，金幣加倍",
+    "detail": "唯一可以重複打的副本。深度跟著你的最高關卡走——刷金幣永遠要付出和你現在實力相稱的難度，不會有「回頭打簡單關領倍率」這種事。",
+    "reward": "金幣",
+    "rules": [
+      "hasteBoss"
+    ],
+    "goldMultiplier": 2.4,
+    "repeatable": true,
+    "floors": [
+      {
+        "stageRatio": 0.85
+      }
+    ]
+  }
+]

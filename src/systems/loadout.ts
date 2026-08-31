@@ -11,7 +11,6 @@
 import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect } from '../data/types';
 import type { SaveData } from '../save/types';
-import { challengeDefsOf } from './challenges';
 import { karmaAmountOf } from './karma';
 import { masteryBonus, masteryTierFor } from './sects';
 import { realmForStage } from './realms';
@@ -90,39 +89,50 @@ export function sectById(id: string | null): Sect | null {
 export interface LoadoutSpec {
   sectId: string;
   stage: number;
-  /** 帶哪四張符看的是**歷史最高關卡**而不是這一關：重打舊關卡時不該被沒收選擇。 */
-  highestStage: number;
+  /** 藏經閣通關層數。它決定抽符池——符籙的解鎖不再看關卡進度。 */
+  libraryFloor: number;
   talismans: readonly string[];
   upgrades: Readonly<Record<string, number>>;
   /** 仙緣各線的等級（不是換算後的數值）。 */
   karma: Readonly<Record<string, number>>;
   /** 這一派累積了幾次通關，決定修為階數。 */
   sectClears: number;
-  challenges: readonly string[];
+  /**
+   * 這一場的規則，由副本帶進來（一般關卡是空的）。
+   *
+   * 沿用原本試煉條件的 id：規則本身沒有改，改的是「誰決定要套用它」——
+   * 以前是玩家自己挑關卡疊上去，現在是副本自己帶著。
+   */
+  rules: readonly string[];
+  /** 這一場的金幣倍率，同樣由副本帶進來。 */
+  goldMultiplier: number;
+  /** 試劍台給的額外陣法格位。 */
+  extraFieldSlots: number;
 }
 
-/** 把存檔攤平成 LoadoutSpec。上報成績時送的也是這一份。 */
+/** 把存檔攤平成一般關卡的 LoadoutSpec。上報成績時送的也是這一份。 */
 export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
   return {
     sectId: save.player.sectId ?? '',
     stage,
-    highestStage: save.world.highestStage,
+    libraryFloor: save.player.dungeons['library'] ?? 0,
     talismans: [...save.player.talismans],
     upgrades: { ...save.player.upgrades },
     karma: { ...save.player.karma.spent },
     sectClears:
       save.player.sectId === null ? 0 : (save.player.sectClears[save.player.sectId] ?? 0),
-    challenges: [...save.player.challenges],
+    rules: [],
+    goldMultiplier: 1,
+    extraFieldSlots: save.player.dungeonFieldSlots,
   };
 }
 
 export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   const sect = sectById(spec.sectId);
   if (sect === null) throw new Error('尚未選擇門派，無法開始挑戰');
-  const challenges = challengeDefsOf(spec.challenges, spec.highestStage);
-  const has = (id: string): boolean => challenges.some((item) => item.id === id);
+  const has = (id: string): boolean => spec.rules.includes(id);
 
-  const all = talismanDefs(spec.talismans, spec.highestStage);
+  const all = talismanDefs(spec.talismans, spec.libraryFloor);
   // 獨門一符：抽符池縮成第一張。每一張都合得起來，階數衝得極快，
   // 但陣法只剩同心、特效完全沒有互補。
   const talismans = has('soloTalisman') ? all.slice(0, 1) : all;
@@ -150,7 +160,8 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   if (has('thinGate')) {
     loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
   }
-  loadout.goldMultiplier *= challenges.reduce((total, item) => total * item.goldMultiplier, 1);
+  loadout.fieldSlots += Math.max(0, Math.floor(spec.extraFieldSlots));
+  loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   return loadout;
 }
 

@@ -51,4 +51,17 @@ export interface RunResultData {
   elapsedMs: number;
   /** 上榜用的重播資料；不可驗證的一場為 null。 */
   submission: RunSubmission | null;
+  /**
+   * 這一場是哪個副本的第幾層。一般關卡是 null。
+   *
+   * 副本的一場**不推進主線、也不上榜**：它的深度是副本決定的，
+   * 把它記進「你推到第幾關」等於用一個比較好打的環境灌進度。
+   */
+  dungeon: { id: string; floor: number } | null;
+}
+
+/** 進入戰鬥時傳給 RunScene 的資料。一般關卡不傳。 */
+export interface RunEntryData {
+  dungeonId?: string;
+  floor?: number;
 }

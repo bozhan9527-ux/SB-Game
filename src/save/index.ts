@@ -1,7 +1,7 @@
 /**
  * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
  */
-import { KARMA, SECTS, UPGRADES } from '../data';
+import { DUNGEONS, KARMA, SECTS, UPGRADES } from '../data';
 import { sanitizeChallenges } from '../systems/challenges';
 import { sanitizeTalismans, starterTalismans } from '../systems/talismans';
 import { trackById, upgradeCost } from '../systems/upgrades';
@@ -26,6 +26,8 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       hints: [],
       talismans: starterTalismans(),
       sectClears: {},
+      dungeons: {},
+      dungeonFieldSlots: 0,
       challenges: [],
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
@@ -114,6 +116,20 @@ function normalizeRecords(raw: unknown): RecordsState {
  *
  * 這份紀錄會直接換成傷害加成，所以壞值不能放行：手改成 99999 等於自己把難度調成零。
  */
+/**
+ * 副本進度。夾在該副本實際的層數之內——手改成 999 不該讓玩家一次拿到
+ * 二十張符，而那正是這個欄位現在的意義。
+ */
+function normalizeDungeons(raw: unknown): Record<string, number> {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const dungeon of DUNGEONS) {
+    const value = Math.floor(asNumber(source[dungeon.id], 0));
+    if (value > 0) out[dungeon.id] = Math.min(dungeon.floors.length, value);
+  }
+  return out;
+}
+
 function normalizeSectClears(raw: unknown): Record<string, number> {
   const source = (raw ?? {}) as Record<string, unknown>;
   const out: Record<string, number> = {};
@@ -154,6 +170,9 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
     merged[track.id] = Math.max(0, Math.min(track.maxLevel, Math.floor(level)));
   }
 
+  // 副本進度要先算出來：符籙的解鎖來源是藏經閣的層數。
+  const dungeons = normalizeDungeons(player['dungeons']);
+
   const stage = Math.max(1, Math.floor(asNumber(world['stage'], 1)));
   const highestStage = Math.max(stage, Math.floor(asNumber(world['highestStage'], stage)));
   return {
@@ -166,8 +185,11 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       achievements,
       hints,
       // 存檔可能引用到已改名或尚未解鎖的符，一律修補成一份能直接開場的四張。
-      talismans: sanitizeTalismans(savedTalismans, highestStage),
+      // 符籙的解鎖來源是藏經閣的層數，不是關卡進度（v17 起）。
+      talismans: sanitizeTalismans(savedTalismans, dungeons['library'] ?? 0),
       sectClears: normalizeSectClears(player['sectClears']),
+      dungeons,
+      dungeonFieldSlots: Math.max(0, Math.floor(asNumber(player['dungeonFieldSlots'], 0))),
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),
       records: normalizeRecords(player['records']),
@@ -296,6 +318,19 @@ export function recordClear(data: SaveData, gold: number): void {
   data.world.highestStage = Math.max(data.world.highestStage, data.world.stage);
   data.world.runs += 1;
   data.world.clears += 1;
+  data.world.retreatAt = Date.now();
+}
+
+/**
+ * 副本的一場。
+ *
+ * 給金幣、算一次挑戰次數（閉關的計時要重設，人確實在場上），
+ * 但**不推進關卡、不累積門派修為、不算主線通關**——副本的深度是副本決定的，
+ * 把它記進「你推到第幾關」等於用一個比較好打的環境灌主線進度。
+ */
+export function recordDungeonRun(data: SaveData, gold: number): void {
+  addGold(data, gold);
+  data.world.runs += 1;
   data.world.retreatAt = Date.now();
 }
 

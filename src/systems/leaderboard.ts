@@ -29,7 +29,7 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
     talismans: [...rest.talismans],
     upgrades: { ...rest.upgrades },
     karma: { ...rest.karma },
-    challenges: [...rest.challenges],
+    rules: [...rest.rules],
   };
 }
 

@@ -17,7 +17,6 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
 import type { MobTrait } from '../data/types';
 import { persist, state } from '../state';
-import { activeChallenges } from '../systems/challenges';
 import type { ReplayAction, ReplayActionInput } from '../systems/replay';
 import { MAX_REPLAY_ACTIONS, MAX_STEPS_PER_FRAME, STEP_MS, runSeed } from '../systems/replay';
 import { track } from '../telemetry';
@@ -37,7 +36,8 @@ import {
 import type { FormationLine } from '../systems/formation';
 import { activeFormations, formationEffect, formationName } from '../systems/formation';
 import { boardBonuses } from '../systems/board';
-import { buildLoadout } from '../systems/loadout';
+import { buildLoadoutFromSpec, loadoutSpecOf } from '../systems/loadout';
+import { dungeonById, dungeonSpecOf } from '../systems/dungeons';
 import type { TutorialStep } from '../systems/tutorial';
 import {
   HINT_BOSS,
@@ -74,7 +74,7 @@ import {
   hexToNumber,
   textStyle,
 } from '../ui/theme';
-import type { RunResultData } from './types';
+import type { RunEntryData, RunResultData } from './types';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 妖魔的行進區間。上緣是妖魔出場處，下緣就是山門。 */
@@ -252,8 +252,25 @@ export class RunScene extends Phaser.Scene {
   /** 這一場的種子用的 runs。上榜時要原封不動送出去，伺服器才重播得出同一場。 */
   private seedRuns = 0;
 
+  /** 這一場是哪個副本的第幾層。一般關卡是 null。 */
+  private dungeonRun: { id: string; floor: number } | null = null;
+
   constructor() {
     super('Run');
+  }
+
+  /**
+   * 副本的一場會帶著「哪個副本、第幾層」進來。一般關卡什麼都不帶。
+   *
+   * Phaser 重用 Scene 實例，所以這裡一定要清成 null——不清的話，
+   * 打完一次副本之後的每一場正常關卡都會被當成副本，那會安靜地
+   * 停掉主線進度，而畫面上完全看不出原因。
+   */
+  init(data?: RunEntryData): void {
+    const id = data?.dungeonId;
+    const floor = data?.floor;
+    this.dungeonRun =
+      typeof id === 'string' && typeof floor === 'number' ? { id, floor } : null;
   }
 
   create(): void {
@@ -264,8 +281,15 @@ export class RunScene extends Phaser.Scene {
       return;
     }
 
-    const stage = save.world.stage;
-    const loadout = buildLoadout(save, stage);
+    const entry = this.dungeonRun;
+    const dungeon = entry === null ? null : dungeonById(entry.id);
+    // 副本走同一個組裝函式，只是規則、倍率與深度由副本填。
+    const spec =
+      dungeon === null || entry === null
+        ? loadoutSpecOf(save, save.world.stage)
+        : dungeonSpecOf(save, dungeon, entry.floor);
+    const stage = spec.stage;
+    const loadout = buildLoadoutFromSpec(spec);
     // 種子帶入挑戰次數：同一關重打會換一批妖魔與符，但單次進行中完全可重現。
     // 種子的另一半要當場記下來：結算頁會把 runs 加一，之後再去讀就不是這一場的種子了。
     this.seedRuns = save.world.runs;
@@ -287,7 +311,9 @@ export class RunScene extends Phaser.Scene {
     drawBackdrop(this, realm.color, realm.scenery);
 
     // 教學要換掉起手牌，必須在建立牌位之前決定，否則陣位數會對不上。
-    this.step = shouldRunTutorial(save) ? 'deploy' : 'done';
+    // 副本裡不跑教學：教學會改寫起手牌，而副本的規則（例如獨門一符）
+    // 本來就已經改過一次牌了，兩者疊在一起誰都說不清這一場的牌是怎麼來的。
+    this.step = this.dungeonRun === null && shouldRunTutorial(save) ? 'deploy' : 'done';
     this.tutorialRun = this.step !== 'done';
     // 起點也要報，否則分母不存在——只有「走到第二步」的人數是算不出完成率的。
     if (this.step === 'deploy') track('tutorial_step', { step: 'deploy' });
@@ -325,10 +351,10 @@ export class RunScene extends Phaser.Scene {
       sect: save.player.sectId,
       // 排序過才聚合得起來：同樣四張符換個順序不該變成兩種組合。
       talismans: [...save.player.talismans].sort().join(','),
-      challenges: activeChallenges(save)
-        .map((item) => item.id)
-        .sort()
-        .join(','),
+      // 這一場是不是在副本裡，以及是哪一個——遙測要分得開，
+      // 不然副本的難度會混進主線的流失曲線裡。
+      dungeon: this.dungeonRun?.id ?? null,
+      dungeon_floor: this.dungeonRun?.floor ?? 0,
       speed: this.speed,
       field_slots: this.run.field.length,
     });
@@ -459,15 +485,16 @@ export class RunScene extends Phaser.Scene {
       .setOrigin(1, 0)
       .setDepth(51);
 
-    // 開了試煉就在 HUD 上常駐一行：規則改過的那一場，玩家必須隨時看得到改了什麼，
+    // 在副本裡就在 HUD 上常駐一行：規則改過的那一場，玩家必須隨時看得到改了什麼，
     // 否則「怎麼合不起來」會被當成 bug。
-    const challenges = activeChallenges(state());
-    if (challenges.length > 0) {
+    const entry = this.dungeonRun;
+    const dungeon = entry === null ? null : dungeonById(entry.id);
+    if (dungeon !== null && entry !== null) {
       this.add
         .text(
           20,
           106,
-          `試煉　${challenges.map((item) => item.name).join('・')}`,
+          `${dungeon.name} 第 ${entry.floor} 層　${dungeon.desc}`,
           textStyle({ size: 15, color: GOLD, bold: true }),
         )
         .setDepth(52);
@@ -1939,10 +1966,12 @@ export class RunScene extends Phaser.Scene {
       telemetry: this.run.telemetry,
       elapsedMs: this.run.elapsedMs,
       // 中途放棄的一場沒有上榜的意義，教學那一場則重播不出來。
+      // 副本也不上榜：它的深度是副本決定的，拿去和「推到第幾關」比不是同一件事。
       submission:
-        this.tutorialRun || reason === 'abandon'
+        this.tutorialRun || reason === 'abandon' || this.dungeonRun !== null
           ? null
           : { runs: this.seedRuns, steps: this.stepIndex, actions: this.actions },
+      dungeon: this.dungeonRun,
     };
 
     fadeToScene(this, 'Result', result);

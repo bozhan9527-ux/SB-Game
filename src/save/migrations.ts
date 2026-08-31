@@ -4,6 +4,8 @@
  * 規則：存檔結構一有變更就把 SAVE_VERSION +1，並在此陣列尾端追加一支遷移函式，
  * 索引 i 的函式負責 v(i+1) → v(i+2)。禁止改結構而不寫遷移。
  */
+import { CARDS } from '../data';
+
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
 /** v1 → v2：加入音效開關。舊存檔沒有這個欄位，預設開啟。 */
@@ -186,6 +188,30 @@ const addVolumes: Migration = (data) => {
   return { ...data, settings: { ...settings, sfxVolume: 1, musicVolume: 1 } };
 };
 
+/**
+ * v16 → v17：試煉改成副本，符籙的解鎖來源跟著換人。
+ *
+ * 這是整條遷移鏈裡最需要小心的一支：**符籙原本由「推到第幾關」解鎖，
+ * 現在由「藏經閣打到第幾層」解鎖**。什麼都不做的話，一個推到第 139 關、
+ * 手上有二十張符的老玩家，改版之後會只剩四張——那是把他打出來的東西沒收掉。
+ *
+ * 所以這裡把已解鎖的張數直接換算成層數：第 N 張非基礎符對應藏經閣第 N 層。
+ * 兩邊的順序都是 cards.json 的順序，所以這個對應是一對一的。
+ *
+ * 換算刻意用「已解鎖」而不是「已帶在身上」：帶在身上的只有四張，
+ * 而他解鎖的是全部——沒收的標準要看他曾經取得什麼，不是他現在用什麼。
+ */
+const addDungeons: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const highest = typeof world['highestStage'] === 'number' ? world['highestStage'] : 1;
+  // 非基礎符 = unlockStage 大於 1 的那些，順序即解鎖順序。
+  const earned = CARDS.filter((card) => card.unlockStage > 1 && card.unlockStage <= Math.max(1, highest));
+  const dungeons: Record<string, number> = {};
+  if (earned.length > 0) dungeons['library'] = earned.length;
+  return { ...data, player: { ...player, dungeons, dungeonFieldSlots: 0 } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -203,6 +229,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addCloudIdentity,
   addLeaderboardFields,
   addVolumes,
+  addDungeons,
 ];
 
 /**

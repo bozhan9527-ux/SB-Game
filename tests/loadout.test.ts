@@ -75,10 +75,11 @@ describe('開局配置', () => {
  * 「合法玩家被指控造假」，而錯誤訊息完全指不到真正的原因。
  */
 describe('上報的配置足以重建同一場戰鬥', () => {
-  it('回頭打舊關卡時，符籙池仍依歷史最高關卡決定', () => {
+  it('回頭打舊關卡時，符籙池仍依藏經閣層數決定', () => {
     const save = createDefaultSave();
     save.player.sectId = 'sword';
     save.world.highestStage = 139;
+    save.player.dungeons['library'] = 16;
     save.player.talismans = ['swordArray', 'flame', 'thunder', 'gale'];
 
     const spec = { ...loadoutFor(save), stage: 26 };
@@ -87,14 +88,14 @@ describe('上報的配置足以重建同一場戰鬥', () => {
     );
   });
 
-  it('修為、仙緣、試煉都跟著上報，重建出來的配置與玩家實際那一場完全相同', () => {
+  it('修為、仙緣、副本進度都跟著上報，重建出來的配置與玩家實際那一場完全相同', () => {
     const save = createDefaultSave();
     save.player.sectId = 'sword';
     save.world.highestStage = 139;
     save.player.sectClears['sword'] = 17;
     save.player.karma.spent['karmaPower'] = 3;
     save.player.karma.spent['karmaGate'] = 2;
-    save.player.challenges = ['thinGate'];
+    save.player.dungeons['library'] = 16;
 
     // 伺服器收到的就是 loadoutFor 的輸出，補上它自己驗出來的關卡。
     const rebuilt = buildLoadoutFromSpec({ ...loadoutFor(save), stage: 26 });
@@ -102,6 +103,6 @@ describe('上報的配置足以重建同一場戰鬥', () => {
     // 而且這些欄位真的有作用——全等於預設值的話，上面那條比較不算數。
     const bare = buildLoadoutFor(sect('sword'), {}, 26);
     expect(rebuilt.damageMultiplier).toBeGreaterThan(bare.damageMultiplier);
-    expect(rebuilt.disciples).toBeLessThan(bare.disciples);
+    expect(rebuilt.disciples).toBeGreaterThan(bare.disciples);
   });
 });

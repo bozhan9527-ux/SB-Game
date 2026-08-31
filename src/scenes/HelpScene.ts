@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { libraryFloor } from '../systems/dungeons';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { BALANCE, CARDS } from '../data';
 import { state } from '../state';
@@ -43,8 +44,8 @@ export class HelpScene extends Phaser.Scene {
   private sections(): Section[] {
     const { field, formation, wave } = BALANCE;
     const save = state();
-    const unlocked = unlockedTalismans(save.world.highestStage);
-    const pool = talismanDefs(save.player.talismans, save.world.highestStage);
+    const unlocked = unlockedTalismans(libraryFloor(save));
+    const pool = talismanDefs(save.player.talismans, libraryFloor(save));
     // 只列玩家帶的四張。二十張全列出來是一份查不完的表，而他這一場遇得到的只有四張。
     const cards = pool.map(
       (card) =>

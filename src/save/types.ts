@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -144,6 +144,16 @@ export interface PlayerState {
   /** 上榜用的名字。沒取過名字是空字串，第一次上榜時才問。 */
   name: string;
   stats: StatsState;
+  /**
+   * 各副本已通關到第幾層（0 或缺席＝一層都沒過）。
+   *
+   * 十六張非基礎符只有藏經閣產出，所以這個欄位同時也是**符籙的解鎖來源**——
+   * 它不再由「推到第幾關」決定。改制時已解鎖的符一律換算成對應的層數，
+   * 沒有人會因為改制少掉任何一張。
+   */
+  dungeons: Record<string, number>;
+  /** 試劍台給的額外陣法格位。和洞府那條升級線分開記，因為它不是用金幣買的。 */
+  dungeonFieldSlots: number;
 }
 
 export interface WorldState {

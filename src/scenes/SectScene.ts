@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { libraryFloor } from '../systems/dungeons';
 import { GAME_WIDTH } from '../config';
 import { CARDS, SECTS } from '../data';
 import type { Sect } from '../data/types';
@@ -55,7 +56,7 @@ export class SectScene extends Phaser.Scene {
     this.add
       .text(cx, 118, '門派修為只長在自己身上——換派要付錢，但舊修為留著', textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(0.5);
-    this.brought = sanitizeTalismans(save.player.talismans, save.world.highestStage);
+    this.brought = sanitizeTalismans(save.player.talismans, libraryFloor(save));
 
     // 四張卡 + 底部兩顆按鈕要塞進 960：140 起、每張 168 高、間距 6，
     // 最後一張底緣落在 830，把 855 以下留給按鈕。卡片內容的行數是算過的（見 buildCard）。

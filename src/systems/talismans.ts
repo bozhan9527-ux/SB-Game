@@ -34,20 +34,29 @@ export function talismanDef(id: string): CardDef | null {
   return CARDS.find((card) => card.id === id) ?? null;
 }
 
-/** 依歷史最高關卡列出已解鎖的符，維持 cards.json 的順序（也就是解鎖順序）。 */
-export function unlockedTalismans(highestStage: number): CardDef[] {
-  return CARDS.filter((card) => card.unlockStage <= Math.max(1, highestStage));
+/**
+ * 已解鎖的符。
+ *
+ * **解鎖來源已經從「推到第幾關」換成「藏經閣打到第幾層」。** 四張基礎符永遠有，
+ * 其餘十六張一層一張，順序就是 cards.json 的順序。
+ *
+ * 這裡吃的是層數而不是存檔：伺服器重播一場成績時沒有存檔，只有玩家上報的數字，
+ * 而它必須算出和玩家當時**完全相同**的抽符池，否則重播的是另一場仗。
+ */
+export function unlockedTalismans(libraryFloor: number): CardDef[] {
+  const starters = CARDS.filter((card) => card.unlockStage <= 1);
+  const rest = CARDS.filter((card) => card.unlockStage > 1);
+  return [...starters, ...rest.slice(0, Math.max(0, Math.floor(libraryFloor)))];
 }
 
-export function isUnlocked(id: string, highestStage: number): boolean {
-  const def = talismanDef(id);
-  return def !== null && def.unlockStage <= Math.max(1, highestStage);
+export function isUnlocked(id: string, libraryFloor: number): boolean {
+  return unlockedTalismans(libraryFloor).some((card) => card.id === id);
 }
 
-/** 下一張還沒解鎖的符，用於在畫面上告訴玩家「再推幾關會拿到什麼」。 */
-export function nextUnlock(highestStage: number): CardDef | null {
-  return CARDS.filter((card) => card.unlockStage > Math.max(1, highestStage))
-    .sort((a, b) => a.unlockStage - b.unlockStage)[0] ?? null;
+/** 下一張還沒解鎖的符，用於在畫面上告訴玩家「再打一層會拿到什麼」。 */
+export function nextUnlock(libraryFloor: number): CardDef | null {
+  const rest = CARDS.filter((card) => card.unlockStage > 1);
+  return rest[Math.max(0, Math.floor(libraryFloor))] ?? null;
 }
 
 /**
@@ -57,8 +66,8 @@ export function nextUnlock(highestStage: number): CardDef | null {
  * 這裡一律吞掉錯誤而不是 throw——開場崩潰的代價遠大於少了一張想帶的符。
  * 規則：去掉不存在／未解鎖／重複的，再用已解鎖的符依序補滿四格。
  */
-export function sanitizeTalismans(chosen: readonly string[], highestStage: number): string[] {
-  const unlocked = unlockedTalismans(highestStage);
+export function sanitizeTalismans(chosen: readonly string[], libraryFloor: number): string[] {
+  const unlocked = unlockedTalismans(libraryFloor);
   const result: string[] = [];
   for (const id of chosen) {
     if (result.length >= TALISMAN_SLOTS) break;
@@ -74,15 +83,15 @@ export function sanitizeTalismans(chosen: readonly string[], highestStage: numbe
 }
 
 /** 選擇是否已經湊滿四張、且每一張都合法。畫面用它決定「入山門」能不能按。 */
-export function isCompleteLoadout(chosen: readonly string[], highestStage: number): boolean {
+export function isCompleteLoadout(chosen: readonly string[], libraryFloor: number): boolean {
   if (chosen.length !== TALISMAN_SLOTS) return false;
   if (new Set(chosen).size !== TALISMAN_SLOTS) return false;
-  return chosen.every((id) => isUnlocked(id, highestStage));
+  return chosen.every((id) => isUnlocked(id, libraryFloor));
 }
 
 /** 帶進場的四張符的定義。順序即 sanitize 後的順序。 */
-export function talismanDefs(chosen: readonly string[], highestStage: number): CardDef[] {
-  return sanitizeTalismans(chosen, highestStage).map((id) => {
+export function talismanDefs(chosen: readonly string[], libraryFloor: number): CardDef[] {
+  return sanitizeTalismans(chosen, libraryFloor).map((id) => {
     const def = talismanDef(id);
     if (def === null) throw new Error(`不存在的符籙：${id}`);
     return def;

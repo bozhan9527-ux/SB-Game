@@ -126,9 +126,11 @@ describe('上榜與百分位', () => {
     // highestStage 與 challenges 是後來補的——少了它們，回頭打舊關卡的人
     // 與開了試煉的人，成績會被自己的伺服器判定為造假。
     expect(Object.keys(loadout).sort()).toEqual([
-      'challenges',
-      'highestStage',
+      'extraFieldSlots',
+      'goldMultiplier',
       'karma',
+      'libraryFloor',
+      'rules',
       'sectClears',
       'sectId',
       'talismans',

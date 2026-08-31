@@ -76,14 +76,17 @@ describe('符籙譜', () => {
     expect(Math.max(...later)).toBeLessThanOrEqual(81);
   });
 
-  it('解鎖只看歷史最高關卡，推得越深選擇越多', () => {
-    expect(unlockedTalismans(1)).toHaveLength(TALISMAN_SLOTS);
-    expect(unlockedTalismans(81)).toHaveLength(CARDS.length);
-    expect(unlockedTalismans(40).length).toBeGreaterThan(unlockedTalismans(10).length);
-    expect(isUnlocked('slayer', 10)).toBe(false);
-    expect(isUnlocked('slayer', 81)).toBe(true);
-    expect(nextUnlock(1)?.unlockStage).toBe(4);
-    expect(nextUnlock(81)).toBeNull();
+  it('解鎖看的是藏經閣打到第幾層，不是推到第幾關', () => {
+    // v17 改制：十六張非基礎符只有藏經閣產出。推關再深也拿不到符，
+    // 這正是「副本是必經內容」這個決定的具體後果。
+    expect(unlockedTalismans(0)).toHaveLength(TALISMAN_SLOTS);
+    expect(unlockedTalismans(16)).toHaveLength(CARDS.length);
+    expect(unlockedTalismans(3)).toHaveLength(TALISMAN_SLOTS + 3);
+    expect(isUnlocked('slayer', 3)).toBe(false);
+    expect(isUnlocked('slayer', 16)).toBe(true);
+    // 一層一張，順序就是 cards.json 的順序。
+    expect(nextUnlock(0)?.id).toBe('frost');
+    expect(nextUnlock(16)).toBeNull();
   });
 
   it('壞掉的配置一律修補成一份能開場的四張，不讓存檔炸掉開場', () => {
@@ -93,14 +96,14 @@ describe('符籙譜', () => {
     expect(sanitizeTalismans(['fan'], 1)[0]).toBe('fan');
     expect(new Set(sanitizeTalismans(['fan', 'fan', 'fan'], 1)).size).toBe(TALISMAN_SLOTS);
     // 已解鎖的照樣留下。
-    expect(sanitizeTalismans(['slayer', 'sword', 'fan', 'flame'], 81)).toContain('slayer');
+    expect(sanitizeTalismans(['slayer', 'sword', 'fan', 'flame'], 16)).toContain('slayer');
   });
 
   it('湊滿四張且都合法才能入場', () => {
-    expect(isCompleteLoadout(['sword', 'bolt', 'fan'], 81)).toBe(false);
-    expect(isCompleteLoadout(['sword', 'sword', 'fan', 'flame'], 81)).toBe(false);
-    expect(isCompleteLoadout(['sword', 'bolt', 'fan', 'slayer'], 10)).toBe(false);
-    expect(isCompleteLoadout(['sword', 'bolt', 'fan', 'slayer'], 81)).toBe(true);
+    expect(isCompleteLoadout(['sword', 'bolt', 'fan'], 16)).toBe(false);
+    expect(isCompleteLoadout(['sword', 'sword', 'fan', 'flame'], 16)).toBe(false);
+    expect(isCompleteLoadout(['sword', 'bolt', 'fan', 'slayer'], 3)).toBe(false);
+    expect(isCompleteLoadout(['sword', 'bolt', 'fan', 'slayer'], 16)).toBe(true);
   });
 
   it('抽符池就是帶的那四張，不會抽到沒帶的符', () => {

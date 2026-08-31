@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { libraryFloor } from '../systems/dungeons';
 import { glyphTexture } from '../art';
 import { CARDS } from '../data';
 import { GAME_WIDTH } from '../config';
@@ -112,7 +113,8 @@ export class TalismanScene extends Phaser.Scene {
   create(): void {
     fadeIn(this);
     const save = state();
-    const highest = save.world.highestStage;
+    // 符籙的解鎖看的是藏經閣打到第幾層，不是推到第幾關。
+    const highest = libraryFloor(save);
     // Phaser 會重用 Scene 實例，這幾個都要清乾淨。
     this.columns = [];
     this.compare = [];
@@ -524,7 +526,7 @@ export class TalismanScene extends Phaser.Scene {
     this.compareButton?.setLabel(this.compareMode ? '比較中' : '比較');
     this.refreshCompare();
 
-    this.confirm?.setEnabled(isCompleteLoadout(this.chosen, state().world.highestStage));
+    this.confirm?.setEnabled(isCompleteLoadout(this.chosen, libraryFloor(state())));
   }
 
   private noteFor(tile: Tile): string {

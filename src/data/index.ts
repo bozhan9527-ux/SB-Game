@@ -14,6 +14,7 @@ import achievementsJson from '../../data/achievements.json';
 import lessonsJson from '../../data/lessons.json';
 import karmaJson from '../../data/karma.json';
 import challengesJson from '../../data/challenges.json';
+import dungeonsJson from '../../data/dungeons.json';
 
 import type {
   Achievement,
@@ -25,6 +26,8 @@ import type {
   CardDef,
   CardEffect,
   ChallengeDef,
+  DungeonDef,
+  DungeonFloor,
   KarmaTrack,
   FormationTierBalance,
   MobArt,
@@ -40,6 +43,7 @@ import type {
 import {
   assertKnownKeys,
   assertUniqueIds,
+  bool,
   field,
   list,
   num,
@@ -429,6 +433,93 @@ export function parseChallenges(raw: unknown, path = 'challenges.json'): Challen
   return challenges;
 }
 
+
+/**
+ * 副本。
+ *
+ * 驗證比別的資料嚴，因為這裡有兩件事錯了都不會當場壞掉、只會靜靜地毀掉遊戲：
+ * 一是某張符沒有任何一層產出它（那張符就永遠拿不到），
+ * 二是某一層兩種深度都給或都不給（前者是矛盾，後者是無法生成關卡）。
+ */
+export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[] {
+  const dungeons = list(raw, path, (item, p) => {
+    const source = item as Record<string, unknown>;
+    const floors = list(source['floors'], `${p}.floors`, (floorRaw, fp) => {
+      const floor = floorRaw as Record<string, unknown>;
+      const out: DungeonFloor = {};
+      if (typeof floor['stage'] === 'number') out.stage = floor['stage'];
+      if (typeof floor['stageRatio'] === 'number') out.stageRatio = floor['stageRatio'];
+      if (typeof floor['talisman'] === 'string') out.talisman = floor['talisman'];
+      if (typeof floor['mastery'] === 'number') out.mastery = floor['mastery'];
+      if (typeof floor['karma'] === 'number') out.karma = floor['karma'];
+      if (typeof floor['fieldSlot'] === 'number') out.fieldSlot = floor['fieldSlot'];
+      const hasStage = out.stage !== undefined;
+      const hasRatio = out.stageRatio !== undefined;
+      if (hasStage === hasRatio) {
+        throw new DataError(fp, 'stage 與 stageRatio 必須剛好給一個');
+      }
+      return out;
+    });
+    return {
+      id: str(source, 'id', p),
+      name: str(source, 'name', p),
+      icon: str(source, 'icon', p),
+      desc: str(source, 'desc', p),
+      detail: str(source, 'detail', p),
+      reward: str(source, 'reward', p),
+      rules: list(source['rules'], `${p}.rules`, (rule, rp) => {
+        if (typeof rule !== 'string') throw new DataError(rp, '規則必須是字串');
+        return rule;
+      }),
+      goldMultiplier: num(source, 'goldMultiplier', p),
+      repeatable: bool(source, 'repeatable', p),
+      floors,
+    };
+  });
+  assertUniqueIds(dungeons, path);
+
+  for (const dungeon of dungeons) {
+    if (dungeon.floors.length === 0) throw new DataError(path, `${dungeon.id} 沒有任何一層`);
+    // 倍率小於 1 的副本等於懲罰玩家進來，那個副本就不會有人打。
+    if (dungeon.goldMultiplier < 1) {
+      throw new DataError(path, `${dungeon.id} 的 goldMultiplier 不得小於 1`);
+    }
+    // 可重複的副本不得發放一次性的回報，否則就是無限產出。
+    if (dungeon.repeatable) {
+      for (const floor of dungeon.floors) {
+        if (
+          floor.talisman !== undefined ||
+          floor.mastery !== undefined ||
+          floor.karma !== undefined ||
+          floor.fieldSlot !== undefined
+        ) {
+          throw new DataError(path, `${dungeon.id} 可重複，不得發放一次性回報`);
+        }
+      }
+    }
+    // 固定深度的層要一層比一層深，否則「爬塔」在畫面上會忽上忽下。
+    let previous = 0;
+    for (const floor of dungeon.floors) {
+      if (floor.stage === undefined) continue;
+      if (floor.stage <= previous) {
+        throw new DataError(path, `${dungeon.id} 的層數深度必須遞增`);
+      }
+      previous = floor.stage;
+    }
+  }
+
+  // 每一張非基礎符都要有且只有一層產出它。少了就是永遠拿不到，
+  // 多了就是同一張符發兩次——兩種錯在畫面上都看不出來。
+  const granted = dungeons.flatMap((d) => d.floors.map((f) => f.talisman)).filter((id): id is string => id !== undefined);
+  const seen = new Set<string>();
+  for (const id of granted) {
+    if (seen.has(id)) throw new DataError(path, `符籙 ${id} 被超過一層產出`);
+    seen.add(id);
+  }
+
+  return dungeons;
+}
+
 export function parseKarma(raw: unknown, path = 'karma.json'): KarmaTrack[] {
   const tracks = list(raw, path, (item, p) => ({
     id: str(item, 'id', p),
@@ -452,6 +543,7 @@ export function parseKarma(raw: unknown, path = 'karma.json'): KarmaTrack[] {
 export const CARDS: readonly CardDef[] = parseCards(cardsJson);
 export const KARMA: readonly KarmaTrack[] = parseKarma(karmaJson);
 export const CHALLENGES: readonly ChallengeDef[] = parseChallenges(challengesJson);
+export const DUNGEONS: readonly DungeonDef[] = parseDungeons(dungeonsJson);
 export const LESSONS: readonly LessonDef[] = parseLessons(lessonsJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);
 export const ENEMIES: EnemyBook = parseEnemies(enemiesJson);

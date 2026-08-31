@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { libraryFloor } from '../systems/dungeons';
 import { audio } from '../audio';
 import type { IconName } from '../art';
 import { DISCIPLE_DISPLAY_HEIGHT, discipleTexture, glyphTexture, iconTexture } from '../art';
@@ -8,7 +9,6 @@ import { persist, state } from '../state';
 import type { SaveData } from '../save/types';
 import { sectById } from '../systems/loadout';
 import { talismanDefs } from '../systems/talismans';
-import { activeChallenges, challengeGoldMultiplier } from '../systems/challenges';
 import { canRebirth } from '../systems/karma';
 import { cloudEnabled } from '../net/client';
 import { formatDuration, resetRetreat, retreatOffer } from '../systems/retreat';
@@ -219,7 +219,7 @@ export class TitleScene extends Phaser.Scene {
       return;
     }
 
-    const talismans = talismanDefs(save.player.talismans, save.world.highestStage);
+    const talismans = talismanDefs(save.player.talismans, libraryFloor(save));
     const cell = 50;
     const total = cell + 26 + talismans.length * cell;
     let x = cx - total / 2 + cell / 2;
@@ -244,19 +244,6 @@ export class TitleScene extends Phaser.Scene {
       x += cell;
     });
 
-    // 挑戰是跨關留著的設定，忘記自己開了什麼又一直打不過，
-    // 是最容易讓人以為遊戲壞掉的情況——所以它常駐在這裡。
-    const active = activeChallenges(save);
-    if (active.length > 0) {
-      this.add
-        .text(
-          cx,
-          y + 34,
-          `試煉 ${active.map((item) => item.name).join('・')}　金幣 ×${challengeGoldMultiplier(save).toFixed(2)}`,
-          textStyle({ size: 15, color: GOLD }),
-        )
-        .setOrigin(0.5);
-    }
   }
 
   /**
@@ -279,7 +266,7 @@ export class TitleScene extends Phaser.Scene {
     // 比沒有那顆按鈕更糟。
     const items: [string, string, IconName][] = [
       [hasSect ? '換門派' : '門派', 'Sect', 'sect'],
-      ['試煉', 'Challenge', 'trial'],
+      ['副本', 'Dungeon', 'trial'],
     ];
     if (cloudEnabled()) items.push(['榜單', 'Leaderboard', 'rank']);
 

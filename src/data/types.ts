@@ -557,6 +557,43 @@ export interface EnemyBook {
  * 條件一律只會讓這一場更難，獎勵一律只是金幣倍率——不能給任何無法用一般玩法取得的
  * 東西，否則它就從「自己找事做」變成「不做就落後」，那是完全相反的一件事。
  */
+/**
+ * 副本的一層。
+ *
+ * 難度來源二選一：`stage` 是固定深度，`stageRatio` 是「你最高關卡的幾成」。
+ * 只有可重複的聚寶洞用後者——固定深度的可重複副本，遲早會變成
+ * 「回頭打一個早就打爛的關卡領倍率」，那正是這次改制要消滅的東西。
+ *
+ * 回報四選一，而且都刻意是**可以用時間換的東西**：符籙、門派修為、仙緣、格位。
+ * 沒有一項是別處完全拿不到的（符籙以外的三種都能靠推關與轉世取得），
+ * 副本只是比較快的那條路。
+ */
+export interface DungeonFloor {
+  stage?: number;
+  stageRatio?: number;
+  talisman?: string;
+  mastery?: number;
+  karma?: number;
+  fieldSlot?: number;
+}
+
+export interface DungeonDef {
+  id: string;
+  name: string;
+  /** 介面圖示名稱，對應 src/art.ts 的 ICON_NAMES。 */
+  icon: string;
+  desc: string;
+  detail: string;
+  /** 這個副本產出什麼，選擇畫面用一個詞說完。 */
+  reward: string;
+  /** 這個副本套用哪幾條規則（沿用原本的試煉條件 id）。 */
+  rules: string[];
+  goldMultiplier: number;
+  /** 可以重複打嗎。只有聚寶洞是 true。 */
+  repeatable: boolean;
+  floors: DungeonFloor[];
+}
+
 export interface ChallengeDef {
   id: string;
   name: string;

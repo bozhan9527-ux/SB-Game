@@ -35,7 +35,9 @@ export interface TelemetryEvents {
     sect: string | null;
     /** 帶進場的四張，排序後以逗號連接——排序過才聚合得起來。 */
     talismans: string;
-    challenges: string;
+    /** 這一場是哪個副本（一般關卡為 null），以及第幾層。 */
+    dungeon: string | null;
+    dungeon_floor: number;
     speed: number;
     field_slots: number;
   };

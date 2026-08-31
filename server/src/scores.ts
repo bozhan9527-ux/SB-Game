@@ -24,8 +24,17 @@ import type {
   ScoreSubmitResult,
 } from '../../src/net/protocol';
 import { MAX_NAME_LENGTH } from '../../src/net/protocol';
-import { CARDS, KARMA, SECTS, UPGRADES } from '../../src/data';
+import { CARDS, DUNGEONS, KARMA, SECTS, UPGRADES } from '../../src/data';
 import { buildLoadoutFromSpec } from '../../src/systems/loadout';
+
+/** 藏經閣總層數，也就是符籙解鎖的上限。 */
+const LIBRARY_FLOORS = DUNGEONS.find((item) => item.id === 'library')?.floors.length ?? 0;
+
+/** 副本能給的最高金幣倍率與最多額外格位，用來夾住客戶端上報的值。 */
+const MAX_GOLD_MULTIPLIER = Math.max(1, ...DUNGEONS.map((item) => item.goldMultiplier));
+const MAX_EXTRA_SLOTS = DUNGEONS.flatMap((item) => item.floors)
+  .map((floor) => floor.fieldSlot ?? 0)
+  .reduce((sum, value) => sum + value, 0);
 import type { ReplayAction } from '../../src/systems/replay';
 import { replayRun, validateReplay } from '../../src/systems/replay';
 
@@ -85,24 +94,33 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
 
   const clears = Number(record['sectClears'] ?? 0);
 
-  // 試煉每一條都只讓這一場更難，所以不必夾——照收，否則開了試煉的玩家永遠驗不過。
-  const challengesRaw = record['challenges'];
-  const challenges: string[] = Array.isArray(challengesRaw)
-    ? challengesRaw.filter((id): id is string => typeof id === 'string')
+  // 副本規則每一條都只讓這一場更難，所以不必夾——照收，
+  // 否則在副本裡通關的玩家永遠驗不過。
+  const rulesRaw = record['rules'];
+  const rules: string[] = Array.isArray(rulesRaw)
+    ? rulesRaw.filter((id): id is string => typeof id === 'string')
     : [];
 
-  // 符籙的解鎖門檻看歷史最高關卡。宣稱得比實際高只會讓這一場更好打，
-  // 但成績仍然是「重播真的通關的那一關」，所以不是可以利用的破口。
-  const highest = Number(record['highestStage'] ?? 0);
+  // 藏經閣層數決定抽符池，夾在實際層數之內——宣稱打到第 99 層不該一次拿到二十張符。
+  const library = Number(record['libraryFloor'] ?? 0);
+  // 倍率只影響金幣、不影響勝負；格位會影響，所以它的上限必須是真的。
+  const gold = Number(record['goldMultiplier'] ?? 1);
+  const slots = Number(record['extraFieldSlots'] ?? 0);
 
   return {
     sectId,
-    highestStage: Number.isFinite(highest) ? Math.max(1, Math.floor(highest)) : 1,
+    libraryFloor: Number.isFinite(library)
+      ? Math.max(0, Math.min(LIBRARY_FLOORS, Math.floor(library)))
+      : 0,
     talismans,
     upgrades,
     karma,
     sectClears: Number.isFinite(clears) ? Math.max(0, Math.floor(clears)) : 0,
-    challenges,
+    rules,
+    goldMultiplier: Number.isFinite(gold) ? Math.max(1, Math.min(MAX_GOLD_MULTIPLIER, gold)) : 1,
+    extraFieldSlots: Number.isFinite(slots)
+      ? Math.max(0, Math.min(MAX_EXTRA_SLOTS, Math.floor(slots)))
+      : 0,
   };
 }
 
@@ -199,20 +217,10 @@ export async function submitScore(request: Request, env: Env, origin: string | n
 
   // 重播。伺服器用自己算出來的結果，完全不採信客戶端宣稱的關卡。
   //
-  // 組裝走的是遊戲**同一個** buildLoadoutFromSpec：修為、試煉、仙緣、符籙解鎖
-  // 全部在裡面。這裡若自己拼一份，只要漏掉一個乘區，重播的就是另一場仗——
-  // 而那個故障看起來會像「玩家作弊」，不像「伺服器算錯」。
-  //
-  // highestStage 夾在「不低於這一關」：剛通關第 N 關的人，歷史最高不可能低於 N。
-  // 這條同時接住舊版客戶端——它根本不送這個欄位。
-  const replayed = replayRun(
-    buildLoadoutFromSpec({
-      ...loadout,
-      stage: claimed,
-      highestStage: Math.max(loadout.highestStage, claimed),
-    }),
-    input,
-  );
+  // 組裝走的是遊戲**同一個** buildLoadoutFromSpec：修為、副本規則、仙緣、
+  // 符籙解鎖、額外格位全部在裡面。這裡若自己拼一份，只要漏掉一個乘區，
+  // 重播的就是另一場仗——而那個故障看起來會像「玩家作弊」，不像「伺服器算錯」。
+  const replayed = replayRun(buildLoadoutFromSpec({ ...loadout, stage: claimed }), input);
 
   // 只有真的通關才記分。沒斬掉首領就不算通關，這條規則和遊戲裡完全一致。
   if (replayed.outcome !== 'cleared') {
