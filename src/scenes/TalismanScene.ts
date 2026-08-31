@@ -57,12 +57,13 @@ interface Tile {
 // 每一段的高度都是算出來的——資料筆數變了就得重算，這是 PROGRESS 的 L-08。
 const CHOSEN_Y = 134;
 const CHOSEN_H = 64;
-const CHOSEN_STEP = 96;
 const TOOLBAR_Y = 196;
 const GRID_TOP = 226;
 const TILE_W = 120;
 const TILE_H = 74;
 const TILE_GAP = 4;
+/** 上排四格與下面四欄同寬同距——對不齊的話看起來就像沒置中。 */
+const CHOSEN_STEP = TILE_W + TILE_GAP;
 const GRID_COLUMNS = 4;
 const DETAIL_TOP = 620;
 /** 最多同時比較幾張。三欄是 540px 寬放得下又還讀得清楚的上限。 */
@@ -78,7 +79,16 @@ const COMPARE_MAX = 3;
  * 只有適不適合。標上分數等於替玩家做完決定，選擇就沒了。
  */
 export class TalismanScene extends Phaser.Scene {
-  private chosen: string[] = [];
+  /**
+   * 帶入場的四張，**固定四格**。
+   *
+   * 原本是一個會 splice 的陣列：卸下第二張時第三、四張會往左遞延，
+   * 於是「換掉中間那一張」變成了「後面全部往前移一格」。
+   * 現在一格對應一格，null 代表那一格是空的。
+   */
+  private chosen: (string | null)[] = [];
+  /** 現在要換哪一格。點上排選格，再點下面的符換進去。 */
+  private activeSlot = 0;
   private tiles: Tile[] = [];
   private slots: Phaser.GameObjects.Container[] = [];
   private detail: Phaser.GameObjects.Text | null = null;
@@ -128,7 +138,9 @@ export class TalismanScene extends Phaser.Scene {
     drawBackdrop(this, realm.color, realm.scenery);
     this.tiles = [];
     this.slots = [];
-    this.chosen = sanitizeTalismans(save.player.talismans, highest);
+    const kept = sanitizeTalismans(save.player.talismans, highest);
+    this.chosen = Array.from({ length: TALISMAN_SLOTS }, (_, i) => kept[i] ?? null);
+    this.activeSlot = 0;
 
     const cx = GAME_WIDTH / 2;
     this.add.text(cx, 40, '符籙譜', textStyle({ size: 34, color: INK, bold: true })).setOrigin(0.5);
@@ -159,11 +171,11 @@ export class TalismanScene extends Phaser.Scene {
       fontSize: 24,
       strokeColor: 0x6f8b7a,
       onClick: () => {
-        save.player.talismans = [...this.chosen];
+        save.player.talismans = this.chosen.filter((id): id is string => id !== null);
         persist();
         // 排序過才聚合得起來：同樣四張換個順序不該被算成兩種組合。
         track('loadout_set', {
-          talismans: [...this.chosen].sort().join(','),
+          talismans: this.chosen.filter((id): id is string => id !== null).sort().join(','),
           sect: save.player.sectId,
           highest_stage: save.world.highestStage,
         });
@@ -182,7 +194,7 @@ export class TalismanScene extends Phaser.Scene {
     this.focus(this.chosen[0] ?? null);
     // 原本這句是一行常駐的標籤，佔掉了工具列要用的一整列。
     // 它只需要在玩家還沒動手時說一次，之後有更該說的話（例如「已經帶滿四張」）。
-    this.say('上排是入場的四張，點一下卸下');
+    this.say('上排點一下選格，再點下面的符換進去');
     this.refresh();
   }
 
@@ -225,25 +237,37 @@ export class TalismanScene extends Phaser.Scene {
       .setColor(has ? JADE : DANGER);
   }
 
-  /** 上方四格：目前帶的四張。點一下就卸下，這是最短的「換掉一張」路徑。 */
+  /**
+   * 上方四格：目前帶的四張。
+   *
+   * 寬度與間距刻意和下面的格線完全一致——原本上排比較窄，四格和四欄對不齊，
+   * 看起來就像沒有置中。它們講的是同一件事（哪四張），對齊之後
+   * 「上面這一格對應下面哪一欄」也才讀得出來。
+   */
   private buildChosenSlots(cx: number): void {
     for (let i = 0; i < TALISMAN_SLOTS; i += 1) {
       const x = cx + (i - (TALISMAN_SLOTS - 1) / 2) * CHOSEN_STEP;
       const background = this.add
-        .rectangle(0, 0, 84, CHOSEN_H, BG_PANEL, 0.92)
+        .rectangle(0, 0, TILE_W, CHOSEN_H, BG_PANEL, 0.92)
         .setStrokeStyle(2, LINE)
         .setInteractive({ useHandCursor: true });
-      const glyph = this.add.image(0, -11, glyphTexture('sword')).setDisplaySize(24, 30);
-      const name = this.add.text(0, 19, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
+      const glyph = this.add.image(0, -10, glyphTexture('sword')).setDisplaySize(28, 34);
+      const name = this.add.text(0, 20, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
       const container = this.add.container(x, CHOSEN_Y, [background, glyph, name]);
       container.setData('glyph', glyph);
       container.setData('name', name);
       container.setData('background', background);
       background.on('pointerup', () => {
-        const id = this.chosen[i];
-        if (id === undefined) return;
-        this.focus(id);
-        this.chosen.splice(i, 1);
+        // 點上排是**選格**，不是卸下。卸下改成「再點一次同一格」——
+        // 這樣「換掉第三張」就真的只換第三張，不會把第四張往前推。
+        if (this.activeSlot === i && this.chosen[i] !== null) {
+          this.chosen[i] = null;
+          this.say('');
+        } else {
+          this.activeSlot = i;
+          const id = this.chosen[i];
+          if (id !== null && id !== undefined) this.focus(id);
+        }
         this.refresh();
       });
       this.slots.push(container);
@@ -271,12 +295,12 @@ export class TalismanScene extends Phaser.Scene {
       // 靠形狀是掃過去就認得——而這一頁的工作正是「比較」。
       // 每張符的顏色也上到圖騰上，讓同一系的符在視覺上先聚成一群。
       const glyph = this.add
-        .image(x, y - 10, glyphTexture(def.art))
-        .setDisplaySize(34, 42)
+        .image(x, y - 12, glyphTexture(def.art))
+        .setDisplaySize(38, 46)
         .setAlpha(unlocked ? 1 : 0.22);
       if (unlocked) glyph.setTint(hexToNumber(def.color));
       const name = this.add
-        .text(x, y + 23, def.name, textStyle({ size: 14, color: unlocked ? def.color : INK_DIM }))
+        .text(x, y + 22, def.name, textStyle({ size: 14, color: unlocked ? def.color : INK_DIM }))
         .setOrigin(0.5);
       // 原本這裡還有一行「N 道 / 第 N 關」。拿掉是為了把空間讓給圖騰——
       // 那一行的資訊在下面的說明面板裡本來就有，而格子的工作是「認出是哪一張」，
@@ -286,7 +310,7 @@ export class TalismanScene extends Phaser.Scene {
       const mark =
         def.id === favoredId
           ? this.add
-              .text(x + TILE_W / 2 - 4, y - TILE_H / 2 + 2, '專', textStyle({ size: 13, color: GOLD, bold: true }))
+              .text(x + TILE_W / 2 - 7, y - TILE_H / 2 + 5, '專', textStyle({ size: 13, color: GOLD, bold: true }))
               .setOrigin(1, 0)
           : null;
 
@@ -432,12 +456,16 @@ export class TalismanScene extends Phaser.Scene {
     }
     const at = this.chosen.indexOf(def.id);
     if (at >= 0) {
-      this.chosen.splice(at, 1);
+      // 已經帶著的：就地卸下那一格，其他格不動。
+      this.chosen[at] = null;
+      this.activeSlot = at;
       this.say('');
-    } else if (this.chosen.length >= TALISMAN_SLOTS) {
-      this.say('已經帶滿四張，先點掉一張再換');
     } else {
-      this.chosen.push(def.id);
+      // 換進目前選中的那一格，然後自動跳到下一格——
+      // 連換四張時不必每換一張就回上排點一次。
+      this.chosen[this.activeSlot] = def.id;
+      const empty = this.chosen.findIndex((id) => id === null);
+      this.activeSlot = empty >= 0 ? empty : (this.activeSlot + 1) % TALISMAN_SLOTS;
       this.say('');
     }
     this.refresh();
@@ -474,15 +502,21 @@ export class TalismanScene extends Phaser.Scene {
       const glyph = container.getData('glyph') as Phaser.GameObjects.Image;
       const name = container.getData('name') as Phaser.GameObjects.Text;
       const background = container.getData('background') as Phaser.GameObjects.Rectangle;
+      // 選中的那一格要看得出來——不然「點上排選格」這個操作沒有回饋。
+      const active = i === this.activeSlot;
       if (def === null) {
         glyph.setVisible(false);
-        name.setText('空');
-        name.setColor(INK_DIM);
-        background.setStrokeStyle(2, LINE).setFillStyle(BG_PANEL, 0.6);
+        name.setText(active ? '換這格' : '空');
+        name.setColor(active ? GOLD : INK_DIM);
+        background
+          .setStrokeStyle(active ? 3 : 2, active ? hexToNumber(GOLD) : LINE)
+          .setFillStyle(BG_PANEL, active ? 0.95 : 0.6);
       } else {
         glyph.setVisible(true).setTexture(glyphTexture(def.art));
         name.setText(def.name).setColor(def.color);
-        background.setStrokeStyle(3, hexToNumber(def.color)).setFillStyle(BG_PANEL_ALT, 1);
+        background
+          .setStrokeStyle(active ? 4 : 3, hexToNumber(active ? GOLD : def.color))
+          .setFillStyle(BG_PANEL_ALT, 1);
       }
     }
 
@@ -529,7 +563,9 @@ export class TalismanScene extends Phaser.Scene {
     this.compareButton?.setLabel(this.compareMode ? '比較中' : '比較');
     this.refreshCompare();
 
-    this.confirm?.setEnabled(isCompleteLoadout(this.chosen, libraryFloor(state())));
+    // 四格都填滿才能收妥。null 代表空格，過濾掉之後長度不足就是還沒填滿。
+    const filled = this.chosen.filter((id): id is string => id !== null);
+    this.confirm?.setEnabled(isCompleteLoadout(filled, libraryFloor(state())));
   }
 
   private noteFor(tile: Tile): string {
