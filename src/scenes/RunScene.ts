@@ -18,6 +18,8 @@ import { BALANCE, CARDS } from '../data';
 import type { MobTrait } from '../data/types';
 import { persist, state } from '../state';
 import { activeChallenges } from '../systems/challenges';
+import type { ReplayAction, ReplayActionInput } from '../systems/replay';
+import { MAX_REPLAY_ACTIONS, MAX_STEPS_PER_FRAME, STEP_MS } from '../systems/replay';
 import { track } from '../telemetry';
 import type { Card } from '../systems/deck';
 import { cardDef, fieldDps, maxTierForStage } from '../systems/deck';
@@ -240,6 +242,13 @@ export class RunScene extends Phaser.Scene {
   private pendingDamage = new Map<number, { total: number; since: number }>();
   private lastHitSoundAt = 0;
   private lastFreezeAt = -9999;
+  /** 固定時步的累積器與已跑格數。見 update() 與 src/systems/replay.ts。 */
+  private stepAccum = 0;
+  private stepIndex = 0;
+  /** 這一場的操作記錄。排行榜要靠它在伺服器上重跑驗證。 */
+  private actions: ReplayAction[] = [];
+  /** 這一場跑過教學：起手牌被改寫過，重播不出來，因此不能上榜。 */
+  private tutorialRun = false;
 
   constructor() {
     super('Run');
@@ -275,6 +284,7 @@ export class RunScene extends Phaser.Scene {
 
     // 教學要換掉起手牌，必須在建立牌位之前決定，否則陣位數會對不上。
     this.step = shouldRunTutorial(save) ? 'deploy' : 'done';
+    this.tutorialRun = this.step !== 'done';
     // 起點也要報，否則分母不存在——只有「走到第二步」的人數是算不出完成率的。
     if (this.step === 'deploy') track('tutorial_step', { step: 'deploy' });
     if (this.step !== 'done') {
@@ -294,6 +304,9 @@ export class RunScene extends Phaser.Scene {
     this.lastHitSoundAt = 0;
     this.gateStage = -1;
     this.lastFreezeAt = -9999;
+    this.stepAccum = 0;
+    this.stepIndex = 0;
+    this.actions = [];
     this.buildPauseOverlay();
     this.buildCoach();
     this.refreshCards();
@@ -809,7 +822,10 @@ export class RunScene extends Phaser.Scene {
       const chosen = this.selected;
       this.clearSelection();
       if (chosen.where === 'hand' && pointer.y > 930 && !this.over) {
-        if (discardHand(this.run, chosen.index)) audio.play('gateTrap');
+        if (discardHand(this.run, chosen.index)) {
+          this.record({ kind: 'discard', index: chosen.index });
+          audio.play('gateTrap');
+        }
       }
       this.refreshCards();
       this.updateHud();
@@ -831,7 +847,10 @@ export class RunScene extends Phaser.Scene {
     if (target !== null) {
       this.applyDrop(source, target);
     } else if (source.where === 'hand' && pointer.y > 930) {
-      if (discardHand(this.run, source.index)) audio.play('gateTrap');
+      if (discardHand(this.run, source.index)) {
+        this.record({ kind: 'discard', index: source.index });
+        audio.play('gateTrap');
+      }
     }
 
     this.refreshCards();
@@ -841,6 +860,8 @@ export class RunScene extends Phaser.Scene {
   private applyDrop(source: CardSlot, target: CardSlot): void {
     const card = cardAt(this.run, source);
     const result = dropOn(this.run, source, target, this.rng);
+    // 連 'none' 也要記：它同樣消耗過 rng 的判定路徑，漏記會讓重播從這裡開始飄。
+    this.record({ kind: 'drop', from: source, to: target });
     if (result === 'none' || card === null) return;
 
     const pos = this.slotPosition(target);
@@ -1173,20 +1194,40 @@ export class RunScene extends Phaser.Scene {
 
   // -------------------------------------------------------------- 主迴圈
 
+  /**
+   * 主迴圈。**固定時步**：真實時間累積成一格一格的 STEP_MS，模擬只看格數。
+   *
+   * 舊版把瀏覽器的畫格時間直接餵給 tickCombat，於是同一組操作在 60fps 與 30fps 的
+   * 機器上會跑出不同的結果——掉幀等於變難，而且一場戰鬥無法被重播驗證。
+   * 改成固定時步同時解掉這兩件事：畫格率不再影響數值，而排行榜也才有辦法
+   * 用「種子＋操作記錄」在伺服器上重跑（見 src/systems/replay.ts）。
+   *
+   * 加速是「一幀補幾格」，不是「一格變長」——後者會讓 3× 跑出和 1× 不同的結果。
+   */
   override update(_time: number, delta: number): void {
     if (this.over) return;
     // 教學的前兩步把戰鬥停住：新手還在找哪裡可以拖的時候，妖魔不該已經走到山門。
     if (this.step === 'deploy' || this.step === 'merge') return;
     if (this.paused) return;
-    // 命中的凍格（hitstop）：把這幾毫秒從模擬裡扣掉，畫面停住但不會漏算時間。
+    // 命中的凍格（hitstop）：這幾毫秒不進累積器，畫面停住、模擬也跟著停。
     if (this.freezeMs > 0) {
       this.freezeMs -= delta;
       return;
     }
-    // 加速只是把每一拍餵給 tickCombat 的時間乘上去。
-    // 模擬本來就是 delta 驅動、而且用 while 補齊出手間隔，所以乘上去不會漏掉輸出。
-    const report = tickCombat(this.run, delta * this.speed, this.rng);
-    this.applyReport(report);
+
+    this.stepAccum += delta * this.speed;
+    let ran = 0;
+    while (this.stepAccum >= STEP_MS && ran < MAX_STEPS_PER_FRAME) {
+      this.stepAccum -= STEP_MS;
+      ran += 1;
+      const report = tickCombat(this.run, STEP_MS, this.rng);
+      this.stepIndex += 1;
+      this.applyReport(report);
+      if (this.run.outcome !== 'running') break;
+    }
+    // 補不完就丟掉：分頁切回前景時 delta 可能是好幾秒，硬補會讓妖魔瞬間衝到山門。
+    if (ran >= MAX_STEPS_PER_FRAME) this.stepAccum = 0;
+
     this.syncEnemies();
     this.animateCharge();
     this.updateHud();
@@ -1194,6 +1235,21 @@ export class RunScene extends Phaser.Scene {
     if (this.run.outcome === 'cleared') this.finish(true, null);
     else if (this.run.outcome === 'defeated') this.finish(false, 'breached');
     else if (this.run.outcome === 'timeout') this.finish(false, 'timeout');
+  }
+
+  /**
+   * 把一個操作記進紀錄。
+   *
+   * 記的是**格數**而不是毫秒：重播時就是「跑到第幾格就套用它」。
+   * Phaser 的輸入事件永遠落在兩幀之間，不可能插進上面那個 while 迴圈中間，
+   * 所以每個操作都精準對齊在格的邊界上——這是重播能對得起來的關鍵。
+   *
+   * 教學那一場不記：教學會直接改寫起手牌，光有種子重播不出同一場。
+   */
+  private record(action: ReplayActionInput): void {
+    if (this.tutorialRun) return;
+    if (this.actions.length >= MAX_REPLAY_ACTIONS) return;
+    this.actions.push({ ...action, step: this.stepIndex });
   }
 
   /**
