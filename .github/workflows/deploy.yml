@@ -40,6 +40,17 @@ jobs:
       # JS 裡），放進 secret 不是為了保密，是為了讓不同的部署指向不同的專案。
       # 沒設定時 build 出來的版本完全不連網：posthog-js 被切成獨立的 chunk，
       # 沒有金鑰就永遠不會被下載。
+      # 建置吃到什麼設定，log 裡要看得見。少了 VITE_API_BASE 的版本不會報錯，
+      # 只會安靜地少掉雲端存檔與榜單——那種故障從畫面上看像是「功能沒做」。
+      # 值透過 env 傳進來再用 shell 展開，不直接插進腳本裡。
+      - name: Report build config
+        env:
+          API_BASE: ${{ vars.VITE_API_BASE }}
+          PH_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+        run: |
+          echo "VITE_API_BASE   = ${API_BASE:-(未設定)}"
+          echo "VITE_POSTHOG_KEY 長度 = ${#PH_KEY}"
+
       - name: Build
         env:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
