@@ -10,7 +10,7 @@
  * 長名字撐不破版面。
  */
 import Phaser from 'phaser';
-import { GAME_WIDTH } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { cloudEnabled, fetchLeaderboard } from '../net/client';
 import type { BoardKind, LeaderboardEntry } from '../net/protocol';
@@ -33,6 +33,7 @@ import {
 } from '../systems/account';
 import { showForm, showNotice } from '../ui/form';
 import {
+  REPLAY_CONTRACT_VERSION,
   MAX_SPEED_STAGE,
   speedBoard,
   trackOfBoard,
@@ -235,6 +236,16 @@ export class LeaderboardScene extends Phaser.Scene {
     this.selfRow = this.add
       .text(cx, this.listTop + height + 20, '', textStyle({ size: 17, color: GOLD, bold: true }))
       .setOrigin(0.5);
+
+    // **看得到自己跑的是哪一版。**
+    //
+    // 瀏覽器快取住舊的那包 JS 時，成績會被伺服器退回，而「我到底是不是
+    // 舊版本」在畫面上完全沒有答案——今天為了這件事來回猜了三次。
+    // 一個數字就解決：和伺服器對不上時，它就是那句話的證據。
+    this.add
+      .text(cx, GAME_HEIGHT - 24, `版本 ${REPLAY_CONTRACT_VERSION}`, textStyle({ size: 13, color: INK_DIM }))
+      .setOrigin(0.5)
+      .setAlpha(0.7);
 
     this.status = this.add
       .text(cx, this.listTop + height + 48, '', textStyle({ size: 16, color: INK_DIM }))

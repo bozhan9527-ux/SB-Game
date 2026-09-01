@@ -10,7 +10,6 @@ import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
 import { REPLAY_CONTRACT_VERSION, SPEED_STAGE, trackOfBoard } from '../src/net/protocol';
 import {
-  QUIET_FAILURE_BELOW_STAGE,
   boardReady,
   boardsFor,
   loadoutFor,
@@ -325,13 +324,21 @@ describe('上榜開通', () => {
     expect(outcome.reason).toContain('重新整理');
   });
 
-  it('前五關的失敗不出聲——那幾筆成績在榜上本來就沒有意義', () => {
-    // 這個常數是結算頁用來決定「要不要寫那一行」的門檻。
-    expect(QUIET_FAILURE_BELOW_STAGE).toBe(6);
-    for (const stage of [1, 2, 3, 4, 5]) {
-      expect(stage < QUIET_FAILURE_BELOW_STAGE).toBe(true);
+  it('**失敗的理由一律說得出來，不分關卡。**', () => {
+    // 結算頁曾經在前五關把失敗訊息整個藏起來，理由是「那幾筆成績在榜上
+    // 沒有意義」。速通改成一關一個榜之後那個理由就不成立了，而它擋住的
+    // 正好是新玩家最需要的那一句——實測有人玩到第四關，每一場都被退回，
+    // 畫面上一個字都沒有。
+    //
+    // 所以每一種失敗都要有一句他做得到的話，不能是空字串。
+    for (const reason of [
+      '你的遊戲是舊版本，重新整理頁面就會更新',
+      '這一場沒上榜：紀錄和伺服器對不起來，重新整理一次再試',
+      '連不上伺服器，這一場沒有上榜',
+    ]) {
+      expect(reason.length).toBeGreaterThan(0);
+      expect(reason).not.toContain('驗不過');
     }
-    expect(6 < QUIET_FAILURE_BELOW_STAGE).toBe(false);
   });
 
   it('驗不過不會去動雲端存檔——那和身分沒有關係', async () => {

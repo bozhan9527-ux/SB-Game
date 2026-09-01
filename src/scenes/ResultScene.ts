@@ -7,10 +7,7 @@ import { dungeonById, grantFloor, nextFloor } from "../systems/dungeons";
 import { detectAchievements } from "../systems/achievements";
 import { track } from "../telemetry";
 import { cloudEnabled } from "../net/client";
-import {
-  QUIET_FAILURE_BELOW_STAGE,
-  submitRun,
-} from "../systems/leaderboard";
+import { submitRun } from "../systems/leaderboard";
 import { updateRecords } from "../systems/records";
 import type { RunTelemetry } from "../systems/defense";
 import {
@@ -339,12 +336,16 @@ export class ResultScene extends Phaser.Scene {
         // 要一個名字的一刻。灰字寫在榜單頁的角落沒有人會看。
         const anon = save.player.account === null ? "　註冊可換成你的道號" : "";
         board = `已上榜 · 第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}${anon}`;
-      } else if (
-        outcome.kind === "failed" &&
-        result.stage >= QUIET_FAILURE_BELOW_STAGE
-      ) {
-        // 前五關失敗就安靜：那幾筆成績在榜上沒有意義，而一行看不懂的紅字
-        // 對剛開始玩的人只會讀成「遊戲壞了」。
+      } else if (outcome.kind === "failed") {
+        // **失敗一律說出來，不分關卡。**
+        //
+        // 這裡原本前五關安靜，理由是「那幾筆成績在榜上沒有意義」。
+        // 速通改成一關一個榜之後那個理由就不成立了——第 1 關也有自己的榜。
+        // 而它擋住的正好是新玩家最需要的那一句（「你的遊戲是舊版本」）：
+        // 實測有人玩到第四關，每一場都被退回，畫面上一個字都沒有。
+        //
+        // 當初怕的是「一行看不懂的紅字讀起來像遊戲壞了」，那個顧慮的答案是
+        // 把訊息寫成他做得到的一步，不是把訊息藏起來。
         board = outcome.reason;
       }
     }
@@ -357,8 +358,9 @@ export class ResultScene extends Phaser.Scene {
     }
     this.cloudLine
       ?.setText(board)
-      // 上榜成功用金色；失敗的說明是資訊不是警告，所以不用紅色。
-      .setColor(ok ? GOLD : INK_DIM);
+      // 上榜成功用金色。失敗不用紅色（那讀起來像遊戲壞了），但也不能用
+      // 最暗的灰——那一行是他唯一的線索，被略過就等於沒寫。
+      .setColor(ok ? GOLD : INK);
     if (this.cloudLine !== undefined) fitText(this.cloudLine, GAME_WIDTH - 40);
   }
 

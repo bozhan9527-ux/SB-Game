@@ -45,17 +45,6 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
   return scoreLoadoutOf(loadoutSpecOf(save, 1));
 }
 
-/**
- * 比這一關淺的成績，上榜失敗時**什麼都不說**。
- *
- * 前五關是新玩家的前幾分鐘，而那幾關的成績在榜上本來就沒有意義（榜單只留
- * 每個人最好的一筆，那幾筆很快就會被自己蓋掉）。為了一個沒有意義的成績，
- * 在他第三次通關的結算頁跳一行紅字，代價遠大於收益——他會以為遊戲壞了，
- * 而那一行字他也做不了任何事。
- *
- * 送還是照送：成功的話「已上榜」照樣顯示，只有失敗那一路安靜。
- */
-export const QUIET_FAILURE_BELOW_STAGE = 6;
 
 /**
  * 這一場該進哪幾個榜。
