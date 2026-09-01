@@ -159,9 +159,11 @@ export function boardReady(save: SaveData): boolean {
  */
 export async function submitRun(
   save: SaveData,
-  stage: number,
   submission: RunSubmission,
 ): Promise<SubmitOutcome> {
+  // **關卡從 submission 拿，不從呼叫端。** 它是種子的一半，而結算頁手上那個
+  // 關卡在無限模式裡是「止步於第幾關」，不是開打的那一關。
+  const stage = submission.stage;
   if (save.player.sectId === null) return { kind: 'skipped' };
   // **沒有帳號就不上榜。** 這是刻意的：榜上每一筆都要對得到一個帳號，
   // 改名、檢舉、跨裝置才都有意義。省下的那一趟請求也不必送——

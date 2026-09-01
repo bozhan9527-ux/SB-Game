@@ -2508,6 +2508,8 @@ export class RunScene extends Phaser.Scene {
         })
           ? null
           : {
+              // 開打那一關，不是結算頁顯示的那一關——見 RunSubmission.stage。
+              stage: this.run.loadout.stage,
               runs: this.seedRuns,
               steps: this.stepIndex,
               actions: this.actions,

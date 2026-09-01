@@ -9,6 +9,15 @@ import type { ScoreLoadout } from "../net/protocol";
  * 所以它不能上榜。這個欄位為 null 就代表「這一場不可驗證」。
  */
 export interface RunSubmission {
+  /**
+   * **開打那一關**，也就是種子的另一半（runSeed(stage, runs)）。
+   *
+   * 不能用結算頁上顯示的那個關卡：無限模式每下一波 stage 就往前跳，
+   * 打完七波之後它是第 9 關，而這一場的種子是用第 1 關算的。
+   * 送錯的話伺服器重播的是完全另一場仗，然後安靜地退回——
+   * 症狀又是「打得最好的人上不了榜」。
+   */
+  stage: number;
   runs: number;
   steps: number;
   actions: ReplayAction[];

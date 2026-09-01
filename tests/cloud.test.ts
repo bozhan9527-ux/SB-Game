@@ -148,6 +148,36 @@ describe('哪一場算數', () => {
   });
 });
 
+describe('上報的關卡是種子那一半', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('**送的是開打那一關，不是結算頁顯示的那一關。**', async () => {
+    // 無限模式每下一波 stage 就往前跳，所以結算頁上那個數字是「止步於第幾關」。
+    // 種子是用開打那一關算的（runSeed(stage, runs)），送錯的話伺服器重播的是
+    // 完全另一場仗，然後安靜地退回——症狀是「打得最好的人上不了榜」。
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.account = { email: 'a@b.co', name: '劍修', salt: 'abc' };
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValue({ ok: true, rank: 1, best: true, elapsedMs: 1000 } as never);
+
+    await submitRun(save, {
+      stage: 1,
+      runs: 3,
+      steps: 30000,
+      actions: [],
+      loadout: loadoutFor(save),
+      arena: true,
+    });
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(submit.mock.calls[0]?.[0]).toMatchObject({ board: 'arena', stage: 1, runs: 3 });
+  });
+});
+
 describe('一場成績進哪幾個榜', () => {
   it('一般的一關只進深度榜', () => {
     expect(boardsFor(40, false)).toEqual(['depth']);
@@ -179,6 +209,7 @@ describe('上榜開通', () => {
   afterEach(() => vi.restoreAllMocks());
 
   const submission = {
+    stage: 42,
     runs: 1,
     steps: 10,
     actions: [],
@@ -207,7 +238,7 @@ describe('上榜開通', () => {
       .mockResolvedValue({ ok: true, savedAt: 1 });
     vi.spyOn(client, 'getSave').mockResolvedValue({ ok: false, error: 'notFound' });
 
-    const outcome = await submitRun(save, 42, submission);
+    const outcome = await submitRun(save, submission);
     expect(put).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledTimes(2);
     expect(outcome).toEqual({ kind: 'ok', rank: 3, best: true });
@@ -223,7 +254,7 @@ describe('上榜開通', () => {
     vi.spyOn(client, 'putSave').mockResolvedValue({ ok: true, savedAt: 1 });
     vi.spyOn(client, 'getSave').mockResolvedValue({ ok: false, error: 'notFound' });
 
-    const outcome = await submitRun(save, 42, submission);
+    const outcome = await submitRun(save, submission);
     expect(submit).toHaveBeenCalledTimes(2);
     expect(outcome.kind).toBe('failed');
   });
@@ -232,7 +263,7 @@ describe('上榜開通', () => {
     const save = playing();
     vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'rejected' });
     vi.spyOn(client, 'putSave');
-    const outcome = await submitRun(save, 42, submission);
+    const outcome = await submitRun(save, submission);
     expect(outcome.kind).toBe('failed');
     if (outcome.kind !== 'failed') return;
     // 「驗不過」讀起來是在說玩家造假。訊息要指向他做得到的那一步。
@@ -254,7 +285,7 @@ describe('上榜開通', () => {
     vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'rejected' });
     const put = vi.spyOn(client, 'putSave').mockResolvedValue({ ok: true, savedAt: 1 });
 
-    const outcome = await submitRun(save, 42, submission);
+    const outcome = await submitRun(save, submission);
     expect(put).not.toHaveBeenCalled();
     expect(outcome.kind).toBe('failed');
   });
@@ -272,7 +303,7 @@ describe('上榜開通', () => {
     });
     const put = vi.spyOn(client, 'putSave');
 
-    await submitRun(save, 42, submission);
+    await submitRun(save, submission);
     expect(put).not.toHaveBeenCalled();
     expect(submit).toHaveBeenCalledTimes(2);
     expect(boardReady(save)).toBe(true);
@@ -286,7 +317,7 @@ describe('上榜開通', () => {
       .mockResolvedValue({ ok: false, error: 'serverError' });
     const put = vi.spyOn(client, 'putSave');
 
-    await submitRun(save, 42, submission);
+    await submitRun(save, submission);
     expect(put).not.toHaveBeenCalled();
     void get;
   });
@@ -297,7 +328,7 @@ describe('上榜開通', () => {
     const submit = vi.spyOn(client, 'submitScore');
     const put = vi.spyOn(client, 'putSave');
 
-    const outcome = await submitRun(save, 42, submission);
+    const outcome = await submitRun(save, submission);
     expect(outcome.kind).toBe('failed');
     if (outcome.kind === 'failed') expect(outcome.reason).toContain('註冊');
     // 一趟請求都不必送：伺服器一樣會擋，只是玩家要多等一個逾時。
@@ -308,7 +339,7 @@ describe('上榜開通', () => {
   it('沒有門派就不送，也不會登記', async () => {
     const submit = vi.spyOn(client, 'submitScore');
     const put = vi.spyOn(client, 'putSave');
-    expect(await submitRun(createDefaultSave(1), 42, submission)).toEqual({ kind: 'skipped' });
+    expect(await submitRun(createDefaultSave(1), submission)).toEqual({ kind: 'skipped' });
     expect(submit).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
@@ -359,7 +390,7 @@ describe('上報的是開打那一刻的配置', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6, elapsedMs: 1000 });
-    await submitRun(save, 6, { runs: 0, steps: 10, actions: [], loadout: captured, arena: false });
+    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false });
 
     const sent = submit.mock.calls[0]?.[0];
     expect(sent?.loadout.sectClears).toBe(4);

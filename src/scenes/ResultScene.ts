@@ -328,7 +328,7 @@ export class ResultScene extends Phaser.Scene {
     if (result.submission !== null) {
       // 送出要跑一趟網路，慢的時候有兩三秒。那段時間留白會被讀成「沒有這個功能」。
       this.cloudLine?.setText("上榜中…").setColor(INK_DIM);
-      const outcome = await submitRun(save, result.stage, result.submission);
+      const outcome = await submitRun(save, result.submission);
       // 不論成敗都存一次：送出的過程可能順手把身分登記上去了（syncedAt），
       // 那一筆不存下來的話，下一場又會再登記一次。
       persist();
