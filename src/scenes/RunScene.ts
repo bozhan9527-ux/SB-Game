@@ -118,12 +118,27 @@ const HAND_STEP = 100;
 /**
  * 放開手指時，離格位中心多遠還算落在那一格。
  *
- * 陣位的間距是 100（橫）與 96（縱），所以 62 大約是「到最近的一格為止」，
- * 而不會大到讓對角線的格子也搶得到。
+ * **這是磁吸半徑，不是命中框。** 陣位的間距是 100（橫）與 96（縱），
+ * 所以格與格之間最遠的那個點（四格正中央）離最近的中心是 69px——
+ * 舊值 62 比它小，於是那一圈是死區：手指放在兩格之間，這裡回 null，
+ * 符就默默飛回原位，什麼事都沒發生。玩家回報的「還是會不小心放歪」就是它。
+ *
+ * 110 讓整片盤面連續：盤面之內任何一點都一定屬於「離它最近的那一格」，
+ * 而且往外多出約一張符的寬容範圍。真正要取消的動作靠「拖到盤面外」，
+ * 不靠「剛好落在縫裡」。
  */
-const SNAP_RADIUS = 62;
+const SNAP_RADIUS = 110;
 /** 距離差在這個範圍內時，優先選合得起來的那一格。 */
 const MERGE_SLACK = 26;
+
+/**
+ * 手牌拖到這條線以下就是棄符。
+ *
+ * 這一條要**壓過磁吸**：棄符區離手牌只有 74px，在 110 的磁吸半徑之內，
+ * 不特別判的話「拖到這裡棄符」那一條提示永遠不會成真——
+ * 畫面上寫著一個做不到的操作，比沒有那個操作更糟。
+ */
+const DISCARD_Y = 930;
 
 /**
  * 手指從按下到放開移動不到這麼多像素，就當作「點一下」而不是「拖曳」。
@@ -228,6 +243,8 @@ export class RunScene extends Phaser.Scene {
   private bossBar: Phaser.GameObjects.Rectangle | null = null;
   private bossText: Phaser.GameObjects.Text | null = null;
   private discardZone!: Phaser.GameObjects.Rectangle;
+  /** 落點框：拖曳中跟著磁吸移動，停在符會落下的那一格。 */
+  private dropTarget: Phaser.GameObjects.Rectangle | undefined;
   private drawWarning!: Phaser.GameObjects.Text;
 
   /** 'done' 代表沒有教學要跑（老玩家或已教過）。 */
@@ -815,6 +832,13 @@ export class RunScene extends Phaser.Scene {
       .setStroke("#0b0f14", 5)
       .setVisible(false);
 
+    // 落點框畫在最上層：它要蓋過符本身，否則被拖過去的那張符會擋住它。
+    this.dropTarget = this.add
+      .rectangle(0, 0, CARD_WIDTH + 18, CARD_HEIGHT + 18, 0xffffff, 0)
+      .setStrokeStyle(3, hexToNumber(GOLD), 0.9)
+      .setDepth(60)
+      .setVisible(false);
+
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
       if (this.drag === null) return;
       this.dragView.container.setPosition(pointer.x, pointer.y - 44);
@@ -882,7 +906,7 @@ export class RunScene extends Phaser.Scene {
       source.where === "field"
         ? this.fieldHighlights[source.index]
         : this.handHighlights[source.index];
-    glow?.setStrokeStyle(4, hexToNumber(GOLD), 1);
+    this.paintGlow(glow, GOLD, 6, 1, 0.22);
     const pos = this.slotPosition(source);
     this.dropLabel
       ?.setVisible(true)
@@ -918,10 +942,14 @@ export class RunScene extends Phaser.Scene {
         target.tier === card.tier &&
         target.tier < cap;
       const empty = !self && target === null;
-      glow.setStrokeStyle(
+      // 這一層是「哪幾格合得起來」的背景提示，只描邊；填色留給真正的目標格，
+      // 否則整片盤面都在發光，反而看不出手指現在指著哪一格。
+      this.paintGlow(
+        glow,
+        same ? JADE : GOLD,
         3,
-        hexToNumber(same ? JADE : GOLD),
         same ? 0.95 : empty ? 0.45 : 0,
+        same ? 0.1 : 0,
       );
     };
     this.fieldHighlights.forEach((glow, index) =>
@@ -940,10 +968,30 @@ export class RunScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * 格位框的樣式。
+   *
+   * 目標格要**填色**，不能只描邊：戰鬥畫面上同時有妖魔、光效與傷害數字在跑，
+   * 一條 3px 的線在那裡面完全看不見。玩家回報的「顯示方框明顯一點」就是這件事。
+   * 填一層淡色之後，「符會落在這一格」在餘光裡就讀得到，不必盯著看。
+   */
+  private paintGlow(
+    glow: Phaser.GameObjects.Rectangle | undefined,
+    color: string,
+    strokeWidth: number,
+    strokeAlpha: number,
+    fillAlpha: number,
+  ): void {
+    if (glow === undefined) return;
+    glow.setStrokeStyle(strokeWidth, hexToNumber(color), strokeAlpha);
+    glow.setFillStyle(hexToNumber(color), fillAlpha);
+  }
+
   private clearMergeHints(): void {
     for (const glow of [...this.fieldHighlights, ...this.handHighlights]) {
-      glow.setStrokeStyle(3, hexToNumber(JADE), 0);
+      this.paintGlow(glow, JADE, 3, 0, 0);
     }
+    this.dropTarget?.setVisible(false);
     this.dropLabel?.setVisible(false);
   }
 
@@ -958,13 +1006,16 @@ export class RunScene extends Phaser.Scene {
     const label = this.dropLabel;
     if (source === null || label === undefined) return;
     const card = this.cardAt(source);
-    const target = this.slotAt(pointer.x, pointer.y, card);
+    // 棄符優先，和 endDrag 走同一條規則——預覽說的和放手做的必須是同一件事。
+    const discarding = source.where === "hand" && pointer.y > DISCARD_Y;
+    const target = discarding
+      ? null
+      : this.slotAt(pointer.x, pointer.y, card);
 
     // 先把所有格位還原成一般的合成提示，再單獨標出這一格。
     if (card !== null) this.showMergeHints(card, source);
 
     if (target === null) {
-      const discarding = source.where === "hand" && pointer.y > 930;
       label
         .setVisible(discarding)
         .setText(discarding ? "棄符" : "")
@@ -996,9 +1047,16 @@ export class RunScene extends Phaser.Scene {
           ? "放置"
           : "交換";
     const color = merges ? JADE : existing === null ? GOLD : INK_DIM;
-    glow?.setStrokeStyle(4, hexToNumber(color), same ? 0 : 1);
+    this.paintGlow(glow, color, 6, same ? 0 : 1, same ? 0 : 0.22);
 
     const pos = this.slotPosition(target);
+    // 落點框：一個跟著磁吸走的方框，直接停在符會落下的那一格。
+    // 手指在格與格之間時，是這個框在回答「到底會落在哪一格」——
+    // 只有顏色深淺的差別讀不出來，一個會移動的框讀得出來。
+    this.dropTarget
+      ?.setVisible(!same)
+      .setPosition(pos.x, pos.y)
+      .setStrokeStyle(3, hexToNumber(color), 0.9);
     label
       .setVisible(text.length > 0)
       .setText(text)
@@ -1016,7 +1074,7 @@ export class RunScene extends Phaser.Scene {
       if (this.selected === null) return;
       const chosen = this.selected;
       this.clearSelection();
-      if (chosen.where === "hand" && pointer.y > 930 && !this.over) {
+      if (chosen.where === "hand" && pointer.y > DISCARD_Y && !this.over) {
         if (discardHand(this.run, chosen.index)) {
           this.record({ kind: "discard", index: chosen.index });
           audio.play("gateTrap");
@@ -1038,17 +1096,19 @@ export class RunScene extends Phaser.Scene {
     }
 
     this.discardZone.setVisible(false);
+    this.dropTarget?.setVisible(false);
     this.clearMergeHints();
     if (this.over) return;
 
-    const target = this.slotAt(pointer.x, pointer.y, this.cardAt(source));
-    if (target !== null) {
-      this.applyDrop(source, target);
-    } else if (source.where === "hand" && pointer.y > 930) {
+    // 棄符先判：棄符區在磁吸半徑之內，先問磁吸的話它永遠吸回手牌那一格。
+    if (source.where === "hand" && pointer.y > DISCARD_Y) {
       if (discardHand(this.run, source.index)) {
         this.record({ kind: "discard", index: source.index });
         audio.play("gateTrap");
       }
+    } else {
+      const target = this.slotAt(pointer.x, pointer.y, this.cardAt(source));
+      if (target !== null) this.applyDrop(source, target);
     }
 
     this.refreshCards();
@@ -1153,6 +1213,11 @@ export class RunScene extends Phaser.Scene {
    * **取最近的一格，不是取第一個命中的。** 舊版用「軸向容差 + 依索引先到先得」，
    * 而陣位的列距是 96px、縱向容差卻是 ±60px——相鄰兩列的判定區重疊 24px，
    * 放在兩列之間會靜默落到上面那一列。玩家回報的「合成常常變成取代到別的卡片」就是這個。
+   *
+   * **而且是磁吸，不是命中框。** SNAP_RADIUS 大到讓整片盤面連續，
+   * 所以手指落在任何一點都一定屬於離它最近的那一格，格與格之間沒有死區——
+   * 舊值 62 比「四格正中央到最近中心」的 69px 還小，那一圈放手是什麼都不會發生，
+   * 而畫面上完全看不出為什麼。回報的「還是會不小心放歪」就是那個縫。
    *
    * 另外在**距離相當**時優先選合得起來的那一格（MERGE_SLACK 之內）。
    * 合成是這個遊戲的核心動作，手指差幾個像素不該把它變成一次交換——
