@@ -20,10 +20,12 @@ import {
   refreshDistribution,
   registerForBoard,
 } from '../systems/leaderboard';
+import { MIN_PASSWORD_LENGTH, hasAccount, login, register } from '../systems/account';
+import { showForm, showNotice } from '../ui/form';
 import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, textStyle } from '../ui/theme';
+import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, hexToNumber, textStyle } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 const LIST_TOP = 226;
@@ -65,13 +67,34 @@ export class LeaderboardScene extends Phaser.Scene {
       .text(cx, 154, '', textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(0.5);
 
-    createButton(this, cx, 192, {
-      width: 220,
-      height: 42,
-      label: save.player.name.length > 0 ? `改名：${save.player.name}` : '取一個上榜的名字',
-      fontSize: 17,
-      onClick: () => this.rename(),
-    });
+    // 有帳號就只需要一顆改名鍵；沒帳號的話這裡是整頁最重要的東西——
+    // 他上不了榜，而且在此之前沒有任何地方告訴過他為什麼。
+    if (hasAccount(save)) {
+      createButton(this, cx, 192, {
+        width: 220,
+        height: 42,
+        label: `改名：${save.player.name}`,
+        fontSize: 17,
+        onClick: () => this.rename(),
+      });
+    } else {
+      createButton(this, cx - 84, 192, {
+        width: 156,
+        height: 42,
+        label: '註冊',
+        fontSize: 17,
+        strokeColor: hexToNumber(GOLD),
+        textColor: GOLD,
+        onClick: () => void this.doRegister(),
+      });
+      createButton(this, cx + 84, 192, {
+        width: 156,
+        height: 42,
+        label: '登入',
+        fontSize: 17,
+        onClick: () => void this.doLogin(),
+      });
+    }
 
     const width = GAME_WIDTH - 44;
     const height = VISIBLE_ROWS * ROW_HEIGHT + 20;
@@ -114,6 +137,10 @@ export class LeaderboardScene extends Phaser.Scene {
   private async prepare(): Promise<void> {
     if (!cloudEnabled()) return;
     const save = state();
+    if (!hasAccount(save)) {
+      this.mine.setText('還沒註冊，你不會出現在榜上').setColor(DANGER);
+      return;
+    }
     if (boardReady(save)) {
       this.mine.setText('上榜已開通，通關就會自動送出').setColor(INK_DIM);
       return;
@@ -125,6 +152,68 @@ export class LeaderboardScene extends Phaser.Scene {
     } else {
       this.mine.setText('開通失敗，通關時會再試一次').setColor(DANGER);
     }
+  }
+
+  /**
+   * 註冊。
+   *
+   * 兩件事一定要在按下去之前講清楚：**沒有 email 就沒有重設密碼**，
+   * 以及救援手段是既有的存檔碼。忘記密碼在這套設計裡是真的救不回來的，
+   * 事後才說等於騙人。
+   */
+  private async doRegister(): Promise<void> {
+    const values = await showForm({
+      title: '註冊',
+      note:
+        '註冊之後才能上榜，而且換裝置能把進度接回來。\n' +
+        `密碼至少 ${MIN_PASSWORD_LENGTH} 個字。\n\n` +
+        '⚠ 沒有 email，所以忘記密碼救不回來。\n記得到「存檔」複製一份存檔碼收好，那是唯一的備援。',
+      fields: [
+        { key: 'name', label: '道號（榜上顯示的名字）', maxLength: MAX_NAME_LENGTH },
+        { key: 'password', label: '密碼', password: true, maxLength: 64 },
+      ],
+      submit: '註冊',
+    });
+    if (values === null) return;
+
+    this.mine.setText('註冊中…').setColor(INK_DIM);
+    const outcome = await register(state(), values['name'] ?? '', values['password'] ?? '');
+    if (outcome.kind === 'failed') {
+      this.mine.setText(outcome.reason).setColor(DANGER);
+      return;
+    }
+    persist();
+    await showNotice('註冊完成', `道號：${outcome.name}\n之後通關就會自動上榜。`);
+    this.scene.restart();
+  }
+
+  /**
+   * 登入。
+   *
+   * **只換身分，不動進度。** 把雲端那份拉下來是「存檔」頁那個明確的動作——
+   * 蓋掉本機進度這種事不該藏在「登入」兩個字底下。
+   */
+  private async doLogin(): Promise<void> {
+    const values = await showForm({
+      title: '登入',
+      note: '登入只會換回你的身分，不會動到這台裝置上的進度。\n要把雲端那份拉下來，到「存檔」按下載。',
+      fields: [
+        { key: 'name', label: '道號', maxLength: MAX_NAME_LENGTH },
+        { key: 'password', label: '密碼', password: true, maxLength: 64 },
+      ],
+      submit: '登入',
+    });
+    if (values === null) return;
+
+    this.mine.setText('登入中…').setColor(INK_DIM);
+    const outcome = await login(state(), values['name'] ?? '', values['password'] ?? '');
+    if (outcome.kind === 'failed') {
+      this.mine.setText(outcome.reason).setColor(DANGER);
+      return;
+    }
+    persist();
+    await showNotice('登入完成', `道號：${outcome.name}\n要接回雲端進度的話，到「存檔」按下載。`);
+    this.scene.restart();
   }
 
   private rename(): void {

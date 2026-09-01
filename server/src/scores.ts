@@ -23,9 +23,9 @@ import type {
   ScoreLoadout,
   ScoreSubmitResult,
 } from '../../src/net/protocol';
-import { MAX_NAME_LENGTH } from '../../src/net/protocol';
 import { CARDS, DUNGEONS, KARMA, SECTS, UPGRADES } from '../../src/data';
 import { buildLoadoutFromSpec } from '../../src/systems/loadout';
+import { accountOf } from './accounts';
 
 /** 藏經閣總層數，也就是符籙解鎖的上限。 */
 const LIBRARY_FLOORS = DUNGEONS.find((item) => item.id === 'library')?.floors.length ?? 0;
@@ -53,13 +53,6 @@ import { replayRun, validateReplay } from '../../src/systems/replay';
 /** 榜上顯示幾筆。 */
 const TOP_N = 50;
 
-/**
- * 名稱裡要拿掉的字元：控制字元、零寬字元、雙向文字控制符。
- *
- * 控制字元與換行會把榜單版面弄壞；零寬與雙向控制符可以拿來做出
- * 「看起來和別人一模一樣」甚至「顯示成反向」的名字。兩者都不是內容，直接拿掉。
- */
-const INVISIBLE = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\ufeff]/g;
 
 /**
  * 把客戶端報上來的配置夾成合法的範圍。
@@ -146,13 +139,6 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   };
 }
 
-/** 名稱：拿掉看不見的字元，掐到長度上限，空的就給一個預設。 */
-export function sanitizeName(raw: unknown): string {
-  if (typeof raw !== 'string') return '無名修士';
-  const cleaned = raw.replace(INVISIBLE, '').trim();
-  if (cleaned.length === 0) return '無名修士';
-  return cleaned.slice(0, MAX_NAME_LENGTH);
-}
 
 function slotOf(raw: unknown): { where: 'hand' | 'field'; index: number } | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -222,6 +208,11 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   if (owner === null) return fail('unauthorized', env, origin, '請先上傳一次雲端存檔');
   if (!timingSafeEqual(owner.secret_hash, hash)) return fail('unauthorized', env, origin);
 
+  // **沒有帳號就不上榜。** 客戶端也會先擋，但那是體貼不是防線——
+  // 真正的規則在這裡。榜上每一筆都對得到一個帳號，檢舉與改名才有對象。
+  const account = await accountOf(env, playerId);
+  if (account === null) return fail('unauthorized', env, origin, '要註冊帳號才能上榜');
+
   const loadout = sanitizeLoadout(record['loadout']);
   if (loadout === null) return fail('badRequest', env, origin, '配置不合法');
   const actions = actionsOf(record['actions']);
@@ -249,7 +240,9 @@ export async function submitScore(request: Request, env: Env, origin: string | n
     return fail('rejected', env, origin, `重播的結果是 ${replayed.outcome}`);
   }
 
-  const name = sanitizeName(record['name']);
+  // 名字用帳號那一份，不收客戶端報的：同一個帳號在榜上永遠是同一個名字，
+  // 而且改名只要改帳號那一列，不必等他再破一次自己的紀錄。
+  const name = account;
   const now = Date.now();
   const existing = await env.DB.prepare('SELECT stage FROM scores WHERE player_id = ?')
     .bind(playerId)

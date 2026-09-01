@@ -33,6 +33,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
       cloud: null,
+      account: null,
       name: '',
       distribution: null,
       records: {
@@ -137,6 +138,22 @@ function normalizeDungeons(raw: unknown): Record<string, number> {
  * 只留實際存在的門派，而且只留大於零的：不存在的 id 是改版或手改存檔的殘留，
  * 而零和「沒有這一項」在語意上是同一件事，不必佔一格。
  */
+/**
+ * 綁定的帳號。壞掉或不完整就當成沒綁。
+ *
+ * 沒綁的後果只是「不能上榜」，不是「玩不下去」——所以這裡寧可回 null，
+ * 也不要為了修補一份殘缺的資料而讓遊戲開不起來。
+ */
+function normalizeAccount(raw: unknown): { name: string; salt: string } | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const name = record['name'];
+  const salt = record['salt'];
+  if (typeof name !== 'string' || name.length === 0) return null;
+  if (typeof salt !== 'string' || salt.length === 0) return null;
+  return { name, salt };
+}
+
 function normalizeSectClears(raw: unknown): Record<string, number> {
   const source = (raw ?? {}) as Record<string, unknown>;
   const out: Record<string, number> = {};
@@ -203,6 +220,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       records: normalizeRecords(player['records']),
       karma: normalizeKarma(player['karma']),
       cloud: normalizeCloud(player['cloud']),
+      account: normalizeAccount(player['account']),
       name: typeof player['name'] === 'string' ? player['name'].slice(0, 32) : '',
       distribution: normalizeDistribution(player['distribution']),
       stats: {

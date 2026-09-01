@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -148,6 +148,14 @@ export interface PlayerState {
   distribution: DistributionCache | null;
   karma: KarmaState;
   cloud: CloudIdentity | null;
+  /**
+   * 綁定的帳號。沒註冊就是 null——**沒有帳號就不上榜**。
+   *
+   * 只存名字與鹽，不存密碼：密碼從來沒有離開過這台裝置，
+   * 身分那一把密鑰是用它現算出來的（見 src/systems/account.ts）。
+   * 鹽留著是為了之後要重算密鑰時不必再問伺服器一次。
+   */
+  account: { name: string; salt: string } | null;
   /** 上榜用的名字。沒取過名字是空字串，第一次上榜時才問。 */
   name: string;
   stats: StatsState;

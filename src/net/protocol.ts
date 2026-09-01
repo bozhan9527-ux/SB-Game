@@ -20,6 +20,27 @@ export const MAX_BLOB_BYTES = 64 * 1024;
 /** 排行榜名稱長度上限。 */
 export const MAX_NAME_LENGTH = 16;
 
+/**
+ * 名稱的正規化。用來擋「看起來一樣但實際不同」的重複名稱。
+ *
+ * **前後端一定要用同一份。** 客戶端說可以用、伺服器說重複，
+ * 那個矛盾在畫面上無法解釋。
+ */
+export function nameKey(name: string): string {
+  return name.normalize('NFKC').trim().toLowerCase();
+}
+
+/** 看不見的字元。留著會做出「和別人長得一模一樣」的名字。 */
+const INVISIBLE = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\ufeff]/g;
+
+/** 清過的名稱。不合法（空的、太長、不是字串）回 null。 */
+export function cleanName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const cleaned = raw.replace(INVISIBLE, '').trim();
+  if (cleaned.length === 0 || cleaned.length > MAX_NAME_LENGTH) return null;
+  return cleaned;
+}
+
 export type ApiError =
   | 'badRequest'
   | 'unauthorized'
@@ -29,6 +50,18 @@ export type ApiError =
   | 'serverError';
 
 export type ApiResponse<T> = ({ ok: true } & T) | { ok: false; error: ApiError; detail?: string };
+
+/** 註冊前先要一把鹽，順便問「這個名字有沒有人用了」。 */
+export interface AccountSaltResult {
+  salt: string;
+  taken: boolean;
+}
+
+/** 註冊與登入回的都是「你是哪個帳號、哪個身分」。 */
+export interface AccountResult {
+  name: string;
+  playerId: string;
+}
 
 /** 匿名身分。playerId 是誰，secret 證明是他本人。 */
 export interface Identity {

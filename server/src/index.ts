@@ -6,6 +6,7 @@
  */
 import type { Env } from './http';
 import { corsHeaders, fail } from './http';
+import { accountSalt, loginAccount, registerAccount } from './accounts';
 import { getSave, putSave } from './saves';
 import { distribution, leaderboard, submitScore } from './scores';
 import { API_VERSION } from '../../src/net/protocol';
@@ -23,6 +24,15 @@ export default {
     try {
       if (path === `/${API_VERSION}/health` && request.method === 'GET') {
         return new Response('ok', { status: 200, headers: corsHeaders(env, origin) });
+      }
+      if (path === `/${API_VERSION}/account/salt` && request.method === 'POST') {
+        return await accountSalt(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/account/register` && request.method === 'POST') {
+        return await registerAccount(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/account/login` && request.method === 'POST') {
+        return await loginAccount(request, env, origin);
       }
       if (path === `/${API_VERSION}/save/put` && request.method === 'POST') {
         return await putSave(request, env, origin);

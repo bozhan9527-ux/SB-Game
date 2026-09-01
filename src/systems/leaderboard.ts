@@ -124,6 +124,12 @@ export async function submitRun(
   submission: RunSubmission,
 ): Promise<SubmitOutcome> {
   if (save.player.sectId === null) return { kind: 'skipped' };
+  // **沒有帳號就不上榜。** 這是刻意的：榜上每一筆都要對得到一個帳號，
+  // 改名、檢舉、跨裝置才都有意義。省下的那一趟請求也不必送——
+  // 伺服器一樣會擋，只是玩家會多等一個逾時。
+  if (save.player.account === null) {
+    return { kind: 'failed', reason: '要註冊才能上榜（到榜單頁註冊）' };
+  }
   const identity = ensureCloudIdentity(save);
 
   const send = (): Promise<Awaited<ReturnType<typeof submitScore>>> =>

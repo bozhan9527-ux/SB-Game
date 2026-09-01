@@ -263,6 +263,17 @@ const addSectDepth: Migration = (data) => {
   return { ...data, player: { ...player, sectDepth: {} } };
 };
 
+/**
+ * v21 → v22：加上帳號欄位。
+ *
+ * 舊存檔一律是 null（沒綁帳號）。他們的匿名身分還在，註冊時會被收編進去，
+ * 所以不會有人因為改制掉進度——但**在他註冊之前上不了榜**，這是刻意的。
+ */
+const addAccount: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, account: null } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -285,6 +296,7 @@ export const MIGRATIONS: readonly Migration[] = [
   dropRetreat,
   dropFieldSlots,
   addSectDepth,
+  addAccount,
 ];
 
 /**

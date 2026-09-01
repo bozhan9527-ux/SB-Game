@@ -9,6 +9,8 @@
  * 不是「畫面卡在轉圈圈」。
  */
 import type {
+  AccountResult,
+  AccountSaltResult,
   ApiResponse,
   DistributionResult,
   Identity,
@@ -55,6 +57,27 @@ async function call<T>(path: string, body: unknown | null): Promise<ApiResponse<
   } finally {
     clearTimeout(timer);
   }
+}
+
+export function accountSalt(body: { name: string }): Promise<ApiResponse<AccountSaltResult>> {
+  return call('/account/salt', body);
+}
+
+export function accountRegister(body: {
+  name: string;
+  playerId: string;
+  salt: string;
+  secretHash: string;
+  oldSecretHash: string;
+}): Promise<ApiResponse<AccountResult>> {
+  return call('/account/register', body);
+}
+
+export function accountLogin(body: {
+  name: string;
+  secretHash: string;
+}): Promise<ApiResponse<AccountResult>> {
+  return call('/account/login', body);
 }
 
 export function putSave(body: Identity & { savedAt: number; blob: string }): Promise<ApiResponse<SavePutResult>> {

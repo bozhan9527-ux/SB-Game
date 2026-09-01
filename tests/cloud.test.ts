@@ -164,9 +164,11 @@ describe('上榜開通', () => {
     loadout: loadoutFor(playing()),
   };
 
+  /** 一份「可以上榜」的存檔：有門派、也註冊過。 */
   function playing() {
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
+    save.player.account = { name: '劍修', salt: 'abc' };
     return save;
   }
 
@@ -267,6 +269,20 @@ describe('上榜開通', () => {
     void get;
   });
 
+  it('沒註冊就不送——上榜要有帳號，這是規則不是體貼', async () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    const submit = vi.spyOn(client, 'submitScore');
+    const put = vi.spyOn(client, 'putSave');
+
+    const outcome = await submitRun(save, 42, submission);
+    expect(outcome.kind).toBe('failed');
+    if (outcome.kind === 'failed') expect(outcome.reason).toContain('註冊');
+    // 一趟請求都不必送：伺服器一樣會擋，只是玩家要多等一個逾時。
+    expect(submit).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it('沒有門派就不送，也不會登記', async () => {
     const submit = vi.spyOn(client, 'submitScore');
     const put = vi.spyOn(client, 'putSave');
@@ -311,6 +327,7 @@ describe('上報的是開打那一刻的配置', () => {
   it('submitRun 送的是 submission 裡那一份，不是從存檔現算的', async () => {
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
+    save.player.account = { name: '劍修', salt: 'abc' };
     save.player.sectClears['sword'] = 4;
     const captured = scoreLoadoutOf(loadoutSpecOf(save, 6));
 
