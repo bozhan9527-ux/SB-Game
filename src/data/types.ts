@@ -685,11 +685,32 @@ export interface DungeonFloor {
   karma?: number;
 }
 
+/**
+ * 介面圖示的名字。
+ *
+ * **定義在這裡而不是 art.ts**，因為資料驗證要用它，而 art.ts 反過來要 import
+ * 資料（它從 cards.json 推出要預載哪些圖騰）——放在那邊會繞成一個環。
+ * art.ts 直接 re-export 這一份，兩邊永遠是同一個清單。
+ */
+export const ICON_NAMES = [
+  'cave',
+  'scroll',
+  'sect',
+  'trial',
+  'rank',
+  'music',
+  'record',
+  'save',
+  'help',
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];
+
 export interface DungeonDef {
   id: string;
   name: string;
-  /** 介面圖示名稱，對應 src/art.ts 的 ICON_NAMES。 */
-  icon: string;
+  /** 介面圖示。載入時會驗，打錯字不會變成一塊空白的方塊。 */
+  icon: IconName;
   desc: string;
   detail: string;
   /** 這個副本產出什麼，選擇畫面用一個詞說完。 */

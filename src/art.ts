@@ -20,19 +20,11 @@ export const ART = {
  * 陌生的詞——文字要讀完才知道是什麼，圖示是先看到形狀再對上詞。
  * 兩個一起放，第二次之後就只靠圖示認得出來了。
  */
-export const ICON_NAMES = [
-  'cave',
-  'scroll',
-  'sect',
-  'trial',
-  'rank',
-  'music',
-  'record',
-  'save',
-  'help',
-] as const;
+import { ICON_NAMES } from './data/types';
+import type { IconName } from './data/types';
 
-export type IconName = (typeof ICON_NAMES)[number];
+export { ICON_NAMES };
+export type { IconName };
 
 export function iconTexture(name: IconName): string {
   return `icon-${name}`;

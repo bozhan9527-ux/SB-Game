@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { BALANCE, CARDS, REALMS, SECTS, UPGRADES, parseCards, parseRealms, parseUpgrades } from '../src/data';
+import { BALANCE, CARDS, DUNGEONS, REALMS, SECTS, UPGRADES, parseCards, parseRealms, parseUpgrades } from '../src/data';
+import { ICON_NAMES } from '../src/data/types';
 import { DataError } from '../src/data/validate';
 import { realmForStage, realmIndexForStage, realmTitle } from '../src/systems/realms';
 
@@ -101,5 +102,15 @@ describe('資料檔驗證（TECH_SPEC 第 3 節）', () => {
         { id: 'x', name: 'N', desc: 'D', unit: '點', perLevel: 1, baseCost: 10, costGrowth: 0.5, maxLevel: 3 },
       ]),
     ).toThrow(/costGrowth/);
+  });
+});
+
+describe('副本圖示', () => {
+  it('每一個副本的圖示都真的存在', () => {
+    // 打錯一個字的症狀是副本列上一塊空白的方塊——沒有錯誤、沒有記錄，
+    // 只是看起來像沒畫完。試劍台就這樣上線過一次（icon 寫成 sword）。
+    for (const dungeon of DUNGEONS) {
+      expect(ICON_NAMES).toContain(dungeon.icon);
+    }
   });
 });

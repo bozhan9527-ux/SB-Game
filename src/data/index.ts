@@ -17,6 +17,7 @@ import karmaJson from '../../data/karma.json';
 import challengesJson from '../../data/challenges.json';
 import dungeonsJson from '../../data/dungeons.json';
 
+import { ICON_NAMES } from './types';
 import type {
   Achievement,
   Scenery,
@@ -505,7 +506,9 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
     return {
       id: str(source, 'id', p),
       name: str(source, 'name', p),
-      icon: str(source, 'icon', p),
+      // **圖示要驗。** 打錯一個字的症狀是副本列上一塊空白的方塊——
+      // 沒有錯誤、沒有記錄，只是看起來像沒畫完。試劍台就這樣上線過一次。
+      icon: oneOf(source, 'icon', p, ICON_NAMES),
       desc: str(source, 'desc', p),
       detail: str(source, 'detail', p),
       reward: str(source, 'reward', p),
