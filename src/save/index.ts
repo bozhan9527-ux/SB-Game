@@ -27,6 +27,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       hints: [],
       talismans: starterTalismans(),
       sectClears: {},
+      sectDepth: {},
       dungeons: {},
       challenges: [],
       challengesDone: [],
@@ -130,6 +131,12 @@ function normalizeDungeons(raw: unknown): Record<string, number> {
   return out;
 }
 
+/**
+ * 分派記的計數表（門派修為的通關次數、門派秘傳的等級）。
+ *
+ * 只留實際存在的門派，而且只留大於零的：不存在的 id 是改版或手改存檔的殘留，
+ * 而零和「沒有這一項」在語意上是同一件事，不必佔一格。
+ */
 function normalizeSectClears(raw: unknown): Record<string, number> {
   const source = (raw ?? {}) as Record<string, unknown>;
   const out: Record<string, number> = {};
@@ -189,6 +196,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       // 符籙的解鎖來源是藏經閣的層數，不是關卡進度（v17 起）。
       talismans: sanitizeTalismans(savedTalismans, dungeons['library'] ?? 0),
       sectClears: normalizeSectClears(player['sectClears']),
+      sectDepth: normalizeSectClears(player['sectDepth']),
       dungeons,
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),

@@ -484,6 +484,35 @@ export interface UpgradeTrack {
   maxLevel: number;
 }
 
+/** 門派秘傳能加的東西。一派一種，那一種就是那一派的長處。 */
+export type SectUpgradeEffect =
+  | 'disciples'
+  | 'bossDamage'
+  | 'favoredDamage'
+  | 'gold';
+
+/**
+ * 門派秘傳：一條沒有上限的深度升級線，一個門派各有一條。
+ *
+ * 洞府那五條線點滿之後金幣就沒有地方去了，而飛升境正好是遊戲最空的一段。
+ * 這條線接在那裡：它不設上限（成本每級 ×1.3，實際上是靠深度換級數），
+ * 而且每一派加的東西都不一樣——選門派的決定要一直有效，
+ * 不能到了後期變成「反正都是傷害 +x%」。
+ */
+export interface SectUpgradeTrack {
+  id: string;
+  /** 屬於哪一派。只有拜在這一派門下才看得到、也才買得到。 */
+  sectId: string;
+  name: string;
+  desc: string;
+  unit: string;
+  /** 每級提供的數值。 */
+  perLevel: number;
+  baseCost: number;
+  costGrowth: number;
+  effect: SectUpgradeEffect;
+}
+
 /**
  * 敵陣造型，對應 public/art/enemy-*.svg。
  * 前六種是妖獸，各自畫成名字裡的那種生物；後四種是人形。

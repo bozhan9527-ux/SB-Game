@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -128,6 +128,13 @@ export interface PlayerState {
    * 而不是一個隨時可改的修飾選單。存等級是衍生值，所以只存次數。
    */
   sectClears: Record<string, number>;
+  /**
+   * 各門派各自的「門派秘傳」等級（見 src/systems/sect-upgrades.ts）。
+   *
+   * 和 sectClears 一樣分派記：投入留在那一派身上，換派不會跟著走。
+   * 它是用金幣買的，所以和洞府同一個待遇——輪迴時歸零。
+   */
+  sectDepth: Record<string, number>;
   /**
    * 這一場要開啟的挑戰條件（見 src/systems/challenges.ts）。
    *

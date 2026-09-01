@@ -38,6 +38,15 @@ const MAX_BANKED_STAGE = 100_000;
 /** 轉世次數的上限。習性機率本來就有上限，這裡只是擋住荒謬值。 */
 const MAX_REBIRTHS = 9_999;
 
+/**
+ * 門派秘傳等級的上限。
+ *
+ * 這條線本身沒有上限，成本每級 ×1.3 才是煞車，所以資料檔裡沒有一個 maxLevel
+ * 可以拿來夾。999 級的成本是天文數字，任何真實存檔都到不了——
+ * 它擋的是「宣稱一百萬級」，不是「多報幾級」。後者和升級等級同一類，堵不死。
+ */
+const MAX_SECT_DEPTH = 999;
+
 import type { ReplayAction } from '../../src/systems/replay';
 import { replayRun, validateReplay } from '../../src/systems/replay';
 
@@ -96,6 +105,9 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   }
 
   const clears = Number(record['sectClears'] ?? 0);
+  // 門派秘傳沒有等級上限（成本是唯一的煞車），所以這裡夾的是一個
+  // 「怎麼玩都到不了」的天花板，不是資料檔裡的 maxLevel。
+  const depth = Number(record['sectDepth'] ?? 0);
 
   // 副本規則每一條都只讓這一場更難，所以不必夾——照收，
   // 否則在副本裡通關的玩家永遠驗不過。
@@ -124,6 +136,9 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
     upgrades,
     karma,
     sectClears: Number.isFinite(clears) ? Math.max(0, Math.floor(clears)) : 0,
+    sectDepth: Number.isFinite(depth)
+      ? Math.max(0, Math.min(MAX_SECT_DEPTH, Math.floor(depth)))
+      : 0,
     rules,
     goldMultiplier: Number.isFinite(gold) ? Math.max(1, Math.min(MAX_GOLD_MULTIPLIER, gold)) : 1,
     bankedStage: Number.isFinite(banked) ? Math.max(0, Math.min(MAX_BANKED_STAGE, Math.floor(banked))) : 0,

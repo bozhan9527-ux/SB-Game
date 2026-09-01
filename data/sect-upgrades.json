@@ -1,0 +1,46 @@
+[
+  {
+    "id": "bodyWall",
+    "sectId": "body",
+    "name": "鐵骨鎮山",
+    "desc": "山門耐久再往上疊，沒有上限。",
+    "unit": "%",
+    "perLevel": 10,
+    "baseCost": 200000,
+    "costGrowth": 1.3,
+    "effect": "disciples"
+  },
+  {
+    "id": "swordEdge",
+    "sectId": "sword",
+    "name": "劍鋒所指",
+    "desc": "對關底首領的傷害再往上疊，沒有上限。",
+    "unit": "%",
+    "perLevel": 8,
+    "baseCost": 200000,
+    "costGrowth": 1.3,
+    "effect": "bossDamage"
+  },
+  {
+    "id": "talismanRite",
+    "sectId": "talisman",
+    "name": "一符通神",
+    "desc": "本門專精的那一張符，傷害再往上疊，沒有上限。",
+    "unit": "%",
+    "perLevel": 9,
+    "baseCost": 200000,
+    "costGrowth": 1.3,
+    "effect": "favoredDamage"
+  },
+  {
+    "id": "alchemyFire",
+    "sectId": "alchemy",
+    "name": "丹火煉金",
+    "desc": "金幣收益再往上疊，沒有上限。",
+    "unit": "%",
+    "perLevel": 15,
+    "baseCost": 200000,
+    "costGrowth": 1.3,
+    "effect": "gold"
+  }
+]

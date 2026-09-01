@@ -8,6 +8,7 @@
  * 六條線一律是**百分比乘算**。早期版本用固定加值，實測邊界關卡完全不動——
  * 難度是指數曲線，固定加值在後期會被稀釋到看不見（見 PROGRESS 的 L-05）。
  */
+import { sectTrackFor, sectUpgradeAmount, sectUpgradeLevel } from './sect-upgrades';
 import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect } from '../data/types';
 import type { SaveData } from '../save/types';
@@ -92,6 +93,13 @@ export interface Loadout {
   rules: RunRules;
   /** 仙緣「宿慧未泯」帶來的階數上限加值。跨世永久生效。 */
   tierBonus: number;
+  /**
+   * 門派秘傳加在**專精那一張符**上的額外傷害（0.27 = 再 +27%）。
+   *
+   * 加在門派本身的專精倍率上，不是另外乘一層：兩者是同一件事的兩段，
+   * 分開乘會讓後期的專精符變成一個獨立的指數。
+   */
+  favoredDamageBonus: number;
 }
 
 export function sectById(id: string | null): Sect | null {
@@ -121,6 +129,13 @@ export interface LoadoutSpec {
   karma: Readonly<Record<string, number>>;
   /** 這一派累積了幾次通關，決定修為階數。 */
   sectClears: number;
+  /**
+   * 門派秘傳的等級（見 src/systems/sect-upgrades.ts）。
+   *
+   * 和 sectClears 一樣要進 spec：伺服器重播時必須組出**同一份**配置，
+   * 少一個欄位就會判成作弊。
+   */
+  sectDepth: number;
   /**
    * 這一場的規則，由副本帶進來（一般關卡是空的）。
    *
@@ -170,6 +185,7 @@ export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
     karma: { ...save.player.karma.spent },
     sectClears:
       save.player.sectId === null ? 0 : (save.player.sectClears[save.player.sectId] ?? 0),
+    sectDepth: sectUpgradeLevel(save),
     rules: [],
     goldMultiplier: 1,
     bankedStage: save.player.karma.claimedStage,
@@ -210,6 +226,7 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   if (has('thinGate')) {
     loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
   }
+  applySectDepth(loadout, spec.sectDepth);
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
   const { traitChancePerLife, traitChanceMax } = BALANCE.rebirth;
   loadout.traitChance = Math.min(
@@ -219,6 +236,30 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   loadout.endless = spec.endless === true;
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   return loadout;
+}
+
+/**
+ * 門派秘傳：一派一種效果，沒有上限。
+ *
+ * 放在組裝的最後、乘在既有倍率上，而不是塞進 buildLoadoutFor 的參數表——
+ * 它加的東西四派各不相同，攤成四個參數只會讓那個已經很長的簽章更難讀，
+ * 而這裡一眼就看得出「哪一派加在哪一格」。
+ */
+function applySectDepth(loadout: Loadout, level: number): void {
+  const track = sectTrackFor(loadout.sect.id);
+  if (track === null) return;
+  const amount = sectUpgradeAmount(track, Math.max(0, Math.floor(level)));
+  if (amount <= 0) return;
+  const ratio = amount / 100;
+  if (track.effect === 'disciples') {
+    loadout.disciples = Math.max(1, Math.round(loadout.disciples * (1 + ratio)));
+  } else if (track.effect === 'bossDamage') {
+    loadout.bossDamageMultiplier *= 1 + ratio;
+  } else if (track.effect === 'favoredDamage') {
+    loadout.favoredDamageBonus += ratio;
+  } else {
+    loadout.goldMultiplier *= 1 + ratio;
+  }
 }
 
 export function buildLoadout(save: SaveData, stage: number): Loadout {
@@ -271,6 +312,7 @@ export function buildLoadoutFor(
   return {
     sect,
     stage,
+    favoredDamageBonus: 0,
     // 沒有轉世資訊時威脅度就是關卡本身、妖魔也不額外長習性。
     // 平衡模擬與測試大多走這條路。
     threat: stage,

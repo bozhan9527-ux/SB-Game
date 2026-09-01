@@ -121,5 +121,8 @@ export function rebirth(save: SaveData): boolean {
   // 十六張非基礎符一起收回，下一世要重新打回來。這是製作人的決定——
   // 它把「轉世之後沒事做」換成了「轉世之後有一整條路要重走」。
   save.player.dungeons = {};
+  // 門派秘傳是用金幣買的，和洞府同一個待遇：金幣歸零，它也歸零。
+  // 修為（sectClears）不動——那是打出來的，不是買出來的。
+  save.player.sectDepth = {};
   return true;
 }

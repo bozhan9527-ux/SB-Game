@@ -9,6 +9,7 @@ import realmsJson from '../../data/realms.json';
 import sectsJson from '../../data/sects.json';
 import cardsJson from '../../data/cards.json';
 import upgradesJson from '../../data/upgrades.json';
+import sectUpgradesJson from '../../data/sect-upgrades.json';
 import enemiesJson from '../../data/enemies.json';
 import achievementsJson from '../../data/achievements.json';
 import lessonsJson from '../../data/lessons.json';
@@ -39,6 +40,7 @@ import type {
   Sect,
   SectArt,
   UpgradeTrack,
+  SectUpgradeTrack,
 } from './types';
 import {
   assertKnownKeys,
@@ -359,6 +361,38 @@ export function parseUpgrades(raw: unknown, path = 'upgrades.json'): UpgradeTrac
   return tracks;
 }
 
+const SECT_UPGRADE_EFFECTS = [
+  'disciples',
+  'bossDamage',
+  'favoredDamage',
+  'gold',
+] as const;
+
+export function parseSectUpgrades(
+  raw: unknown,
+  path = 'sect-upgrades.json',
+): SectUpgradeTrack[] {
+  const tracks = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    sectId: str(item, 'sectId', p),
+    name: str(item, 'name', p),
+    desc: str(item, 'desc', p),
+    unit: str(item, 'unit', p),
+    perLevel: num(item, 'perLevel', p),
+    baseCost: num(item, 'baseCost', p),
+    costGrowth: num(item, 'costGrowth', p),
+    effect: oneOf(item, 'effect', p, SECT_UPGRADE_EFFECTS),
+  }));
+  assertUniqueIds(tracks, path);
+  for (const track of tracks) {
+    // 沒有上限的線，成本成長率就是唯一的煞車：小於 1 會讓它越買越便宜。
+    if (track.costGrowth <= 1) {
+      throw new DataError(path, `${track.id} 的 costGrowth 必須大於 1`);
+    }
+  }
+  return tracks;
+}
+
 export function parseAchievements(raw: unknown, path = 'achievements.json'): Achievement[] {
   const items = list(raw, path, (item, p) => ({
     id: str(item, 'id', p),
@@ -563,8 +597,22 @@ export const CHALLENGES: readonly ChallengeDef[] = parseChallenges(challengesJso
 export const DUNGEONS: readonly DungeonDef[] = parseDungeons(dungeonsJson);
 export const LESSONS: readonly LessonDef[] = parseLessons(lessonsJson);
 export const UPGRADES: readonly UpgradeTrack[] = parseUpgrades(upgradesJson);
+export const SECT_UPGRADES: readonly SectUpgradeTrack[] =
+  parseSectUpgrades(sectUpgradesJson);
 export const ENEMIES: EnemyBook = parseEnemies(enemiesJson);
 export const ACHIEVEMENTS: readonly Achievement[] = parseAchievements(achievementsJson);
+
+// 每一派都要剛好有一條秘傳。少一條的話那一派的玩家到了飛升境就沒有東西可以買，
+// 而那正是這條線存在的理由。
+for (const sect of SECTS) {
+  const own = SECT_UPGRADES.filter((track) => track.sectId === sect.id);
+  if (own.length !== 1) {
+    throw new DataError(
+      'sect-upgrades.json',
+      `門派 ${sect.id} 的秘傳有 ${own.length} 條，必須剛好一條`,
+    );
+  }
+}
 
 /** 每個境界都必須有敵陣與首領可抽，否則該境界的關卡生不出遭遇。 */
 for (const realm of REALMS) {

@@ -92,7 +92,11 @@ export function mergedCard(a: Card): Card {
 /** 一張符每一道的傷害。 */
 export function cardDamage(card: Card, loadout: Loadout): number {
   const def = cardDef(card.type);
-  const favored = card.type === loadout.sect.favoredCard ? loadout.sect.favoredDamageMultiplier : 1;
+  // 門派秘傳加在專精倍率**上面**，不是另外乘一層——兩者是同一件事的兩段。
+  const favored =
+    card.type === loadout.sect.favoredCard
+      ? loadout.sect.favoredDamageMultiplier + loadout.favoredDamageBonus
+      : 1;
   return (
     def.damage *
     Math.pow(BALANCE.field.tierGrowth, card.tier - 1) *

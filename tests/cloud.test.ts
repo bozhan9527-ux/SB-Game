@@ -133,6 +133,7 @@ describe('上榜與百分位', () => {
       'rebirths',
       'rules',
       'sectClears',
+      'sectDepth',
       'sectId',
       'talismans',
       'upgrades',

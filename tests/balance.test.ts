@@ -501,6 +501,7 @@ describe('副本難度', () => {
       upgrades,
       karma: {},
       sectClears: 0,
+    sectDepth: 0,
       rules: [...dungeon.rules],
       goldMultiplier: dungeon.goldMultiplier,
       

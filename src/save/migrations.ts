@@ -253,6 +253,16 @@ const dropFieldSlots: Migration = (data) => {
   return { ...data, player: rest };
 };
 
+/**
+ * v20 → v21：加上門派秘傳的等級表。
+ *
+ * 舊存檔一律從 0 級開始——這條線是新的，沒有可以換算的舊資料。
+ */
+const addSectDepth: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, sectDepth: {} } };
+};
+
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
@@ -274,6 +284,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addAchievementClaims,
   dropRetreat,
   dropFieldSlots,
+  addSectDepth,
 ];
 
 /**
