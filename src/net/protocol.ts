@@ -71,6 +71,35 @@ export function cleanEmail(raw: unknown): string | null {
   return cleaned;
 }
 
+/**
+ * 還沒註冊的人在榜上叫什麼。
+ *
+ * **名字由伺服器從 playerId 推出來，不收客戶端報的。** 匿名也能上榜之後，
+ * 如果名字是自己報的，任何人都能把自己叫做別人的道號——榜上就分不出
+ * 誰是誰了。推導出來的名字擋掉這件事，而且同一個人每一場都是同一個名字。
+ *
+ * 註冊過的人用自己的道號；註冊的那一刻，榜上那幾列會一起改過去。
+ */
+export const ANON_NAME_PREFIX = '無名修士·';
+
+/** 這個身分在榜上的匿名名字。同一個 playerId 永遠推出同一個。 */
+export function anonName(playerId: string): string {
+  // 取尾巴而不是開頭：playerId 是 UUID，開頭那幾碼在某些版本裡是時間戳，
+  // 同一批進來的人會長得一模一樣。
+  const tail = playerId.replace(/[^0-9a-z]/gi, '').slice(-6).toLowerCase();
+  return `${ANON_NAME_PREFIX}${tail.length > 0 ? tail : '000000'}`;
+}
+
+/**
+ * 這個道號是不是在冒充匿名的名字。
+ *
+ * 擋掉的是「註冊一個叫做無名修士·a3f2 的帳號」——那會讓榜上出現一列
+ * 看起來是匿名、實際上是別人的紀錄。
+ */
+export function looksAnon(name: string): boolean {
+  return nameKey(name).startsWith(nameKey(ANON_NAME_PREFIX));
+}
+
 /** 找回帳號的驗證碼長度。六位數字：夠短到可以用手打，夠長到猜不中。 */
 export const RECOVERY_CODE_LENGTH = 6;
 

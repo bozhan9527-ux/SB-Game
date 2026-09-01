@@ -168,12 +168,8 @@ export async function submitRun(
   // 關卡在無限模式裡是「止步於第幾關」，不是開打的那一關。
   const stage = submission.stage;
   if (save.player.sectId === null) return { kind: 'skipped' };
-  // **沒有帳號就不上榜。** 這是刻意的：榜上每一筆都要對得到一個帳號，
-  // 改名、檢舉、跨裝置才都有意義。省下的那一趟請求也不必送——
-  // 伺服器一樣會擋，只是玩家會多等一個逾時。
-  if (save.player.account === null) {
-    return { kind: 'failed', reason: '要註冊才能上榜（到榜單頁註冊）' };
-  }
+  // 沒註冊照樣送。榜上會顯示一個伺服器發的匿名名字，等他哪天註冊了，
+  // 那幾列就跟著變成他的道號——註冊會收編這個身分。
   const identity = ensureCloudIdentity(save);
 
   const send = (board: BoardKind): Promise<Awaited<ReturnType<typeof submitScore>>> =>

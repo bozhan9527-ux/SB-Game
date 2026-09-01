@@ -263,18 +263,18 @@ export class LeaderboardScene extends Phaser.Scene {
   private async prepare(): Promise<void> {
     if (!cloudEnabled()) return;
     const save = state();
-    if (!hasAccount(save)) {
-      this.mine.setText('還沒註冊，你不會出現在榜上').setColor(DANGER);
-      return;
-    }
+    // 沒註冊也上得了榜，只是榜上是一個系統給的名字。這一行要說清楚
+    // 「你已經在榜上了」和「註冊能拿到什麼」——講成「你不會出現在榜上」
+    // 是錯的，而且那正是這一頁原本說的話。
+    const ready = `上榜已開通，通關就會自動送出${hasAccount(save) ? '' : '（榜上顯示無名修士，註冊就換成你的道號）'}`;
     if (boardReady(save)) {
-      this.mine.setText('上榜已開通，通關就會自動送出').setColor(INK_DIM);
+      this.mine.setText(ready).setColor(INK_DIM);
       return;
     }
     this.mine.setText('開通上榜中…').setColor(INK_DIM);
     if (await registerForBoard(save)) {
       persist();
-      this.mine.setText('上榜已開通，通關就會自動送出').setColor(JADE);
+      this.mine.setText(ready).setColor(JADE);
     } else {
       this.mine.setText('開通失敗，通關時會再試一次').setColor(DANGER);
     }
@@ -291,7 +291,7 @@ export class LeaderboardScene extends Phaser.Scene {
     const values = await showForm({
       title: '註冊',
       note:
-        '註冊之後才能上榜，換裝置也能把進度接回來。\n' +
+        '註冊之後榜上就是你的道號，換裝置也能把進度接回來。\n' +
         `密碼至少 ${MIN_PASSWORD_LENGTH} 個字。\n` +
         '救援問題是忘記密碼時的救命繩，答對就能重設一組新的。\n' +
         '注意：問題本身任何人查得到，別把答案寫進問題裡。',

@@ -334,7 +334,11 @@ export class ResultScene extends Phaser.Scene {
       persist();
       if (outcome.kind === "ok") {
         ok = true;
-        board = `已上榜 · 第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}`;
+        // 沒註冊的人現在也上得了榜，只是掛著一個系統給的名字。**提醒放在
+        // 這裡而不是別的地方**：他剛看到自己的名次，那是他這一整局裡最想
+        // 要一個名字的一刻。灰字寫在榜單頁的角落沒有人會看。
+        const anon = save.player.account === null ? "　註冊可換成你的道號" : "";
+        board = `已上榜 · 第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}${anon}`;
       } else if (
         outcome.kind === "failed" &&
         result.stage >= QUIET_FAILURE_BELOW_STAGE

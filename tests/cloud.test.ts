@@ -370,18 +370,22 @@ describe('上榜開通', () => {
     void get;
   });
 
-  it('沒註冊就不送——上榜要有帳號，這是規則不是體貼', async () => {
+  it('**沒註冊照樣送。** 註冊當門檻的代價是榜上長期只有一個人', async () => {
+    // 「註冊才能上榜」這條規則本身站得住（榜上每一筆都對得到一個帳號，
+    // 檢舉與改名才有對象），但實測的代價太大：玩家通關後只看到結算頁角落
+    // 一行灰字，幾乎沒有人會為此專程走到榜單頁填一張表。
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
-    const submit = vi.spyOn(client, 'submitScore');
-    const put = vi.spyOn(client, 'putSave');
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+    expect(save.player.account).toBeNull();
+
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValue({ ok: true, rank: 7, best: true, stage: 42, elapsedMs: 1 } as never);
 
     const outcome = await submitRun(save, submission);
-    expect(outcome.kind).toBe('failed');
-    if (outcome.kind === 'failed') expect(outcome.reason).toContain('註冊');
-    // 一趟請求都不必送：伺服器一樣會擋，只是玩家要多等一個逾時。
-    expect(submit).not.toHaveBeenCalled();
-    expect(put).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ kind: 'ok', rank: 7, best: true });
+    expect(submit).toHaveBeenCalled();
   });
 
   it('沒有門派就不送，也不會登記', async () => {

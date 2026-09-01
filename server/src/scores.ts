@@ -16,7 +16,7 @@
  */
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
-import { REPLAY_CONTRACT_VERSION, isBoardKind, trackOfBoard } from '../../src/net/protocol';
+import { REPLAY_CONTRACT_VERSION, anonName, isBoardKind, trackOfBoard } from '../../src/net/protocol';
 import type {
   DistributionResult,
   LeaderboardEntry,
@@ -247,10 +247,17 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   if (owner === null) return fail('unauthorized', env, origin, '請先上傳一次雲端存檔');
   if (!timingSafeEqual(owner.secret_hash, hash)) return fail('unauthorized', env, origin);
 
-  // **沒有帳號就不上榜。** 客戶端也會先擋，但那是體貼不是防線——
-  // 真正的規則在這裡。榜上每一筆都對得到一個帳號，檢舉與改名才有對象。
+  // **沒註冊也上得了榜。**
+  //
+  // 原本這裡擋著「要註冊帳號才能上榜」，而那個規則本身站得住（榜上每一筆
+  // 都對得到一個帳號，檢舉與改名才有對象）——但實測的代價太大：玩家通關後
+  // 只看到結算頁角落一行灰字，幾乎沒有人會為了它專程走到榜單頁填一張表。
+  // 榜上長期只有一個人，而一個只有一個人的榜等於沒有榜。
+  //
+  // 取捨講明白：**匿名那幾列對不到帳號**，被檢舉時查不出是誰，
+  // 他自己也改不了名字。要拿回那些，他註冊就是了——註冊會收編這個身分，
+  // 榜上那幾列跟著變成他的。
   const account = await accountOf(env, playerId);
-  if (account === null) return fail('unauthorized', env, origin, '要註冊帳號才能上榜');
 
   // **版本對不上就直說。**
   //
@@ -325,9 +332,12 @@ export async function submitScore(request: Request, env: Env, origin: string | n
     return fail('rejected', env, origin, `重播的結果是 ${replayed.outcome}`);
   }
 
-  // 名字用帳號那一份，不收客戶端報的：同一個帳號在榜上永遠是同一個名字，
-  // 而且改名只要改帳號那一列，不必等他再破一次自己的紀錄。
-  const name = account;
+  // **名字一律由伺服器決定，不收客戶端報的。** 註冊過的用他的道號；
+  // 沒註冊的用 playerId 推出來的匿名名字。
+  //
+  // 匿名那一半特別重要：名字如果是自己報的，任何人都能把自己叫做別人的
+  // 道號，榜上就分不出誰是誰了。
+  const name = account ?? anonName(playerId);
   const now = Date.now();
 
   // **秒數用伺服器重播算出來的，不收客戶端報的。** 它和關卡數一樣是分數，

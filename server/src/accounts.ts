@@ -20,6 +20,7 @@ import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
 import {
   ANSWER_LOCK_MS,
+  looksAnon,
   MAX_ANSWER_ATTEMPTS,
   RECOVERY_CODE_LENGTH,
   RECOVERY_TTL_MS,
@@ -94,6 +95,9 @@ export async function registerAccount(
   if (email === null) return fail('badRequest', env, origin, '電子信箱不合法');
   const name = cleanName(record['name']);
   if (name === null) return fail('badRequest', env, origin, '道號不合法');
+  // 擋掉「註冊一個叫做無名修士·a3f2 的帳號」——那會讓榜上出現一列
+  // 看起來是匿名、實際上是別人的紀錄。
+  if (looksAnon(name)) return fail('rejected', env, origin, '這個開頭是保留給還沒註冊的人的');
   if (!isNonEmptyString(record['playerId'], 64)) return fail('badRequest', env, origin, '缺少身分');
   if (!isNonEmptyString(record['salt'], 64)) return fail('badRequest', env, origin, '缺少鹽');
   // 新的 secret 是客戶端用密碼推導出來的，這裡只收它的雜湊。
@@ -142,6 +146,13 @@ export async function registerAccount(
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(email, name, key, playerId, salt, secretHash, Date.now())
+    .run();
+
+  // **把榜上那幾列認領回來。** 他註冊之前打的成績是用匿名的名字記的，
+  // 而註冊收編的是同一個 playerId——不改的話他會在榜上看到一個
+  // 「無名修士·a3f2」，而那就是他自己，只是他認不出來。
+  await env.DB.prepare('UPDATE board_runs SET name = ? WHERE player_id = ?')
+    .bind(name, playerId)
     .run();
 
   return json({ ok: true, name, playerId }, env, origin);
@@ -204,6 +215,7 @@ export async function renameAccount(
   }
   const name = cleanName(record['name']);
   if (name === null) return fail('badRequest', env, origin, '道號不合法');
+  if (looksAnon(name)) return fail('rejected', env, origin, '這個開頭是保留給還沒註冊的人的');
   const playerId = record['playerId'];
   const key = nameKey(name);
 
