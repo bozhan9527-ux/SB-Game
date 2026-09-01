@@ -203,6 +203,12 @@ export async function submitRun(
     // 自己補登記再重送一次。只重試這一次：登記完還是 unauthorized 的話
     // 成因是另一件事（密鑰對不上），再送幾次也一樣。
     if (await registerForBoard(save)) result = await send(primary);
+  } else if (!result.ok && result.error === 'serverError') {
+    // **傳輸層的失敗重送一次。** 手機網路斷一下就丟掉一整場成績太貴了，
+    // 而這一支是冪等的（伺服器只留每個人最好的一筆），重送不會有副作用。
+    //
+    // 只重一次：真的連不上的話，第二次也不會通，而玩家已經在等了。
+    result = await send(primary);
   }
   for (const board of boards.slice(1)) await send(board);
 
@@ -226,7 +232,13 @@ export async function submitRun(
         reason: result.detail ?? '這一場沒上榜：紀錄和伺服器對不起來，重新整理一次再試',
       };
     }
-    return { kind: 'failed', reason: '連不上伺服器，這一場沒有上榜' };
+    // 其餘（連不上、逾時、伺服器內部錯誤、資料太大）一樣用伺服器／傳輸層
+    // 給的那一句。這裡原本也是一句寫死的「連不上伺服器」，而它把四種不同的
+    // 失敗蓋成同一句話——網路明明是通的那個人只會覺得這句話在騙他。
+    return {
+      kind: 'failed',
+      reason: result.detail ?? '這一場沒有上榜，稍後再試',
+    };
   }
   return { kind: 'ok', rank: result.rank, best: result.best };
 }

@@ -358,6 +358,37 @@ describe('上榜開通', () => {
     }
   });
 
+  it('傳輸層失敗會重送一次——手機斷一下不該丟掉一整場成績', async () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValueOnce({ ok: false, error: 'serverError', detail: '連不上伺服器' } as never)
+      .mockResolvedValue({ ok: true, rank: 2, best: true, stage: 42, elapsedMs: 1 } as never);
+
+    const outcome = await submitRun(save, submission);
+    expect(outcome).toEqual({ kind: 'ok', rank: 2, best: true });
+    // 主榜送第一次、重送一次，再加上那一關的速通榜。
+    expect(submit).toHaveBeenCalledTimes(3);
+  });
+
+  it('**逾時和連不上要分開講。** 網路是通的人看到「連不上」只會覺得被騙', async () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+    vi.spyOn(client, 'submitScore').mockResolvedValue({
+      ok: false,
+      error: 'serverError',
+      detail: '伺服器太久沒回應，等一下再試',
+    } as never);
+
+    const outcome = await submitRun(save, submission);
+    if (outcome.kind === 'failed') {
+      expect(outcome.reason).toBe('伺服器太久沒回應，等一下再試');
+    }
+  });
+
   it('**失敗的理由一律說得出來，不分關卡。**', () => {
     // 結算頁曾經在前五關把失敗訊息整個藏起來，理由是「那幾筆成績在榜上
     // 沒有意義」。速通改成一關一個榜之後那個理由就不成立了，而它擋住的

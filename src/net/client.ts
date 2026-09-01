@@ -43,7 +43,11 @@ async function call<T>(path: string, body: unknown | null): Promise<ApiResponse<
   if (base === null) return { ok: false, error: 'badRequest', detail: '未設定伺服器位址' };
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
   try {
     const response = await fetch(`${base}/${API_VERSION}${path}`, {
       method: body === null ? 'GET' : 'POST',
@@ -54,8 +58,14 @@ async function call<T>(path: string, body: unknown | null): Promise<ApiResponse<
     const parsed = (await response.json()) as ApiResponse<T>;
     return parsed;
   } catch {
-    // 連不上、逾時、回的不是 JSON——對呼叫端來說都是同一件事：這次沒成功。
-    return { ok: false, error: 'serverError', detail: '連不上伺服器' };
+    // **逾時和連不上要分開講。**
+    //
+    // 它們對程式來說是同一件事（這次沒成功），但對玩家不是：連不上要他
+    // 看網路，逾時多半是等一下就好。全部寫成「連不上伺服器」的話，
+    // 網路明明是通的那個人只會覺得這句話在騙他——而他就沒有下一步了。
+    return timedOut
+      ? { ok: false, error: 'serverError', detail: '伺服器太久沒回應，等一下再試' }
+      : { ok: false, error: 'serverError', detail: '連不上伺服器，看一下網路' };
   } finally {
     clearTimeout(timer);
   }
