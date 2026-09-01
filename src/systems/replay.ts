@@ -22,6 +22,7 @@ import type { CardSlot, DefenseState, Outcome } from './defense';
 import { createDefenseState, discardHand, dropOn, tickCombat } from './defense';
 import type { Loadout } from './loadout';
 import { createRng } from './rng';
+import { applyTutorialOpening } from './tutorial';
 
 /**
  * 一格模擬的長度（ms）。
@@ -56,6 +57,14 @@ export interface ReplayInput {
   /** 總共跑了幾格。伺服器最多跑這麼多格，提早分出勝負就停。 */
   totalSteps: number;
   actions: readonly ReplayAction[];
+  /**
+   * 這一場是不是教學。
+   *
+   * 教學會把起手牌整組換掉，所以重播得先做同一件事，否則跑出來的是另一場仗。
+   * **不設這個欄位的代價是「打贏第一關卻沒有上榜」**——而那是每個新玩家
+   * 遇到的第一件事，畫面上還一個字都不會說。
+   */
+  tutorial?: boolean;
 }
 
 export interface ReplayResult {
@@ -126,6 +135,8 @@ export function validateReplay(input: ReplayInput): ReplayRejection | null {
 export function replayRun(loadout: Loadout, input: ReplayInput): ReplayResult {
   const rng = createRng(runSeed(input.stage, input.runs));
   const state = createDefenseState(loadout, rng);
+  // 教學把起手牌換掉了。走的是遊戲**同一個**函式，兩邊不可能走散。
+  if (input.tutorial === true) applyTutorialOpening(state);
 
   let cursor = 0;
   let steps = 0;

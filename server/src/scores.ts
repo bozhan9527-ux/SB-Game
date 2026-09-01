@@ -285,7 +285,10 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   if (!Number.isInteger(runs) || runs < 0) return fail('badRequest', env, origin, 'runs 不合法');
   if (!Number.isInteger(claimed) || claimed < 1) return fail('badRequest', env, origin, 'stage 不合法');
 
-  const input = { stage: claimed, runs, totalSteps: steps, actions };
+  // 教學那一場會換掉起手牌。**不收這個欄位的話它永遠驗不過**，
+  // 而那是每個新玩家打贏的第一關。
+  const tutorial = record['tutorial'] === true;
+  const input = { stage: claimed, runs, totalSteps: steps, actions, tutorial };
   const rejection = validateReplay(input);
   if (rejection !== null) return fail('rejected', env, origin, rejection);
 

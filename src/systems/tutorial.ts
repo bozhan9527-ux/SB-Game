@@ -10,6 +10,7 @@
 import { LESSONS } from '../data';
 import type { LessonDef } from '../data/types';
 import type { Card } from './deck';
+import type { DefenseState } from './defense';
 import type { SaveData } from '../save/types';
 
 /** 教學本身也是一個一次性提示，看過就記進存檔。 */
@@ -67,6 +68,21 @@ export function tutorialHand(slots: number, type: string): (Card | null)[] {
   const hand = new Array<Card | null>(Math.max(3, slots)).fill(null);
   for (let i = 0; i < 3; i += 1) hand[i] = { type, tier: 1 };
   return hand.slice(0, Math.max(3, slots));
+}
+
+/**
+ * 把教學那一場的起手狀態套上去。
+ *
+ * **這是唯一一份實作，遊戲與伺服器都呼叫它。** 教學會把起手牌整組換掉，
+ * 所以重播必須做一模一樣的事——兩邊各寫一份的話，教學那一場的成績會
+ * 永遠驗不過，而且症狀是「打贏第一關卻沒有上榜」，畫面上一個字都不會說。
+ *
+ * 它是純粹的：同樣的 state 進來，出去永遠一樣。所以教學那一場一樣重播得出來。
+ */
+export function applyTutorialOpening(state: DefenseState): void {
+  state.field = tutorialField(state.field.length);
+  state.hand = tutorialHand(state.hand.length, state.loadout.talismans[0]?.id ?? 'flame');
+  state.cooldowns = state.cooldowns.map(() => 0);
 }
 
 /** 課程也走 hints 那套「看過就不再出現」，但加前綴避免和提示的 id 撞到。 */

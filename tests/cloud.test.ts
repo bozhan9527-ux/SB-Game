@@ -120,14 +120,17 @@ describe('上榜', () => {
  * RunScene 的一行三元運算裡，沒有任何東西守著它。
  */
 describe('哪一場算數', () => {
-  const main = { tutorial: false, abandoned: false, dungeonRules: null };
+  const main = { abandoned: false, dungeonRules: null };
 
   it('主線正常通關要上報', () => {
     expect(runIsRankable(main)).toBe(true);
   });
 
-  it('教學那一場不上報——它換過起手牌，重播不出來', () => {
-    expect(runIsRankable({ ...main, tutorial: true })).toBe(false);
+  it('**教學那一場也要上報。** 那是新玩家打贏的第一關', () => {
+    // 它曾經被排除（教學會改寫起手牌），但那是實作問題不是規則問題——
+    // 伺服器現在走同一個 applyTutorialOpening，重播得出來。排除它的代價是
+    // 每個新玩家打贏的第一關都不算，而那正是他最需要看到自己名字的一刻。
+    expect(runIsRankable(main)).toBe(true);
   });
 
   it('中途放棄的一場不上報', () => {
@@ -171,6 +174,7 @@ describe('上報的關卡是種子那一半', () => {
       actions: [],
       loadout: loadoutFor(save),
       arena: true,
+      tutorial: false,
     });
 
     expect(submit).toHaveBeenCalledTimes(1);
@@ -201,6 +205,7 @@ describe('版本對不上就直說', () => {
       actions: [],
       loadout: loadoutFor(save),
       arena: false,
+      tutorial: false,
     });
     expect(submit.mock.calls[0]?.[0]).toMatchObject({ contract: REPLAY_CONTRACT_VERSION });
   });
@@ -262,6 +267,7 @@ describe('上榜開通', () => {
     actions: [],
     loadout: loadoutFor(playing()),
     arena: false,
+    tutorial: false,
   };
 
   /** 一份「可以上榜」的存檔：有門派、也註冊過。 */
@@ -442,7 +448,7 @@ describe('上報的是開打那一刻的配置', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6, elapsedMs: 1000 });
-    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false });
+    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false, tutorial: false });
 
     const sent = submit.mock.calls[0]?.[0];
     expect(sent?.loadout.sectClears).toBe(4);

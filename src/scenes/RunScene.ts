@@ -1590,10 +1590,11 @@ export class RunScene extends Phaser.Scene {
    * Phaser 的輸入事件永遠落在兩幀之間，不可能插進上面那個 while 迴圈中間，
    * 所以每個操作都精準對齊在格的邊界上——這是重播能對得起來的關鍵。
    *
-   * 教學那一場不記：教學會直接改寫起手牌，光有種子重播不出同一場。
+   * **教學那一場照記。** 它會改寫起手牌，但那件事是確定性的，而且伺服器
+   * 走同一個 applyTutorialOpening——所以它一樣重播得出來。不記的話，
+   * 新玩家的第一場（也就是他打贏的第一關）永遠不會上榜。
    */
   private record(action: ReplayActionInput): void {
-    if (this.tutorialRun) return;
     if (this.actions.length >= MAX_REPLAY_ACTIONS) return;
     this.actions.push({ ...action, step: this.stepIndex });
   }
@@ -2502,7 +2503,6 @@ export class RunScene extends Phaser.Scene {
       submission:
         this.runLoadout === null ||
         !runIsRankable({
-          tutorial: this.tutorialRun,
           abandoned: reason === "abandon",
           dungeonRules:
             this.dungeonRun === null
@@ -2518,6 +2518,7 @@ export class RunScene extends Phaser.Scene {
               actions: this.actions,
               loadout: this.runLoadout,
               arena: this.run.loadout.arena,
+              tutorial: this.tutorialRun,
             },
       dungeon: this.dungeonRun,
     };

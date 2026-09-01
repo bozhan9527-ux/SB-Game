@@ -84,17 +84,21 @@ export function boardsFor(stage: number, arena: boolean): BoardKind[] {
  * 玩家通關、結算表照跑、榜上就是永遠沒有他。真的發生過一次（配置快照那一行
  * 漏了，於是 submission 恆為 null，一場都沒送出去）。
  *
- * 規則本身：教學那一場重播不出來；中途放棄的一場沒有意義；副本的深度是
- * 副本決定的，拿去和「推到第幾關」比不是同一件事。**競技場是唯一的例外**——
- * 它是個副本，但它存在的理由就是那個榜。
+ * 規則本身：中途放棄的一場沒有意義；副本的深度是副本決定的，拿去和
+ * 「推到第幾關」比不是同一件事。**競技場是唯一的例外**——它是個副本，
+ * 但它存在的理由就是那個榜。
+ *
+ * **教學那一場也要上榜。** 它曾經被排除（它會改寫起手牌），但那是實作問題
+ * 不是規則問題——伺服器現在走同一個 applyTutorialOpening，重播得出來。
+ * 排除它的代價是每個新玩家打贏的第一關都不算，而那正是他最需要看到
+ * 自己名字的一刻。
  */
 export function runIsRankable(options: {
-  tutorial: boolean;
   abandoned: boolean;
   /** 這一場的副本規則。主線是 null。 */
   dungeonRules: readonly string[] | null;
 }): boolean {
-  if (options.tutorial || options.abandoned) return false;
+  if (options.abandoned) return false;
   if (options.dungeonRules === null) return true;
   return options.dungeonRules.includes(ARENA_RULE);
 }
@@ -193,6 +197,8 @@ export async function submitRun(
       // 所以看起來像隨機。種子那一半（runs）當初就是為了同一個理由當場記下來的，
       // 配置這一半漏了。
       loadout: submission.loadout,
+      // 教學會換掉起手牌，伺服器重播前要先做同一件事。
+      tutorial: submission.tutorial,
       // 對不上的話伺服器直接說「你的遊戲是舊版本」，而不是丟一句
       // 「紀錄和伺服器對不起來」讓玩家自己猜。
       contract: REPLAY_CONTRACT_VERSION,

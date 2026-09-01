@@ -13,7 +13,7 @@ import { SECTS } from '../src/data';
 import type { Sect } from '../src/data/types';
 import { createDefenseState, dropOn, tickCombat } from '../src/systems/defense';
 import type { CardSlot, DefenseState } from '../src/systems/defense';
-import { buildLoadoutFor } from '../src/systems/loadout';
+import { buildLoadoutFor, buildLoadoutFromSpec } from '../src/systems/loadout';
 import type { Loadout } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
 import {
@@ -26,6 +26,7 @@ import {
 } from '../src/systems/replay';
 import type { ReplayAction } from '../src/systems/replay';
 import { talismanDefs } from '../src/systems/talismans';
+import { applyTutorialOpening } from '../src/systems/tutorial';
 
 function sect(id = 'body'): Sect {
   const found = SECTS.find((item) => item.id === id);
@@ -162,5 +163,120 @@ describe('重播的事前檢查', () => {
       validateReplay({ ...base, actions: [{ step: 999, kind: 'discard', index: 0 }] }),
     ).toBe('stepOutOfRange');
     expect(validateReplay({ ...base, totalSteps: -1 })).toBe('stepOutOfRange');
+  });
+});
+
+/**
+ * 教學那一場的重播。
+ *
+ * 這一組守的是製作人回報的那件事：「我用小可愛打贏第一關，為什麼第一關
+ * 沒有上榜」。原因是教學會把起手牌整組換掉，而重播不知道，所以跑出來的
+ * 是另一場仗——於是教學整個被排除在上榜之外，而那是**每個新玩家打贏的
+ * 第一關**，也是他第一次有機會看到自己的名字。
+ *
+ * 現在兩邊走同一個 applyTutorialOpening。這裡驗的就是「真的對得起來」。
+ */
+describe('教學那一場也重播得出來', () => {
+  function opening(): DefenseState {
+    const loadout = buildLoadoutFor(SECTS[0]!, {}, 1);
+    const state = createDefenseState(loadout, createRng(1));
+    applyTutorialOpening(state);
+    return state;
+  }
+
+  it('起手是固定的：場上全空、手上三張同種同階', () => {
+    // 隨機起手有可能三張都合不起來，教學第二步就卡死了。
+    const state = opening();
+    expect(state.field.every((card) => card === null)).toBe(true);
+    const hand = state.hand.filter((card) => card !== null);
+    expect(hand).toHaveLength(3);
+    expect(new Set(hand.map((card) => card!.type)).size).toBe(1);
+    expect(hand.every((card) => card!.tier === 1)).toBe(true);
+  });
+
+  it('同樣的輸入永遠推出同樣的起手——不然重播從第一格就散了', () => {
+    expect(JSON.stringify(opening().hand)).toBe(JSON.stringify(opening().hand));
+  });
+
+  it('**打一場教學，重播出來要是同一場。**', () => {
+    const spec = {
+      sectId: SECTS[0]!.id,
+      stage: 1,
+      libraryFloor: 0,
+      talismans: [],
+      upgrades: {},
+      karma: {},
+      sectClears: 0,
+      sectDepth: 0,
+      rules: [],
+      goldMultiplier: 1,
+      bankedStage: 0,
+      rebirths: 0,
+    };
+    const loadout = buildLoadoutFromSpec(spec);
+
+    // 客戶端這一場：createDefenseState 之後套教學起手，然後照 RunScene 的
+    // 順序跑（先套用這一格的操作，再推進一格）。
+    const rng = createRng(runSeed(1, 0));
+    const state = createDefenseState(loadout, rng);
+    applyTutorialOpening(state);
+    const actions: ReplayAction[] = [];
+    let steps = 0;
+    while (state.outcome === 'running' && steps < MAX_REPLAY_STEPS) {
+      // 教學教的就是這兩步：放下去、疊起來。
+      for (let h = 0; h < state.hand.length; h += 1) {
+        if (state.hand[h] === null) continue;
+        const target = state.field.findIndex((card) => card === null);
+        if (target < 0) break;
+        const from = { where: 'hand' as const, index: h };
+        const to = { where: 'field' as const, index: target };
+        if (dropOn(state, from, to, rng) !== 'none') {
+          actions.push({ step: steps, kind: 'drop', from, to });
+        }
+      }
+      tickCombat(state, STEP_MS, rng);
+      steps += 1;
+    }
+
+    // 伺服器那一半：只拿到種子、格數、操作，以及「這是教學」。
+    const replayed = replayRun(buildLoadoutFromSpec(spec), {
+      stage: 1,
+      runs: 0,
+      totalSteps: steps,
+      actions,
+      tutorial: true,
+    });
+
+    expect(replayed.outcome).toBe(state.outcome);
+    expect(replayed.stage).toBe(state.stage);
+    expect(replayed.elapsedMs).toBe(state.elapsedMs);
+    expect(replayed.kills).toBe(state.kills);
+    expect(replayed.disciples).toBe(state.disciples);
+  });
+
+  it('**漏掉 tutorial 旗標就會驗不過。** 這正是原本那個故障', () => {
+    const spec = {
+      sectId: SECTS[0]!.id, stage: 1, libraryFloor: 0, talismans: [], upgrades: {},
+      karma: {}, sectClears: 0, sectDepth: 0, rules: [], goldMultiplier: 1,
+      bankedStage: 0, rebirths: 0,
+    };
+    const loadout = buildLoadoutFromSpec(spec);
+    const rng = createRng(runSeed(1, 0));
+    const state = createDefenseState(loadout, rng);
+    applyTutorialOpening(state);
+    let steps = 0;
+    while (state.outcome === 'running' && steps < 4000) {
+      tickCombat(state, STEP_MS, rng);
+      steps += 1;
+    }
+    const withFlag = replayRun(buildLoadoutFromSpec(spec), {
+      stage: 1, runs: 0, totalSteps: steps, actions: [], tutorial: true,
+    });
+    const without = replayRun(buildLoadoutFromSpec(spec), {
+      stage: 1, runs: 0, totalSteps: steps, actions: [],
+    });
+    expect(withFlag.elapsedMs).toBe(state.elapsedMs);
+    // 沒有旗標的那一份起手牌完全不同，所以它不是同一場仗。
+    expect(without.kills).not.toBe(withFlag.kills);
   });
 });
