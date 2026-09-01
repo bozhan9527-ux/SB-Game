@@ -15,6 +15,7 @@ import type { RunSubmission } from '../scenes/types';
 import { ensureCloudIdentity } from './cloud';
 import type { CloudIdentity } from '../save/types';
 import { loadoutSpecOf } from './loadout';
+import type { LoadoutSpec } from './loadout';
 
 /**
  * 把存檔裡的配置整理成伺服器重播要用的那一份。
@@ -23,8 +24,8 @@ import { loadoutSpecOf } from './loadout';
  * 和玩家這一場實際用的是同一個組裝函式。這裡若自己挑欄位，
  * 兩邊遲早會走散，而症狀是「合法成績被退回」。
  */
-export function loadoutFor(save: SaveData): ScoreLoadout {
-  const { stage: _stage, ...rest } = loadoutSpecOf(save, 1);
+export function scoreLoadoutOf(spec: LoadoutSpec): ScoreLoadout {
+  const { stage: _stage, endless: _endless, ...rest } = spec;
   return {
     ...rest,
     talismans: [...rest.talismans],
@@ -32,6 +33,16 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
     karma: { ...rest.karma },
     rules: [...rest.rules],
   };
+}
+
+/**
+ * 從存檔現算一份。
+ *
+ * **只適合「當下就要開打」的情境。** 上報成績不能用它——見 submitRun 的註解，
+ * 存檔在那一刻已經被這一場的結算改過了。
+ */
+export function loadoutFor(save: SaveData): ScoreLoadout {
+  return scoreLoadoutOf(loadoutSpecOf(save, 1));
 }
 
 export type SubmitOutcome =
@@ -112,7 +123,17 @@ export async function submitRun(
       runs: submission.runs,
       steps: submission.steps,
       actions: submission.actions,
-      loadout: loadoutFor(save),
+      // **用開打那一刻的那一份，不是現在現算的。**
+      //
+      // 結算頁在送成績之前已經寫過存檔了：recordClear 會把這一派的通關次數
+      // 加一，而門派修為每五次升一階、每階 +4% 法寶傷害。跨過階的那一場，
+      // 伺服器重播出來的是一個傷害比較高的自己——擊殺順序不同、rng 消耗的
+      // 次序就不同，重播從那裡開始飄，最後判成沒通關。
+      //
+      // 症狀是「正常通關卻說驗不過」，而且只在第 5、10、15、20 次通關發生，
+      // 所以看起來像隨機。種子那一半（runs）當初就是為了同一個理由當場記下來的，
+      // 配置這一半漏了。
+      loadout: submission.loadout,
     });
 
   let result = await send();

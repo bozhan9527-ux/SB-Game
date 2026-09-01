@@ -93,6 +93,7 @@ import {
   textStyle,
 } from "../ui/theme";
 import type { RunEntryData, RunResultData } from "./types";
+import type { ScoreLoadout } from "../net/protocol";
 import { fadeIn, fadeToScene } from "../ui/transition";
 
 /** 妖魔的行進區間。上緣是妖魔出場處，下緣就是山門。 */
@@ -300,6 +301,13 @@ export class RunScene extends Phaser.Scene {
   private dungeonBanner: Phaser.GameObjects.Text | null = null;
   /** 無限模式的那一行怎麼寫。不是無限模式就是 null。 */
   private endlessBanner: ((waves: number) => string) | null = null;
+  /**
+   * 這一場**開打時**的配置，上報成績時原封不動送出去。
+   *
+   * 不能等到結算頁再從存檔現算：那時候 recordClear 已經把這一派的通關次數
+   * 加一了，而修為每五次升一階。跨階的那一場，重播出來的是一個比較強的自己。
+   */
+  private runLoadout: ScoreLoadout | null = null;
 
   constructor() {
     super("Run");
@@ -2481,12 +2489,16 @@ export class RunScene extends Phaser.Scene {
       // 中途放棄的一場沒有上榜的意義，教學那一場則重播不出來。
       // 副本也不上榜：它的深度是副本決定的，拿去和「推到第幾關」比不是同一件事。
       submission:
-        this.tutorialRun || reason === "abandon" || this.dungeonRun !== null
+        this.tutorialRun ||
+        reason === "abandon" ||
+        this.dungeonRun !== null ||
+        this.runLoadout === null
           ? null
           : {
               runs: this.seedRuns,
               steps: this.stepIndex,
               actions: this.actions,
+              loadout: this.runLoadout,
             },
       dungeon: this.dungeonRun,
     };

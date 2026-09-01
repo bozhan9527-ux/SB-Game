@@ -5,7 +5,7 @@
  * 身分只產一次、身分不跟著雲端那份走、以及套用雲端存檔要走既有的遷移路徑。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDefaultSave } from '../src/save';
+import { createDefaultSave, recordClear } from '../src/save';
 import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
 import { percentileOf } from '../src/net/protocol';
@@ -14,8 +14,10 @@ import {
   boardReady,
   loadoutFor,
   percentileLine,
+  scoreLoadoutOf,
   submitRun,
 } from '../src/systems/leaderboard';
+import { buildLoadoutFromSpec, loadoutSpecOf } from '../src/systems/loadout';
 import * as client from '../src/net/client';
 
 describe('雲端身分', () => {
@@ -154,7 +156,12 @@ describe('上榜與百分位', () => {
 describe('上榜開通', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  const submission = { runs: 1, steps: 10, actions: [] };
+  const submission = {
+    runs: 1,
+    steps: 10,
+    actions: [],
+    loadout: loadoutFor(playing()),
+  };
 
   function playing() {
     const save = createDefaultSave(1);
@@ -244,5 +251,58 @@ describe('上榜開通', () => {
     expect(await submitRun(createDefaultSave(1), 42, submission)).toEqual({ kind: 'skipped' });
     expect(submit).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 上報的配置必須是**開打那一刻**的那一份。
+ *
+ * 真實故障：製作人回報「正常通關也顯示驗不過」。原因是結算頁在送成績之前
+ * 已經寫過存檔了——recordClear 把這一派的通關次數加一，而門派修為每五次
+ * 升一階、每階 +4% 法寶傷害。跨階的那一場，伺服器重播出來的是一個傷害
+ * 比較高的自己：擊殺順序不同、rng 消耗的次序就不同，重播從那裡開始飄。
+ *
+ * 症狀只在第 5、10、15、20 次通關出現，所以看起來像隨機。
+ */
+describe('上報的是開打那一刻的配置', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('第 5 次通關：結算之後現算的那一份，傷害比實際打的高一階', () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.world.stage = 6;
+    save.world.highestStage = 6;
+    save.player.sectClears['sword'] = 4;
+
+    const played = loadoutSpecOf(save, save.world.stage);
+    recordClear(save, 100);
+    const stale = loadoutSpecOf(save, save.world.stage);
+
+    expect(played.sectClears).toBe(4);
+    expect(stale.sectClears).toBe(5);
+    // 這 4% 就是重播走散的起點。確定性重播沒有「差一點點」這種事。
+    expect(buildLoadoutFromSpec(stale).damageMultiplier).toBeGreaterThan(
+      buildLoadoutFromSpec(played).damageMultiplier,
+    );
+  });
+
+  it('submitRun 送的是 submission 裡那一份，不是從存檔現算的', async () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.sectClears['sword'] = 4;
+    const captured = scoreLoadoutOf(loadoutSpecOf(save, 6));
+
+    // 結算頁的順序：先寫存檔，再送成績。
+    recordClear(save, 100);
+
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6 });
+    await submitRun(save, 6, { runs: 0, steps: 10, actions: [], loadout: captured });
+
+    const sent = submit.mock.calls[0]?.[0];
+    expect(sent?.loadout.sectClears).toBe(4);
+    // 現算的話會是 5——那就是「合法玩家被自己的伺服器指控造假」。
+    expect(loadoutFor(save).sectClears).toBe(5);
   });
 });

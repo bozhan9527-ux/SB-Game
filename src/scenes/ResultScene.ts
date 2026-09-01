@@ -316,6 +316,14 @@ export class ResultScene extends Phaser.Scene {
     if (!cloudEnabled()) return;
     const save = state();
 
+    // 上榜的結果與百分位**合成同一行**，不是先後蓋掉對方。
+    //
+    // 原本是「先寫榜上第 N 名，再用百分位覆蓋它」——於是上榜成功這件事
+    // 只在畫面上閃過幾百毫秒，玩家的感受是「送出去了嗎？不知道」。
+    // 兩者又都值得那一行：名次回答「成功了沒」，百分位回答「這個成績有多好」。
+    let board: string | null = null;
+    let ok = false;
+
     if (result.victory && result.submission !== null) {
       // 第一次上榜才問名字。每次都問很煩，而且他多半只想看結算表。
       if (save.player.name.length === 0) {
@@ -328,26 +336,33 @@ export class ResultScene extends Phaser.Scene {
           persist();
         }
       }
+      // 送出要跑一趟網路，慢的時候有兩三秒。那段時間留白會被讀成「沒有這個功能」。
+      this.cloudLine?.setText("上榜中…").setColor(INK_DIM);
       const outcome = await submitRun(save, result.stage, result.submission);
       // 不論成敗都存一次：送出的過程可能順手把身分登記上去了（syncedAt），
       // 那一筆不存下來的話，下一場又會再登記一次。
       persist();
       if (outcome.kind === "ok") {
-        this.cloudLine
-          ?.setText(
-            `榜上第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}`,
-          )
-          .setColor(GOLD);
+        ok = true;
+        board = `已上榜 · 第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}`;
       } else if (outcome.kind === "failed") {
-        this.cloudLine?.setText(outcome.reason).setColor(INK_DIM);
+        board = outcome.reason;
       }
     }
 
     if (await refreshDistribution(save, Date.now())) persist();
-    const line = percentileLine(save, result.stage);
-    // 百分位比名次更值得佔那一行：名次只有前幾名的人在乎，百分位人人都有。
-    if (line !== null && result.victory)
-      this.cloudLine?.setText(line).setColor(JADE);
+    const line = result.victory ? percentileLine(save, result.stage) : null;
+
+    const parts = [board, line].filter((part): part is string => part !== null);
+    if (parts.length === 0) {
+      this.cloudLine?.setText("");
+      return;
+    }
+    this.cloudLine
+      ?.setText(parts.join("　"))
+      // 上榜成功用金色，失敗的說明只是資訊不是警告，百分位單獨出現時用玉色。
+      .setColor(ok ? GOLD : board !== null ? INK_DIM : JADE);
+    if (this.cloudLine !== undefined) fitText(this.cloudLine, GAME_WIDTH - 40);
   }
 
   /**

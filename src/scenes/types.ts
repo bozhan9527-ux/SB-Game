@@ -1,5 +1,6 @@
 import type { RunTelemetry } from "../systems/defense";
 import type { ReplayAction } from "../systems/replay";
+import type { ScoreLoadout } from "../net/protocol";
 
 /**
  * 上榜要用的原始資料。
@@ -11,6 +12,14 @@ export interface RunSubmission {
   runs: number;
   steps: number;
   actions: ReplayAction[];
+  /**
+   * 開打那一刻的配置。
+   *
+   * **在這裡存一份，而不是上報時從存檔現算**：結算頁在送出之前已經改過存檔了
+   * （通關次數 +1，而門派修為每五次升一階），現算的那一份會比實際打的那一場強，
+   * 伺服器重播就走散了。種子的另一半（runs）當初就是為了同一個理由當場記下來的。
+   */
+  loadout: ScoreLoadout;
 }
 
 /** 場景之間傳遞的資料結構。 */
