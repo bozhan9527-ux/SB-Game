@@ -7,12 +7,13 @@
  *
  * 本檔不 import Phaser。
  */
-import { fetchDistribution, submitScore } from '../net/client';
+import { fetchDistribution, getSave, putSave, submitScore } from '../net/client';
 import { percentileOf } from '../net/protocol';
 import type { ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
 import { ensureCloudIdentity } from './cloud';
+import type { CloudIdentity } from '../save/types';
 import { loadoutSpecOf } from './loadout';
 
 /**
@@ -39,10 +40,60 @@ export type SubmitOutcome =
   | { kind: 'failed'; reason: string };
 
 /**
+ * 把這個身分登記到伺服器上（＝上傳一次雲端存檔）。
+ *
+ * 上榜要求伺服器認得這個身分，理由是「被檢舉時查得到是誰」——那是對的，
+ * 但**那一步對玩家毫無意義**：他要的是上榜，不是同步存檔，而在他通關之前
+ * 沒有任何地方會告訴他少做了這一步。所以改成由程式自己補。
+ *
+ * 只在伺服器說「沒看過這個身分」時才做，因此**不可能蓋掉任何東西**：
+ * 那句話的意思就是雲端還沒有這一份。手動上傳那條路留著，
+ * 它處理的是另一件事（換裝置、覆蓋、看時間戳決定要不要蓋）。
+ */
+export async function registerForBoard(save: SaveData): Promise<boolean> {
+  const identity = ensureCloudIdentity(save);
+
+  // **先問，再寫。** 伺服器上已經有這個身分的話，登記這件事本來就完成了，
+  // 一個位元組都不必上傳。這一條讓「自動開通」在任何情況下都不可能蓋掉
+  // 雲端那一份——而那正是手動上傳存在的理由（它要處理覆蓋，所以會問人）。
+  const existing = await getSave({
+    playerId: identity.playerId,
+    secret: identity.secret,
+  });
+  if (existing.ok) {
+    identity.syncedAt = Date.now();
+    return true;
+  }
+  // notFound 才是「還沒登記」。其他錯誤（連不上、密鑰對不上）不能當成
+  // 「雲端是空的」——那會把一份還在的存檔蓋掉。
+  if (existing.error !== 'notFound') return false;
+
+  const result = await putSave({
+    playerId: identity.playerId,
+    secret: identity.secret,
+    savedAt: save.savedAt,
+    blob: JSON.stringify(save),
+  });
+  if (!result.ok) return false;
+  identity.syncedAt = Date.now();
+  return true;
+}
+
+/** 伺服器已經認得這個身分了嗎。認得就代表上榜這條路是通的。 */
+export function boardReady(save: SaveData): boolean {
+  const identity: CloudIdentity | null = save.player.cloud;
+  return identity !== null && identity.syncedAt > 0;
+}
+
+/**
  * 送出一筆成績。
  *
  * **只在通關時送。** 沒通關的一場上榜沒有意義，而且伺服器也會拒絕——
  * 在這裡先擋掉可以省下一趟完全會失敗的請求。
+ *
+ * 第一次被回 unauthorized 時會自己登記一次再重送：那個錯誤幾乎一定是
+ * 「還沒上傳過雲端存檔」，而要求玩家先去別的頁面按一顆按鈕、
+ * 再回來重打一場，只是把一個實作細節丟給他扛。
  */
 export async function submitRun(
   save: SaveData,
@@ -52,21 +103,29 @@ export async function submitRun(
   if (save.player.sectId === null) return { kind: 'skipped' };
   const identity = ensureCloudIdentity(save);
 
-  const result = await submitScore({
-    playerId: identity.playerId,
-    secret: identity.secret,
-    name: save.player.name,
-    stage,
-    runs: submission.runs,
-    steps: submission.steps,
-    actions: submission.actions,
-    loadout: loadoutFor(save),
-  });
+  const send = (): Promise<Awaited<ReturnType<typeof submitScore>>> =>
+    submitScore({
+      playerId: identity.playerId,
+      secret: identity.secret,
+      name: save.player.name,
+      stage,
+      runs: submission.runs,
+      steps: submission.steps,
+      actions: submission.actions,
+      loadout: loadoutFor(save),
+    });
+
+  let result = await send();
+
+  if (!result.ok && result.error === 'unauthorized') {
+    // 自己補登記再重送一次。只重試這一次：登記完還是 unauthorized 的話
+    // 成因是另一件事（密鑰對不上），再送幾次也一樣。
+    if (await registerForBoard(save)) result = await send();
+  }
 
   if (!result.ok) {
-    // 「還沒上傳過雲端存檔」是最常見的一種，要說得具體，玩家才知道下一步做什麼。
     if (result.error === 'unauthorized') {
-      return { kind: 'failed', reason: '要先到「存檔」上傳一次雲端存檔才能上榜' };
+      return { kind: 'failed', reason: '這台裝置的身分對不上雲端那一份，先到「存檔」同步一次' };
     }
     if (result.error === 'rejected') {
       return { kind: 'failed', reason: '這一場的紀錄驗不過，沒有上榜' };

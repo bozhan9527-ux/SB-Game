@@ -329,8 +329,10 @@ export class ResultScene extends Phaser.Scene {
         }
       }
       const outcome = await submitRun(save, result.stage, result.submission);
+      // 不論成敗都存一次：送出的過程可能順手把身分登記上去了（syncedAt），
+      // 那一筆不存下來的話，下一場又會再登記一次。
+      persist();
       if (outcome.kind === "ok") {
-        persist();
         this.cloudLine
           ?.setText(
             `榜上第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}`,

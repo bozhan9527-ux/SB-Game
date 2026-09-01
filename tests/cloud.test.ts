@@ -4,16 +4,19 @@
  * 網路那一層不在這裡測（那是 Worker 的事），這裡守的是三條會靜靜出錯的規矩：
  * 身分只產一次、身分不跟著雲端那份走、以及套用雲端存檔要走既有的遷移路徑。
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultSave } from '../src/save';
 import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
 import { percentileOf } from '../src/net/protocol';
 import {
   MIN_SAMPLES_FOR_PERCENTILE,
+  boardReady,
   loadoutFor,
   percentileLine,
+  submitRun,
 } from '../src/systems/leaderboard';
+import * as client from '../src/net/client';
 
 describe('雲端身分', () => {
   it('第一次呼叫才產生，之後一直是同一組', () => {
@@ -138,5 +141,108 @@ describe('上榜與百分位', () => {
       'talismans',
       'upgrades',
     ]);
+  });
+});
+
+/**
+ * 上榜的開通。
+ *
+ * 伺服器要求上榜的身分先被登記過（＝上傳過一次雲端存檔）。那個要求成立
+ * ——被檢舉時要查得到是誰——但它不該由玩家自己去別的頁面補。
+ * 這一組守的就是「程式自己補得掉」，以及補的時機不會蓋到雲端已有的東西。
+ */
+describe('上榜開通', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const submission = { runs: 1, steps: 10, actions: [] };
+
+  function playing() {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    return save;
+  }
+
+  it('第一次被回 unauthorized 時，自己登記一次再重送', async () => {
+    const save = playing();
+    expect(boardReady(save)).toBe(false);
+
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValueOnce({ ok: false, error: 'unauthorized' })
+      .mockResolvedValueOnce({ ok: true, rank: 3, best: true, stage: 42 });
+    const put = vi
+      .spyOn(client, 'putSave')
+      .mockResolvedValue({ ok: true, savedAt: 1 });
+    vi.spyOn(client, 'getSave').mockResolvedValue({ ok: false, error: 'notFound' });
+
+    const outcome = await submitRun(save, 42, submission);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(outcome).toEqual({ kind: 'ok', rank: 3, best: true });
+    // 登記成功之後，這台裝置就不必再走一次那條路。
+    expect(boardReady(save)).toBe(true);
+  });
+
+  it('登記完還是 unauthorized 就不再重試——成因是密鑰對不上，送幾次都一樣', async () => {
+    const save = playing();
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValue({ ok: false, error: 'unauthorized' });
+    vi.spyOn(client, 'putSave').mockResolvedValue({ ok: true, savedAt: 1 });
+    vi.spyOn(client, 'getSave').mockResolvedValue({ ok: false, error: 'notFound' });
+
+    const outcome = await submitRun(save, 42, submission);
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(outcome.kind).toBe('failed');
+  });
+
+  it('驗不過不會去動雲端存檔——那和身分沒有關係', async () => {
+    const save = playing();
+    vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'rejected' });
+    const put = vi.spyOn(client, 'putSave').mockResolvedValue({ ok: true, savedAt: 1 });
+
+    const outcome = await submitRun(save, 42, submission);
+    expect(put).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ kind: 'failed', reason: '這一場的紀錄驗不過，沒有上榜' });
+  });
+
+  it('雲端已經有這一份時只認登記，不上傳——自動開通不得蓋掉任何東西', async () => {
+    const save = playing();
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValueOnce({ ok: false, error: 'unauthorized' })
+      .mockResolvedValueOnce({ ok: true, rank: 1, best: true, stage: 42 });
+    vi.spyOn(client, 'getSave').mockResolvedValue({
+      ok: true,
+      savedAt: 999,
+      blob: '{}',
+    });
+    const put = vi.spyOn(client, 'putSave');
+
+    await submitRun(save, 42, submission);
+    expect(put).not.toHaveBeenCalled();
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(boardReady(save)).toBe(true);
+  });
+
+  it('連不上伺服器時不當成「雲端是空的」——那會把還在的存檔蓋掉', async () => {
+    const save = playing();
+    vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'serverError' });
+    const get = vi
+      .spyOn(client, 'getSave')
+      .mockResolvedValue({ ok: false, error: 'serverError' });
+    const put = vi.spyOn(client, 'putSave');
+
+    await submitRun(save, 42, submission);
+    expect(put).not.toHaveBeenCalled();
+    void get;
+  });
+
+  it('沒有門派就不送，也不會登記', async () => {
+    const submit = vi.spyOn(client, 'submitScore');
+    const put = vi.spyOn(client, 'putSave');
+    expect(await submitRun(createDefaultSave(1), 42, submission)).toEqual({ kind: 'skipped' });
+    expect(submit).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
   });
 });

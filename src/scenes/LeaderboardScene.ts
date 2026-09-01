@@ -14,11 +14,16 @@ import { GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { cloudEnabled, fetchLeaderboard } from '../net/client';
 import { MAX_NAME_LENGTH } from '../net/protocol';
-import { percentileLine, refreshDistribution } from '../systems/leaderboard';
+import {
+  boardReady,
+  percentileLine,
+  refreshDistribution,
+  registerForBoard,
+} from '../systems/leaderboard';
 import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, GOLD, INK, INK_DIM, JADE, LINE, fitText, textStyle } from '../ui/theme';
+import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, textStyle } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 const LIST_TOP = 226;
@@ -29,6 +34,8 @@ export class LeaderboardScene extends Phaser.Scene {
   private rows: Phaser.GameObjects.Text[] = [];
   private status!: Phaser.GameObjects.Text;
   private percentile!: Phaser.GameObjects.Text;
+  /** 「你在不在榜上」那一行。它回答的是這一頁最常被問的問題。 */
+  private mine!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Leaderboard');
@@ -49,12 +56,18 @@ export class LeaderboardScene extends Phaser.Scene {
       .text(cx, 100, '', textStyle({ size: 22, color: JADE, bold: true }))
       .setOrigin(0.5);
     this.add
-      .text(cx, 138, `你最深到第 ${save.world.highestStage} 關`, textStyle({ size: 17, color: INK_DIM }))
+      .text(cx, 128, `你最深到第 ${save.world.highestStage} 關`, textStyle({ size: 17, color: INK_DIM }))
       .setOrigin(0.5);
 
-    createButton(this, cx, 182, {
+    // 「我到底有沒有上榜」是這一頁最常被問的問題，而原本這裡完全沒有回答——
+    // 玩家只看得到別人的名次，看不出自己缺了什麼、或是根本已經在榜上了。
+    this.mine = this.add
+      .text(cx, 154, '', textStyle({ size: 15, color: INK_DIM }))
+      .setOrigin(0.5);
+
+    createButton(this, cx, 192, {
       width: 220,
-      height: 48,
+      height: 42,
       label: save.player.name.length > 0 ? `改名：${save.player.name}` : '取一個上榜的名字',
       fontSize: 17,
       onClick: () => this.rename(),
@@ -86,7 +99,32 @@ export class LeaderboardScene extends Phaser.Scene {
     });
 
     this.refreshPercentile();
+    void this.prepare();
     void this.loadBoard();
+  }
+
+  /**
+   * 把上榜這條路先接通，玩家不必知道它存在。
+   *
+   * 伺服器要求上榜的身分先被登記過（＝上傳過一次雲端存檔），理由是
+   * 「被檢舉時查得到是誰」。那個理由成立，但那一步對玩家沒有意義——
+   * 他要的是上榜。所以進到這一頁就順手補掉，並且**只在還沒登記時做**，
+   * 因此不可能蓋掉雲端已經有的任何東西。
+   */
+  private async prepare(): Promise<void> {
+    if (!cloudEnabled()) return;
+    const save = state();
+    if (boardReady(save)) {
+      this.mine.setText('上榜已開通，通關就會自動送出').setColor(INK_DIM);
+      return;
+    }
+    this.mine.setText('開通上榜中…').setColor(INK_DIM);
+    if (await registerForBoard(save)) {
+      persist();
+      this.mine.setText('上榜已開通，通關就會自動送出').setColor(JADE);
+    } else {
+      this.mine.setText('開通失敗，通關時會再試一次').setColor(DANGER);
+    }
   }
 
   private rename(): void {
