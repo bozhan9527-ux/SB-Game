@@ -28,7 +28,7 @@ export const API_VERSION = 'v1';
  * 要 +1 的例子：戰鬥數值（balance.json）、tickCombat 的邏輯、抽符規則、
  * 無限模式的級距、上報欄位的意義。純畫面的改動不必動它。
  */
-export const REPLAY_CONTRACT_VERSION = 2;
+export const REPLAY_CONTRACT_VERSION = 3;
 
 /** 上傳的存檔最大幾個位元組。目前一份完整存檔約 1KB，64KB 是很寬鬆的上限。 */
 export const MAX_BLOB_BYTES = 64 * 1024;
@@ -293,18 +293,59 @@ export interface LeaderboardResult {
   mine: LeaderboardEntry | null;
 }
 
-/** 三個榜。字串直接進網址與資料庫，改名等於改協定。 */
-export type BoardKind = 'depth' | 'speed' | 'arena';
+/**
+ * 所有的榜。字串直接進網址與資料庫，改名等於改協定。
+ *
+ * 速通是**一關一個**（speed1、speed40…），關卡編在榜名裡。
+ */
+export type BoardKind = 'depth' | 'arena' | `speed${number}`;
+
+/** 速通最後那一條賽道：主線的終點。 */
+export const SPEED_STAGE = 81;
 
 /**
- * 速通榜的賽道：主線的最後一關。
+ * 速通：**每一關各自是一個獨立的榜。**
  *
- * **賽道必須固定，而且兩邊必須是同一個數字。** 不同關卡的秒數不能比——
- * 「第 1 關 40 秒」會贏過「第 81 關 3 分鐘」，榜單就退化成
- * 「誰最快打完最簡單的一關」。前後端各寫一份的話，客戶端會送出
- * 一筆伺服器一定退回的成績，而畫面上說不出原因。
+ * 原本只有第 81 關一條，而那是主線的終點——榜上要等到有人走完全程才會
+ * 出現第一筆，在那之前它是一個永遠空著的分頁。空的榜看起來像壞掉的功能。
+ *
+ * 但「有成績就先上去」不能做成「不管第幾關都丟進同一個榜」：那樣
+ * 第 1 關 40 秒會贏過第 81 關 3 分鐘，它就退化成「誰最快打完最簡單的一關」。
+ *
+ * 一關一個榜同時解決兩件事——**同一個榜上大家打的必然是同一關**，
+ * 秒數直接可比；而第一關就有榜，新玩家打完第一場就上得去。
+ *
+ * 賽道編在榜名裡（speed1、speed40…），所以多一關不必動資料表：
+ * board 本來就是主鍵的一部分。
  */
-export const SPEED_STAGE = 81;
+
+/** 速通榜收到第幾關為止。飛升境沒有終點，但榜總得有個界。 */
+export const MAX_SPEED_STAGE = 9999;
+
+/** 這一關有沒有對應的速通榜。超出範圍回 null。 */
+export function speedTrackOf(stage: number): number | null {
+  if (!Number.isInteger(stage) || stage < 1 || stage > MAX_SPEED_STAGE) return null;
+  return stage;
+}
+
+/** 關卡 → 榜別。 */
+export function speedBoard(stage: number): BoardKind {
+  return `speed${stage}`;
+}
+
+/** 榜別 → 那一關。不是速通榜就回 null。 */
+export function trackOfBoard(board: BoardKind): number | null {
+  const match = /^speed(\d+)$/.exec(board);
+  if (match === null) return null;
+  return speedTrackOf(Number(match[1]));
+}
+
+/** 這個字串是不是一個合法的榜別。**認不得的一律不收**，見 scores.ts 的說明。 */
+export function isBoardKind(raw: unknown): raw is BoardKind {
+  if (typeof raw !== 'string') return false;
+  if (raw === 'depth' || raw === 'arena') return true;
+  return trackOfBoard(raw as BoardKind) !== null;
+}
 
 /**
  * 關卡分布。索引就是關卡編號，值是「最深只到這一關的人數」。

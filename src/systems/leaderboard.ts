@@ -8,7 +8,7 @@
  * 本檔不 import Phaser。
  */
 import { getSave, putSave, submitScore } from '../net/client';
-import { REPLAY_CONTRACT_VERSION, SPEED_STAGE } from '../net/protocol';
+import { REPLAY_CONTRACT_VERSION, speedBoard, speedTrackOf } from '../net/protocol';
 import type { BoardKind, ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
@@ -60,9 +60,8 @@ export const QUIET_FAILURE_BELOW_STAGE = 6;
 /**
  * 這一場該進哪幾個榜。
  *
- * 打完主線最後一關的那一場**同時進兩個榜**：它既是一筆深度成績，
- * 也是一筆速通成績。在這裡判而不是丟給伺服器，是因為
- * 「一場成績算幾個榜」是遊戲規則，不是資料庫的事。
+ * 在這裡判而不是丟給伺服器，是因為「一場成績算幾個榜」是遊戲規則，
+ * 不是資料庫的事。
  *
  * **看的是競技場，不是無限模式。** 聚寶洞也是無限模式，但它帶著玩家
  * 全部的養成——把它的波數丟進競技榜，那個榜就從「誰操作得好」
@@ -70,7 +69,11 @@ export const QUIET_FAILURE_BELOW_STAGE = 6;
  */
 export function boardsFor(stage: number, arena: boolean): BoardKind[] {
   if (arena) return ['arena'];
-  return stage === SPEED_STAGE ? ['depth', 'speed'] : ['depth'];
+  // 每一場**同時進兩個榜**：它既是一筆深度成績，也是那一關的一筆秒數成績。
+  // 速通是一關一個榜，所以一場只會佔其中一個——同一個榜上大家打的
+  // 必然是同一關，秒數才真的可以比。
+  const track = speedTrackOf(stage);
+  return track === null ? ['depth'] : ['depth', speedBoard(track)];
 }
 
 /**

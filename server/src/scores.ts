@@ -16,7 +16,7 @@
  */
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
-import { REPLAY_CONTRACT_VERSION, SPEED_STAGE } from '../../src/net/protocol';
+import { REPLAY_CONTRACT_VERSION, isBoardKind, trackOfBoard } from '../../src/net/protocol';
 import type {
   DistributionResult,
   LeaderboardEntry,
@@ -177,22 +177,28 @@ function actionsOf(raw: unknown): ReplayAction[] | null {
  * 榜別。
  *
  * - depth：主線推得最深。同深度比誰快——那是這個榜唯一分得出高下的第二個維度。
- * - speed：主線終點（第 81 關）的速通。**賽道必須固定**：不同關卡的秒數
- *   不能比，否則「第 1 關 40 秒」會贏過「第 81 關 3 分鐘」，榜單就退化成
- *   「誰最快打完最簡單的一關」。
+ * - speed1 / speed2 / …：速通，**一關一個榜**。同一個榜上大家打的必然是
+ *   同一關，秒數才可以比；混成一個榜的話「第 1 關 40 秒」會贏過
+ *   「第 81 關 3 分鐘」，它就退化成「誰最快打完最簡單的一關」。
+ *   一關一個也讓新玩家打完第一場就上得去，不必等到走完主線。
  * - arena：競技場連下幾波。
  */
-export type BoardKind = 'depth' | 'speed' | 'arena';
+export type BoardKind = 'depth' | 'arena' | `speed${number}`;
 
-const BOARDS: readonly BoardKind[] = ['depth', 'speed', 'arena'];
-
-/** 這個榜是分數大的贏，還是小的贏。 */
+/** 這個榜是分數大的贏，還是小的贏。速通比誰快，其餘比誰多。 */
 function lowerIsBetter(board: BoardKind): boolean {
-  return board === 'speed';
+  return trackOfBoard(board) !== null;
 }
 
-function boardOf(raw: unknown): BoardKind {
-  return BOARDS.includes(raw as BoardKind) ? (raw as BoardKind) : 'depth';
+/**
+ * 認不得的榜別回 null，**不要退回 'depth'**。
+ *
+ * 退回 depth 的話，一個舊版客戶端送來的速通成績會安靜地變成一筆深度成績，
+ * 而它宣稱的關卡是賽道那一關——等於用一場簡單的仗污染深度榜。
+ * 不認得就拒絕，讓它在畫面上說得出話。
+ */
+function boardOf(raw: unknown): BoardKind | null {
+  return isBoardKind(raw) ? raw : null;
 }
 
 /**
@@ -277,6 +283,7 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   if (rejection !== null) return fail('rejected', env, origin, rejection);
 
   const board = boardOf(record['board']);
+  if (board === null) return fail('badRequest', env, origin, '不認得這個榜');
   // **競技榜只收競技場的一場，而且反過來也成立。**
   //
   // 沒有這一條的話，聚寶洞的一場（同樣是無限模式，但帶著玩家全部的養成）
@@ -327,12 +334,12 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   // 自報的分數沒有意義。而且它是模擬時間——加速鍵改的是「一幀補幾格」，
   // 所以開 3× 打完這個數字完全一樣，拿來排名是公平的。
   const elapsed = Math.round(replayed.elapsedMs);
-  // 速通榜只收固定賽道那一關：不同關的秒數不能比。
-  if (board === 'speed' && claimed !== SPEED_STAGE) {
-    return fail('rejected', env, origin, `速通榜只收第 ${SPEED_STAGE} 關`);
+  // 速通榜只收自己那一關：不同關的秒數不能比。
+  const track = trackOfBoard(board);
+  if (track !== null && claimed !== track) {
+    return fail('rejected', env, origin, `這個速通榜只收第 ${track} 關`);
   }
-  const score =
-    board === 'speed' ? elapsed : board === 'arena' ? replayed.clearedStages : claimed;
+  const score = track !== null ? elapsed : board === 'arena' ? replayed.clearedStages : claimed;
 
   const existing = await env.DB.prepare(
     'SELECT score, elapsed_ms FROM board_runs WHERE board = ? AND player_id = ?',
@@ -418,7 +425,7 @@ export async function leaderboard(
   origin: string | null,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const board = boardOf(url.searchParams.get('board'));
+  const board = boardOf(url.searchParams.get('board')) ?? 'depth';
   const playerId = url.searchParams.get('playerId');
 
   // 同分時比秒數，秒數也一樣就先到的排前面——後來的人追平不該把先達成的擠下去。

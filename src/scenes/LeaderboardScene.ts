@@ -14,7 +14,6 @@ import { GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { cloudEnabled, fetchLeaderboard } from '../net/client';
 import type { BoardKind, LeaderboardEntry } from '../net/protocol';
-import { SPEED_STAGE } from '../net/protocol';
 import { MAX_NAME_LENGTH } from '../net/protocol';
 import {
   boardReady,
@@ -34,6 +33,9 @@ import {
 } from '../systems/account';
 import { showForm, showNotice } from '../ui/form';
 import {
+  MAX_SPEED_STAGE,
+  speedBoard,
+  trackOfBoard,
   MAX_ANSWER_ATTEMPTS,
   MAX_QUESTION_LENGTH,
   MIN_ANSWER_LENGTH,
@@ -52,6 +54,9 @@ const VISIBLE_ROWS = 14;
 
 export class LeaderboardScene extends Phaser.Scene {
   private rows: Phaser.GameObjects.Text[] = [];
+  /** 榜的版面。速通分頁多一列賽道，所以這兩個是算出來的，不是常數。 */
+  private listTop = LIST_TOP;
+  private visibleRows = VISIBLE_ROWS;
   private status!: Phaser.GameObjects.Text;
   /** 「你在不在榜上」那一行。它回答的是這一頁最常被問的問題。 */
   private mine!: Phaser.GameObjects.Text;
@@ -81,13 +86,16 @@ export class LeaderboardScene extends Phaser.Scene {
 
     // 三個分頁。同一頁塞三種排序會讓人看不出現在在看什麼，
     // 而三個榜回答的是三個不同的問題：走得多深、多快、撐得多久。
+    const track = trackOfBoard(this.board);
     const tabs: [BoardKind, string][] = [
       ['depth', '推得最深'],
-      ['speed', '速通'],
+      // 進速通分頁時預設落在他最深的那一關——那裡最可能有他自己的紀錄。
+      // 預設停在第 1 關的話，推很遠的人每次進來都要點一長串才找得到自己。
+      [speedBoard(track ?? Math.max(1, save.world.highestStage)), '速通'],
       ['arena', '競技場'],
     ];
     tabs.forEach(([kind, label], index) => {
-      const active = kind === this.board;
+      const active = kind === this.board || (index === 1 && track !== null);
       createButton(this, cx + (index - 1) * 116, 86, {
         width: 110,
         height: 36,
@@ -102,6 +110,47 @@ export class LeaderboardScene extends Phaser.Scene {
       });
     });
 
+    // 速通分頁多一列關卡選擇。**一關就是一個獨立的榜**：同一個榜上大家打的
+    // 必然是同一關，秒數才真的可以比。混成一個榜的話，第 1 關 40 秒會贏過
+    // 第 81 關 3 分鐘，它就退化成「誰最快打完最簡單的一關」。
+    //
+    // 用左右鍵而不是把每一關列出來：關卡有好幾百個，列不完。大跳十關那兩顆
+    // 是必要的——一關一關點過去，推到第 152 關的人要點一百多下。
+    // 賽道那一列多佔一行，所以底下整塊往下推，榜少放一列——
+    // 不推的話它會直接壓在「你最深到第幾關」上面。
+    const shift = track === null ? 0 : 40;
+    this.listTop = LIST_TOP + shift;
+    this.visibleRows = VISIBLE_ROWS - (track === null ? 0 : 1);
+
+    if (track !== null) {
+      const go = (stage: number): void => {
+        const target = Math.max(1, Math.min(MAX_SPEED_STAGE, stage));
+        if (target !== track) this.scene.restart({ board: speedBoard(target) });
+      };
+      const steps: [number, string][] = [
+        [-10, '«'],
+        [-1, '‹'],
+        [1, '›'],
+        [10, '»'],
+      ];
+      // x 直接寫死，不用等距換算——中間那一格要留給「第 9999 關」，
+      // 而算出來的間距一縮，「›」就會被關卡數字整個蓋掉：按鈕還在、
+      // 點得到，只是看不見。這種壞法沒有人查得出來。
+      const xs = [-166, -104, 104, 166];
+      steps.forEach(([delta, label], index) => {
+        createButton(this, cx + (xs[index] ?? 0), 122, {
+          width: 52,
+          height: 32,
+          label,
+          fontSize: 18,
+          onClick: () => go(track + delta),
+        });
+      });
+      this.add
+        .text(cx, 122, `第 ${track} 關`, textStyle({ size: 17, color: JADE, bold: true }))
+        .setOrigin(0.5);
+    }
+
     // **最上面那一行寫自己的進度，不寫百分位。**
     //
     // 百分位要榜上先有夠多人才算得出來，在那之前它固定顯示「樣本還不夠多」——
@@ -110,7 +159,7 @@ export class LeaderboardScene extends Phaser.Scene {
     this.add
       .text(
         cx,
-        136,
+        136 + shift,
         `你最深到第 ${save.world.highestStage} 關`,
         textStyle({ size: 22, color: GOLD, bold: true }),
       )
@@ -119,13 +168,13 @@ export class LeaderboardScene extends Phaser.Scene {
     // 「我到底有沒有上榜」是這一頁最常被問的問題，而原本這裡完全沒有回答——
     // 玩家只看得到別人的名次，看不出自己缺了什麼、或是根本已經在榜上了。
     this.mine = this.add
-      .text(cx, 174, '', textStyle({ size: 15, color: INK_DIM }))
+      .text(cx, 174 + shift, '', textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(0.5);
 
     // 有帳號就只需要一顆改名鍵；沒帳號的話這裡是整頁最重要的東西——
     // 他上不了榜，而且在此之前沒有任何地方告訴過他為什麼。
     if (hasAccount(save)) {
-      createButton(this, cx - 58, 208, {
+      createButton(this, cx - 58, 208 + shift, {
         width: 160,
         height: 42,
         label: `改名：${save.player.name}`,
@@ -133,7 +182,7 @@ export class LeaderboardScene extends Phaser.Scene {
         onClick: () => void this.rename(),
       });
       // 註冊之前就存在的帳號沒有救援問題，這顆是他們補上的地方。
-      createButton(this, cx + 84, 208, {
+      createButton(this, cx + 84, 208 + shift, {
         width: 116,
         height: 42,
         label: '救援問題',
@@ -141,7 +190,7 @@ export class LeaderboardScene extends Phaser.Scene {
         onClick: () => void this.doSetQuestion(),
       });
     } else {
-      createButton(this, cx - 110, 208, {
+      createButton(this, cx - 110, 208 + shift, {
         width: 104,
         height: 42,
         label: '註冊',
@@ -150,14 +199,14 @@ export class LeaderboardScene extends Phaser.Scene {
         textColor: GOLD,
         onClick: () => void this.doRegister(),
       });
-      createButton(this, cx, 208, {
+      createButton(this, cx, 208 + shift, {
         width: 104,
         height: 42,
         label: '登入',
         fontSize: 17,
         onClick: () => void this.doLogin(),
       });
-      createButton(this, cx + 110, 208, {
+      createButton(this, cx + 110, 208 + shift, {
         width: 104,
         height: 42,
         label: '忘記密碼',
@@ -167,14 +216,14 @@ export class LeaderboardScene extends Phaser.Scene {
     }
 
     const width = GAME_WIDTH - 44;
-    const height = VISIBLE_ROWS * ROW_HEIGHT + 20;
+    const height = this.visibleRows * ROW_HEIGHT + 20;
     this.add
-      .rectangle(cx, LIST_TOP + height / 2, width, height, BG_PANEL, 0.9)
+      .rectangle(cx, this.listTop + height / 2, width, height, BG_PANEL, 0.9)
       .setStrokeStyle(2, LINE);
-    for (let i = 0; i < VISIBLE_ROWS; i += 1) {
+    for (let i = 0; i < this.visibleRows; i += 1) {
       this.rows.push(
         this.add
-          .text(cx - width / 2 + 20, LIST_TOP + 22 + i * ROW_HEIGHT, '', textStyle({ size: 17, color: INK }))
+          .text(cx - width / 2 + 20, this.listTop + 22 + i * ROW_HEIGHT, '', textStyle({ size: 17, color: INK }))
           .setOrigin(0, 0.5),
       );
     }
@@ -184,11 +233,11 @@ export class LeaderboardScene extends Phaser.Scene {
     // **前 N 名之外的人也要看得到自己。** 沒有這一行的話，第 400 名的玩家
     // 在這一頁永遠找不到自己——而他才是絕大多數。
     this.selfRow = this.add
-      .text(cx, LIST_TOP + height + 20, '', textStyle({ size: 17, color: GOLD, bold: true }))
+      .text(cx, this.listTop + height + 20, '', textStyle({ size: 17, color: GOLD, bold: true }))
       .setOrigin(0.5);
 
     this.status = this.add
-      .text(cx, LIST_TOP + height + 48, '', textStyle({ size: 16, color: INK_DIM }))
+      .text(cx, this.listTop + height + 48, '', textStyle({ size: 16, color: INK_DIM }))
       .setOrigin(0.5);
 
     createButton(this, cx, 900, {
@@ -515,10 +564,11 @@ export class LeaderboardScene extends Phaser.Scene {
   }
 
 
-  /** 一列在這個榜上怎麼讀。三個榜的分數是三種東西，只有這裡知道差別。 */
+  /** 一列在這個榜上怎麼讀。每個榜的分數是不同的東西，只有這裡知道差別。 */
   private describe(entry: LeaderboardEntry): string {
     const time = formatTime(entry.elapsedMs);
-    if (this.board === 'speed') return `第 ${entry.stage} 關　${time}`;
+    // 速通榜上整條賽道都是同一關，關卡再寫一次是廢話——秒數才是分數。
+    if (trackOfBoard(this.board) !== null) return time;
     if (this.board === 'arena') return `${entry.score} 波　${time}`;
     return `第 ${entry.score} 關　${time}`;
   }
@@ -537,17 +587,18 @@ export class LeaderboardScene extends Phaser.Scene {
       return;
     }
     if (result.entries.length === 0) {
+      const empty = trackOfBoard(this.board);
       this.status.setText(
-        this.board === 'speed'
-          ? `還沒有人打完第 ${SPEED_STAGE} 關。`
-          : '榜上還沒有人。第一個上榜的就是第一名。',
+        empty === null
+          ? '榜上還沒有人。第一個上榜的就是第一名。'
+          : `還沒有人上這一條。打通第 ${empty} 關就會自動送出。`,
       );
     } else {
       this.status.setText(`共 ${result.total} 人上榜`);
     }
 
     const mineId = save.player.cloud?.playerId ?? null;
-    result.entries.slice(0, VISIBLE_ROWS).forEach((entry, index) => {
+    result.entries.slice(0, this.visibleRows).forEach((entry, index) => {
       const row = this.rows[index];
       if (row === undefined) return;
       row.setText(`${String(entry.rank).padStart(2, ' ')}　${entry.name}　${this.describe(entry)}`);

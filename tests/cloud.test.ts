@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultSave, recordClear } from '../src/save';
 import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
-import { REPLAY_CONTRACT_VERSION, SPEED_STAGE } from '../src/net/protocol';
+import { REPLAY_CONTRACT_VERSION, SPEED_STAGE, trackOfBoard } from '../src/net/protocol';
 import {
   QUIET_FAILURE_BELOW_STAGE,
   boardReady,
@@ -212,12 +212,26 @@ describe('版本對不上就直說', () => {
 });
 
 describe('一場成績進哪幾個榜', () => {
-  it('一般的一關只進深度榜', () => {
-    expect(boardsFor(40, false)).toEqual(['depth']);
+  it('主線最後一關同時進深度與速通——同一場既是深度也是秒數', () => {
+    expect(boardsFor(SPEED_STAGE, false)).toEqual(['depth', 'speed81']);
   });
 
-  it('主線最後一關同時進深度與速通——同一場既是深度也是秒數', () => {
-    expect(boardsFor(SPEED_STAGE, false)).toEqual(['depth', 'speed']);
+  it('**每一關都有自己的速通榜，打完第一關就上得去。**', () => {
+    // 原本速通只有第 81 關一條，那是主線的終點——榜上要等到有人走完全程
+    // 才會出現第一筆，在那之前它是一個永遠空著的分頁。空的榜看起來像壞掉。
+    expect(boardsFor(1, false)).toEqual(['depth', 'speed1']);
+    expect(boardsFor(40, false)).toEqual(['depth', 'speed40']);
+    expect(boardsFor(152, false)).toEqual(['depth', 'speed152']);
+  });
+
+  it('一場只進一個速通榜——同一個榜上大家打的必然是同一關', () => {
+    // 這是「秒數可以比」的唯一根據。混成一個榜的話，第 1 關 40 秒會贏過
+    // 第 81 關 3 分鐘，速通就退化成「誰最快打完最簡單的一關」。
+    for (const stage of [1, 9, 40, 81, 152]) {
+      const speed = boardsFor(stage, false).filter((board) => trackOfBoard(board) !== null);
+      expect(speed).toHaveLength(1);
+      expect(trackOfBoard(speed[0]!)).toBe(stage);
+    }
   });
 
   it('競技場只進競技榜', () => {
@@ -273,7 +287,8 @@ describe('上榜開通', () => {
 
     const outcome = await submitRun(save, submission);
     expect(put).toHaveBeenCalledTimes(1);
-    expect(submit).toHaveBeenCalledTimes(2);
+    // 主榜（深度）送一次、補登記之後重送一次，再加上那一關的速通榜。
+    expect(submit).toHaveBeenCalledTimes(3);
     expect(outcome).toEqual({ kind: 'ok', rank: 3, best: true });
     // 登記成功之後，這台裝置就不必再走一次那條路。
     expect(boardReady(save)).toBe(true);
@@ -288,7 +303,7 @@ describe('上榜開通', () => {
     vi.spyOn(client, 'getSave').mockResolvedValue({ ok: false, error: 'notFound' });
 
     const outcome = await submitRun(save, submission);
-    expect(submit).toHaveBeenCalledTimes(2);
+    expect(submit).toHaveBeenCalledTimes(3);
     expect(outcome.kind).toBe('failed');
   });
 
@@ -338,7 +353,7 @@ describe('上榜開通', () => {
 
     await submitRun(save, submission);
     expect(put).not.toHaveBeenCalled();
-    expect(submit).toHaveBeenCalledTimes(2);
+    expect(submit).toHaveBeenCalledTimes(3);
     expect(boardReady(save)).toBe(true);
   });
 
