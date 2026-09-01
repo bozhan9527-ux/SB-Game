@@ -174,6 +174,22 @@ export function threatStage(stage: number, bankedStage: number): number {
   return stage + Math.round(banked * ascendThreatRatio);
 }
 
+/**
+ * 副本的固定層數要乘上多少。
+ *
+ * 主線用加法（見 threatStage），副本不行：藏經閣第一層只有第 1 關，
+ * 加上三十幾關就直接沒得打。這裡改成乘法，而且看的同樣是**上一世走了多深**
+ * 而不是轉了幾次世——沒走更深就不會變硬，這一點和主線是同一條規則。
+ *
+ * 轉世會把副本進度清光，所以下一世整條路要重走；少了這個係數，
+ * 那趟重走就是純粹的勞動：難度停在原地，而玩家手上多了整套仙緣。
+ */
+export function dungeonThreatFactor(bankedStage: number): number {
+  const { minStage, dungeonAscendRatio } = BALANCE.rebirth;
+  const banked = Math.max(0, Math.floor(bankedStage) - minStage);
+  return 1 + (banked / minStage) * dungeonAscendRatio;
+}
+
 /** 把存檔攤平成一般關卡的 LoadoutSpec。上報成績時送的也是這一份。 */
 export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
   return {

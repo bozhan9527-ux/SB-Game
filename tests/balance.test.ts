@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BALANCE, DUNGEONS, SECTS, UPGRADES } from '../src/data';
+import { BALANCE, DUNGEONS, KARMA, SECTS, UPGRADES } from '../src/data';
 import { cardDps, fieldDps, maxTierForStage } from '../src/systems/deck';
 import type { Card } from '../src/systems/deck';
 import type { CardSlot, DefenseState } from '../src/systems/defense';
@@ -14,7 +14,12 @@ import {
   swapSlots,
   tickCombat,
 } from '../src/systems/defense';
-import { buildLoadoutFromSpec, buildLoadoutFor } from '../src/systems/loadout';
+import {
+  buildLoadoutFromSpec,
+  buildLoadoutFor,
+  dungeonThreatFactor,
+} from '../src/systems/loadout';
+import { karmaCost, karmaTrackById } from '../src/systems/karma';
 import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
 import { trackById, upgradeCost } from '../src/systems/upgrades';
@@ -248,6 +253,21 @@ function spendGold(levels: Record<string, number>, gold: number): number {
     if (cheapest === null) return gold;
     gold -= cheapest.cost;
     levels[cheapest.id] = (levels[cheapest.id] ?? 0) + 1;
+  }
+}
+
+/** 有點就買最便宜的那一條仙緣，和 spendGold 同一種「不做長期規劃」的花法。 */
+function spendKarma(spent: Record<string, number>, points: number): number {
+  for (;;) {
+    let cheapest: { id: string; cost: number } | null = null;
+    for (const track of KARMA) {
+      const cost = karmaCost(karmaTrackById(track.id), spent[track.id] ?? 0);
+      if (cost === null || cost > points) continue;
+      if (cheapest === null || cost < cheapest.cost) cheapest = { id: track.id, cost };
+    }
+    if (cheapest === null) return points;
+    points -= cheapest.cost;
+    spent[cheapest.id] = (spent[cheapest.id] ?? 0) + 1;
   }
 }
 
@@ -491,6 +511,8 @@ describe('副本難度', () => {
     index: number,
     upgrades: Record<string, number>,
     stage: number,
+    karma: Record<string, number> = {},
+    rebirths = 0,
   ): number {
     const loadout = buildLoadoutFromSpec({
       sectId: 'sword',
@@ -499,13 +521,14 @@ describe('副本難度', () => {
       libraryFloor: dungeon.id === 'library' ? index : 16,
       talismans: ['swordArray', 'flame', 'thunder', 'gale'],
       upgrades,
-      karma: {},
+      karma,
       sectClears: 0,
-    sectDepth: 0,
+      sectDepth: 0,
       rules: [...dungeon.rules],
       goldMultiplier: dungeon.goldMultiplier,
       
-      bankedStage: 0, rebirths: 0,
+      bankedStage: 0,
+      rebirths,
     });
     let wins = 0;
     const runs = 12;
@@ -554,4 +577,36 @@ describe('副本難度', () => {
       });
     }
   });
+
+  /**
+   * 轉世之後重走的那一趟。
+   *
+   * 轉世把副本進度清光，所以整條路要重走一次；而重走若是原價，那就只是勞動。
+   * 這裡驗的是加了轉世係數之後**還是走得完**——尤其藏經閣：十六張非基礎符
+   * 只有它產出，某一世打不過就等於那一世永遠少四張符。
+   */
+  it('轉世之後副本會變深，但每一層仍然過得了', () => {
+    const snaps = progressionSnapshots();
+    // 上一世的深度取實測的收斂鏈（見 threatStage 的註解），仙緣照它換點平均分配。
+    const chain = [107, 151, 157];
+    const spent: Record<string, number> = {};
+    let points = 0;
+    chain.forEach((banked, life) => {
+      points = spendKarma(spent, points + 3 + Math.floor(Math.max(0, banked - 82) / 6));
+      const factor = dungeonThreatFactor(banked);
+      expect(factor, `第 ${life + 2} 世的係數`).toBeGreaterThan(1);
+      for (const dungeon of DUNGEONS) {
+        dungeon.floors.forEach((floor, index) => {
+          if (floor.stage === undefined) return;
+          const gate = floor.minStage ?? dungeon.minStage;
+          // 深度照 floorDepth 的算法：乘上係數，再夾在門檻之內。
+          const stage = Math.max(1, Math.min(Math.round(floor.stage * factor), gate));
+          const upgrades = snaps.get(Math.min(81, Math.max(1, gate))) ?? {};
+          const rate = clearRate(dungeon, index, upgrades, stage, spent, life + 1);
+          const label = `第 ${life + 2} 世 ${dungeon.name} 第 ${index + 1} 層（門檻 ${gate}、第 ${stage} 關）`;
+          expect(rate, label).toBeGreaterThanOrEqual(dungeon.id === 'library' ? 0.7 : 0.4);
+        });
+      }
+    });
+  }, 120000);
 });

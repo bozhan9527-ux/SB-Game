@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import { CARDS, DUNGEONS } from '../src/data';
 import { createDefaultSave } from '../src/save';
+import { rebirth } from '../src/systems/karma';
 import type { SaveData } from '../src/save/types';
 import { createDefenseState, mergeInto, tickCombat } from '../src/systems/defense';
 import {
@@ -20,6 +21,8 @@ import {
   dungeonById,
   dungeonSpecOf,
   floorAt,
+  floorDepth,
+  floorOpen,
   floorStage,
   grantFloor,
   nextFloor,
@@ -28,17 +31,24 @@ import type { LoadoutSpec } from '../src/systems/loadout';
 import { buildLoadoutFromSpec, loadoutSpecOf } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
 
-function saveAt(highestStage = 999): SaveData {
+/**
+ * 一份「這一世推到第 N 關」的存檔。
+ *
+ * stage 與 highestStage 一起設：副本的門檻看的是**這一世**的進度
+ * （world.stage），因為 highestStage 不會因為轉世歸零——拿它當門檻的話，
+ * 轉世之後所有副本會在第一秒全部開放。
+ */
+function saveAt(stage = 999): SaveData {
   const save = createDefaultSave(1);
   save.player.sectId = 'body';
-  save.world.highestStage = highestStage;
-  save.world.stage = 30;
+  save.world.stage = stage;
+  save.world.highestStage = stage;
   save.player.dungeons['library'] = 16;
   return save;
 }
 
 function specWith(rules: string[]): LoadoutSpec {
-  return { ...loadoutSpecOf(saveAt(), 30), rules };
+  return { ...loadoutSpecOf(saveAt(30), 30), rules };
 }
 
 function dungeon(id: string) {
@@ -153,6 +163,58 @@ describe('副本的結構', () => {
     const veteran = saveAt(999);
     expect(dungeonAvailable(rookie, dungeon('pagoda'))).toBe(false);
     expect(dungeonAvailable(veteran, dungeon('pagoda'))).toBe(true);
+  });
+
+  it('轉世之後副本整條重來：進度清空、門檻回到這一世的進度', () => {
+    // highestStage 不會因為轉世歸零，所以門檻若看它，轉世之後所有副本會在
+    // 第一秒全部開放——進度被清光、關卡卻一層都不用再爬。
+    const save = saveAt(200);
+    save.player.dungeons = { library: 16, pagoda: 5 };
+    save.player.karma.claimedStage = 0;
+    expect(rebirth(save)).toBe(true);
+
+    expect(clearedFloors(save, 'library')).toBe(0);
+    expect(save.world.highestStage).toBeGreaterThan(100);
+    expect(save.world.stage).toBe(1);
+    // 深的副本關起來了，藏經閣第一層照樣開著——新的一世從第一張符重新爬。
+    expect(dungeonAvailable(save, dungeon('pagoda'))).toBe(false);
+    expect(dungeonAvailable(save, dungeon('trove'))).toBe(false);
+    expect(floorOpen(save, dungeon('library'), 1)).toBe(true);
+    expect(floorOpen(save, dungeon('library'), 10)).toBe(false);
+  });
+
+  it('轉世之後同一層會變深，但永遠不會深過它自己的門檻', () => {
+    const before = saveAt(60);
+    const library = dungeon('library');
+    const base = floorDepth(before, library, 12);
+
+    const after = saveAt(60);
+    // 上一世推到第 200 關的人，重走的這一趟每一層都更深。
+    after.player.karma.claimedStage = 200;
+    const scaled = floorDepth(after, library, 12);
+    expect(scaled).toBeGreaterThan(base);
+
+    // 但深度永遠不過門檻——副本難的是規則不是深度，這是整套平衡的地基。
+    const extreme = saveAt(60);
+    extreme.player.karma.claimedStage = 99_999;
+    for (const item of DUNGEONS) {
+      item.floors.forEach((floor, index) => {
+        if (floor.stage === undefined) return;
+        const gate = floor.minStage ?? item.minStage;
+        expect(floorDepth(extreme, item, index + 1), `${item.name} 第 ${index + 1} 層`)
+          .toBeLessThanOrEqual(gate);
+      });
+    }
+  });
+
+  it('聚寶洞的深度看這一世，不看歷史最高——剛轉世的人不會一進去就必死', () => {
+    const save = saveAt(200);
+    save.player.karma.claimedStage = 0;
+    rebirth(save);
+    save.world.stage = 40;
+    // 歷史最高還是 200，但這一趟只會開在第 40 關附近。
+    expect(save.world.highestStage).toBeGreaterThan(100);
+    expect(floorDepth(save, dungeon('trove'), 1)).toBeLessThan(50);
   });
 
   it('每個副本的回報都真的寫進存檔', () => {

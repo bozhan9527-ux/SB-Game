@@ -52,6 +52,7 @@
     "stagesPerPoint": 6,
     "basePoints": 3,
     "ascendThreatRatio": 0.35,
+    "dungeonAscendRatio": 0.2,
     "traitChancePerLife": 0.25,
     "traitChanceMax": 0.9
   },

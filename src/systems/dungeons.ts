@@ -20,7 +20,7 @@ import { CARDS, DUNGEONS } from '../data';
 import type { DungeonDef, DungeonFloor } from '../data/types';
 import type { SaveData } from '../save/types';
 import type { LoadoutSpec } from './loadout';
-import { loadoutSpecOf } from './loadout';
+import { dungeonThreatFactor, loadoutSpecOf } from './loadout';
 
 /** 產出符籙的那一個。符籙的解鎖完全由它決定。 */
 export const LIBRARY_ID = 'library';
@@ -35,15 +35,54 @@ export function clearedFloors(save: SaveData, dungeonId: string): number {
 }
 
 /**
+ * 這一世推到第幾關。副本的門檻與深度全部看它，不看歷史最高。
+ *
+ * **highestStage 不會因為轉世歸零**，所以拿它當門檻的話，轉世之後所有副本
+ * 會在第一秒全部開放：進度被清光、關卡卻一層都不用再爬，而玩家手上還多了
+ * 整套仙緣。聚寶洞更糟——它的深度是歷史最高的 0.85 倍，剛轉世的人一進去
+ * 就是必死的第 170 關。
+ *
+ * world.stage 是「下一關要打第幾關」，轉世時歸 1，之後只會往前走，
+ * 所以它正好就是「這一世走到哪」。
+ */
+export function lifeStage(save: SaveData): number {
+  return Math.max(1, Math.floor(save.world.stage));
+}
+
+/**
  * 一層的實際戰鬥深度。
  *
- * stageRatio 的那一種跟著玩家的最高關卡走——這是聚寶洞不會退化成提款機的
- * 唯一原因：它永遠開在你現在打得動的邊緣，而不是你三十關前打爛的地方。
+ * stageRatio 的那一種跟著玩家**這一世**的進度走——這是聚寶洞不會退化成
+ * 提款機的唯一原因：它永遠開在你現在打得動的邊緣，而不是你三十關前打爛的地方。
  */
-export function floorStage(floor: DungeonFloor, highestStage: number): number {
+export function floorStage(floor: DungeonFloor, currentStage: number): number {
   if (floor.stage !== undefined) return Math.max(1, Math.round(floor.stage));
   const ratio = floor.stageRatio ?? 1;
-  return Math.max(1, Math.round(Math.max(1, highestStage) * ratio));
+  return Math.max(1, Math.round(Math.max(1, currentStage) * ratio));
+}
+
+/**
+ * 這一層這一世實際會打到第幾關。
+ *
+ * 固定層數的那一種要乘上轉世係數（見 dungeonThreatFactor）：
+ * 轉世把副本進度清光，重走的那一趟若難度停在原地，就只是勞動。
+ *
+ * 跟著進度走的那一種（聚寶洞）**不再乘一次**——它看的本來就是這一世的
+ * 進度，而那個數字已經反映了變硬的世界。
+ */
+export function floorDepth(save: SaveData, dungeon: DungeonDef, index: number): number {
+  const floor = floorAt(dungeon, index);
+  if (floor === null) return 1;
+  const base = floorStage(floor, lifeStage(save));
+  if (floor.stage === undefined) return base;
+  const scaled = Math.round(base * dungeonThreatFactor(save.player.karma.claimedStage));
+  // **深度不得超過那一層的門檻。**
+  //
+  // 這是整套副本平衡的地基：副本難的是規則不是深度，所以一層的關卡永遠開得比
+  // 「你得推到哪才進得來」淺。轉世係數若能把它推過門檻，鎮妖塔第四層會從
+  // 第 55 關被推到第 78 關而門檻只有 58——實測勝率直接歸零。
+  // 上限一夾，係數就只能把那一層從「比門檻淺很多」推到「貼著門檻」為止。
+  return Math.max(1, Math.min(scaled, floorGate(dungeon, index)));
 }
 
 /**
@@ -121,13 +160,14 @@ export function grantFloor(save: SaveData, dungeon: DungeonDef, index: number): 
  * 填進同一個 spec 裡。兩條路徑若各自組裝，排行榜的重播驗證立刻會對不上。
  */
 export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number): LoadoutSpec {
-  const floor = floorAt(dungeon, index);
-  const stage = floor === null ? 1 : floorStage(floor, save.world.highestStage);
   return {
-    ...loadoutSpecOf(save, stage),
+    ...loadoutSpecOf(save, floorDepth(save, dungeon, index)),
     rules: [...dungeon.rules],
     goldMultiplier: dungeon.goldMultiplier,
     endless: dungeon.endless,
+    // 轉世的加成已經算進 floorDepth 了，這裡要把主線那條關掉，否則同一件事
+    // 會被算兩次——深層的副本本來就會超過第 82 關，threatStage 會再加一次。
+    bankedStage: 0,
   };
 }
 
@@ -141,7 +181,7 @@ export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number
  * 會看到五個他一個都打不動的入口。
  */
 export function dungeonAvailable(save: SaveData, dungeon: DungeonDef): boolean {
-  return save.world.highestStage >= dungeon.minStage;
+  return lifeStage(save) >= dungeon.minStage;
 }
 
 /** 這一層的開放門檻（主線要推到第幾關）。 */
@@ -158,5 +198,5 @@ export function floorGate(dungeon: DungeonDef, index: number): number {
  */
 export function floorOpen(save: SaveData, dungeon: DungeonDef, index: number): boolean {
   if (clearedFloors(save, dungeon.id) < index - 1) return false;
-  return save.world.highestStage >= floorGate(dungeon, index);
+  return lifeStage(save) >= floorGate(dungeon, index);
 }

@@ -167,6 +167,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       minStage: p(rebirth, 'minStage', 'rebirth'),
       stagesPerPoint: p(rebirth, 'stagesPerPoint', 'rebirth'),
       ascendThreatRatio: p(rebirth, 'ascendThreatRatio', 'rebirth'),
+      dungeonAscendRatio: p(rebirth, 'dungeonAscendRatio', 'rebirth'),
       basePoints: p(rebirth, 'basePoints', 'rebirth'),
       traitChancePerLife: p(rebirth, 'traitChancePerLife', 'rebirth'),
       traitChanceMax: p(rebirth, 'traitChanceMax', 'rebirth'),

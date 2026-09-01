@@ -22,7 +22,7 @@ import {
   floorAt,
   floorGate,
   floorOpen,
-  floorStage,
+  floorDepth,
   nextFloor,
 } from "../systems/dungeons";
 import { realmForStage, realmTitle } from "../systems/realms";
@@ -157,8 +157,8 @@ export class DungeonScene extends Phaser.Scene {
 
     // 右邊那顆按鈕要先講深度再講層數：玩家要判斷的是「我現在打不打得動」。
     const floor = upcoming === null ? null : floorAt(dungeon, upcoming);
-    const stage =
-      floor === null ? 0 : floorStage(floor, save.world.highestStage);
+    // 深度要用 floorDepth 算，不是資料裡那個數字：轉世之後同一層會變深。
+    const stage = upcoming === null ? 0 : floorDepth(save, dungeon, upcoming);
     if (!available) {
       this.add
         .text(
