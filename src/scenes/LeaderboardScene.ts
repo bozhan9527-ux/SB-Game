@@ -18,8 +18,6 @@ import { SPEED_STAGE } from '../net/protocol';
 import { MAX_NAME_LENGTH } from '../net/protocol';
 import {
   boardReady,
-  percentileLine,
-  refreshDistribution,
   registerForBoard,
 } from '../systems/leaderboard';
 import {
@@ -45,7 +43,6 @@ const VISIBLE_ROWS = 14;
 export class LeaderboardScene extends Phaser.Scene {
   private rows: Phaser.GameObjects.Text[] = [];
   private status!: Phaser.GameObjects.Text;
-  private percentile!: Phaser.GameObjects.Text;
   /** 「你在不在榜上」那一行。它回答的是這一頁最常被問的問題。 */
   private mine!: Phaser.GameObjects.Text;
   /** 現在看的是哪一個榜。 */
@@ -95,12 +92,18 @@ export class LeaderboardScene extends Phaser.Scene {
       });
     });
 
-    // 百分位在最上面，而且用最大的字——它是這一頁對多數人唯一有意義的數字。
-    this.percentile = this.add
-      .text(cx, 124, '', textStyle({ size: 20, color: JADE, bold: true }))
-      .setOrigin(0.5);
+    // **最上面那一行寫自己的進度，不寫百分位。**
+    //
+    // 百分位要榜上先有夠多人才算得出來，在那之前它固定顯示「樣本還不夠多」——
+    // 一行永遠不會變的字，佔著整頁最大的字級。進度則是他每推一關就會動的數字，
+    // 而且不必連線、不必等別人上榜就有。
     this.add
-      .text(cx, 150, `你最深到第 ${save.world.highestStage} 關`, textStyle({ size: 16, color: INK_DIM }))
+      .text(
+        cx,
+        136,
+        `你最深到第 ${save.world.highestStage} 關`,
+        textStyle({ size: 22, color: GOLD, bold: true }),
+      )
       .setOrigin(0.5);
 
     // 「我到底有沒有上榜」是這一頁最常被問的問題，而原本這裡完全沒有回答——
@@ -178,7 +181,6 @@ export class LeaderboardScene extends Phaser.Scene {
       onClick: () => fadeToScene(this, 'Title'),
     });
 
-    this.refreshPercentile();
     void this.prepare();
     void this.loadBoard();
   }
@@ -374,15 +376,6 @@ export class LeaderboardScene extends Phaser.Scene {
   }
 
 
-  private refreshPercentile(): void {
-    const save = state();
-    const line = percentileLine(save, save.world.highestStage);
-    this.percentile
-      .setText(line ?? '樣本還不夠多，百分位先不算')
-      .setColor(line === null ? INK_DIM : JADE);
-    fitText(this.percentile, GAME_WIDTH - 40);
-  }
-
   /** 一列在這個榜上怎麼讀。三個榜的分數是三種東西，只有這裡知道差別。 */
   private describe(entry: LeaderboardEntry): string {
     const time = formatTime(entry.elapsedMs);
@@ -399,11 +392,6 @@ export class LeaderboardScene extends Phaser.Scene {
     this.status.setText('載入中…');
 
     const save = state();
-    if (await refreshDistribution(save, Date.now())) {
-      persist();
-      this.refreshPercentile();
-    }
-
     const result = await fetchLeaderboard(this.board, save.player.cloud?.playerId ?? null);
     if (!result.ok) {
       this.status.setText('連不上伺服器，稍後再試。');

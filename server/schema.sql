@@ -39,10 +39,9 @@ CREATE INDEX IF NOT EXISTS scores_rank ON scores (hidden, stage DESC, verified_a
 -- **這裡沒有密碼，也沒有可以直接拿來用的秘密。** 身分那一把 secret 是
 -- 客戶端用「密碼 + salt」推導出來的（PBKDF2），這裡存的仍然只是它的
 -- SHA-256，和匿名時代的 saves.secret_hash 完全同一種東西。
--- **一次性重建。** accounts 是上一次部署才建的，而 CREATE TABLE IF NOT EXISTS
--- 加不了欄位——這裡要補的 email 是「註冊當下沒收就永遠補不回來」的東西，
--- 所以趁表還是空的把它換掉。下一次部署會把這一行拿掉。
-DROP TABLE IF EXISTS accounts;
+-- （這裡曾經有一行 DROP TABLE IF EXISTS accounts，用來補上 email 欄位。
+-- 它只該存在一次部署，任務完成後就拿掉了——留著的話每一次部署都會
+-- 把所有帳號清光，而那種錯不會有人發現，直到有人抱怨登不進去。）
 
 -- 帳號。**帳號是電子信箱，道號只負責顯示。**
 --

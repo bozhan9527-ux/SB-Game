@@ -52,6 +52,7 @@ import {
 import { boardBonuses } from "../systems/board";
 import { buildLoadoutFromSpec, loadoutSpecOf } from "../systems/loadout";
 import { dungeonById, dungeonSpecOf } from "../systems/dungeons";
+import { runIsRankable, scoreLoadoutOf } from "../systems/leaderboard";
 import type { TutorialStep } from "../systems/tutorial";
 import {
   HINT_BOSS,
@@ -350,6 +351,13 @@ export class RunScene extends Phaser.Scene {
         : dungeonSpecOf(save, dungeon, entry.floor);
     const stage = spec.stage;
     const loadout = buildLoadoutFromSpec(spec);
+    // **配置在這裡就記下來，和種子同一個理由。**
+    //
+    // 結算頁在送出成績之前已經改過存檔了（recordClear 把這一派的通關次數 +1，
+    // 而修為每五次升一階、每階 +4% 傷害），那時候現算的配置比實際打的這一場強，
+    // 伺服器重播出來就是另一場仗。漏掉這一行的後果不是「偶爾驗不過」，
+    // 而是 submission 永遠是 null——**一場都不會上榜**，而且畫面上完全沒有跡象。
+    this.runLoadout = scoreLoadoutOf(spec);
     // 種子帶入挑戰次數：同一關重打會換一批妖魔與符，但單次進行中完全可重現。
     // 種子的另一半要當場記下來：結算頁會把 runs 加一，之後再去讀就不是這一場的種子了。
     this.seedRuns = save.world.runs;
@@ -2486,20 +2494,25 @@ export class RunScene extends Phaser.Scene {
       telemetry: this.run.telemetry,
       elapsedMs: this.run.elapsedMs,
       endlessCleared: this.run.loadout.endless ? this.run.clearedStages : null,
-      // 中途放棄的一場沒有上榜的意義，教學那一場則重播不出來。
-      // 副本也不上榜：它的深度是副本決定的，拿去和「推到第幾關」比不是同一件事。
+      // 哪一場算數的規則在 runIsRankable 裡，不在這一行三元運算裡——
+      // 它錯掉的症狀是玩家永遠不會上榜，而畫面上完全看不出來。
       submission:
-        this.tutorialRun ||
-        reason === "abandon" ||
-        this.dungeonRun !== null ||
-        this.runLoadout === null
+        this.runLoadout === null ||
+        !runIsRankable({
+          tutorial: this.tutorialRun,
+          abandoned: reason === "abandon",
+          dungeonRules:
+            this.dungeonRun === null
+              ? null
+              : (dungeonById(this.dungeonRun.id)?.rules ?? []),
+        })
           ? null
           : {
               runs: this.seedRuns,
               steps: this.stepIndex,
               actions: this.actions,
               loadout: this.runLoadout,
-              endless: this.run.loadout.endless,
+              arena: this.run.loadout.arena,
             },
       dungeon: this.dungeonRun,
     };

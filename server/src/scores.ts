@@ -25,7 +25,7 @@ import type {
   ScoreSubmitResult,
 } from '../../src/net/protocol';
 import { CARDS, DUNGEONS, KARMA, SECTS, UPGRADES } from '../../src/data';
-import { buildLoadoutFromSpec } from '../../src/systems/loadout';
+import { ARENA_RULE, buildLoadoutFromSpec } from '../../src/systems/loadout';
 import { accountOf } from './accounts';
 
 /** 藏經閣總層數，也就是符籙解鎖的上限。 */
@@ -118,8 +118,7 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   // 確認——和升級等級同一類的結構性限制，見 README。
   const banked = Number(record['bankedStage'] ?? 0);
   const lives = Number(record['rebirths'] ?? 0);
-  // endless 刻意不收：無限模式只存在於聚寶洞，而副本的一場本來就不上榜。
-  // 這裡不讀它，重播出來的世界就一定是有終點的那一種。
+  // endless 刻意不收：它由榜別決定（見 submitScore），不是客戶端能報的欄位。
 
   return {
     sectId,
@@ -262,15 +261,45 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   const rejection = validateReplay(input);
   if (rejection !== null) return fail('rejected', env, origin, rejection);
 
+  const board = boardOf(record['board']);
+  // **競技榜只收競技場的一場，而且反過來也成立。**
+  //
+  // 沒有這一條的話，聚寶洞的一場（同樣是無限模式，但帶著玩家全部的養成）
+  // 手動改個 board 就能進競技榜，那個榜立刻退化成「誰洞府等級高」。
+  // 反向那一條擋的是另一件事：競技場永遠打第 1 關，混進深度榜沒有意義。
+  const arena = loadout.rules.includes(ARENA_RULE);
+  if (board === 'arena' && !arena) {
+    return fail('rejected', env, origin, '競技榜只收試劍台的一場');
+  }
+  if (board !== 'arena' && arena) {
+    return fail('rejected', env, origin, '試劍台的一場只進競技榜');
+  }
+
   // 重播。伺服器用自己算出來的結果，完全不採信客戶端宣稱的關卡。
   //
   // 組裝走的是遊戲**同一個** buildLoadoutFromSpec：修為、副本規則、仙緣、
   // 符籙解鎖、額外格位全部在裡面。這裡若自己拼一份，只要漏掉一個乘區，
   // 重播的就是另一場仗——而那個故障看起來會像「玩家作弊」，不像「伺服器算錯」。
-  const replayed = replayRun(buildLoadoutFromSpec({ ...loadout, stage: claimed }), input);
+  //
+  // endless 由**榜別**決定，不收客戶端報的：它不是配置，是「這一場是哪一種」。
+  // 而且自報它沒有意義——無限模式只會讓這一場更難，作弊的方向不在這裡。
+  const replayed = replayRun(
+    buildLoadoutFromSpec({ ...loadout, stage: claimed, endless: arena }),
+    input,
+  );
 
-  // 只有真的通關才記分。沒斬掉首領就不算通關，這條規則和遊戲裡完全一致。
-  if (replayed.outcome !== 'cleared') {
+  if (arena) {
+    // **無限模式沒有「通關」這件事。** 它一定是打到守不住為止，所以這裡要驗的
+    // 是另外兩件：這一場真的結束了（不是送一份跑到一半就截斷的紀錄），
+    // 而且至少下了一波（一波都沒下的 0 分不必佔一列）。
+    if (replayed.outcome === 'running') {
+      return fail('rejected', env, origin, '這一場還沒打完');
+    }
+    if (replayed.clearedStages < 1) {
+      return fail('rejected', env, origin, '一波都還沒下');
+    }
+  } else if (replayed.outcome !== 'cleared') {
+    // 只有真的通關才記分。沒斬掉首領就不算通關，這條規則和遊戲裡完全一致。
     return fail('rejected', env, origin, `重播的結果是 ${replayed.outcome}`);
   }
 
@@ -283,7 +312,6 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   // 自報的分數沒有意義。而且它是模擬時間——加速鍵改的是「一幀補幾格」，
   // 所以開 3× 打完這個數字完全一樣，拿來排名是公平的。
   const elapsed = Math.round(replayed.elapsedMs);
-  const board = boardOf(record['board']);
   // 速通榜只收固定賽道那一關：不同關的秒數不能比。
   if (board === 'speed' && claimed !== SPEED_STAGE) {
     return fail('rejected', env, origin, `速通榜只收第 ${SPEED_STAGE} 關`);

@@ -8,13 +8,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultSave, recordClear } from '../src/save';
 import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
-import { percentileOf } from '../src/net/protocol';
+import { SPEED_STAGE } from '../src/net/protocol';
 import {
-  MIN_SAMPLES_FOR_PERCENTILE,
   QUIET_FAILURE_BELOW_STAGE,
   boardReady,
+  boardsFor,
   loadoutFor,
-  percentileLine,
+  runIsRankable,
   scoreLoadoutOf,
   submitRun,
 } from '../src/systems/leaderboard';
@@ -82,43 +82,7 @@ describe('套用雲端存檔', () => {
   });
 });
 
-describe('百分位', () => {
-  it('從直方圖算出「超過幾成人」', () => {
-    // buckets[i] = 最深停在第 i 關的人數。
-    const buckets = [0, 10, 0, 30, 0, 60];
-    expect(percentileOf(buckets, 1)).toBeCloseTo(0, 6);
-    expect(percentileOf(buckets, 3)).toBeCloseTo(10 / 100, 6);
-    expect(percentileOf(buckets, 5)).toBeCloseTo(40 / 100, 6);
-    expect(percentileOf(buckets, 99)).toBeCloseTo(1, 6);
-  });
-
-  it('沒有資料時回 0，不是 NaN', () => {
-    // 剛上線、還沒有任何人上傳過的時候會走到這條路。
-    expect(percentileOf([], 10)).toBe(0);
-    expect(percentileOf([0, 0, 0], 2)).toBe(0);
-  });
-});
-
-describe('上榜與百分位', () => {
-  it('樣本太少時不報百分位', () => {
-    // 三個人裡排第一寫成「超過 67%」只是誤導，那個數字要有意義得先有夠多人。
-    const save = createDefaultSave(1);
-    save.player.distribution = { buckets: [0, 0, 1, 2], total: 3, fetchedAt: 1 };
-    expect(percentileLine(save, 3)).toBeNull();
-  });
-
-  it('樣本夠多才報，而且數字對得上直方圖', () => {
-    const save = createDefaultSave(1);
-    const buckets = [0, 30, 30, 40];
-    save.player.distribution = { buckets, total: 100, fetchedAt: 1 };
-    expect(save.player.distribution.total).toBeGreaterThanOrEqual(MIN_SAMPLES_FOR_PERCENTILE);
-    expect(percentileLine(save, 3)).toContain('60%');
-  });
-
-  it('沒有快取時也不會炸——離線第一次進遊戲就是這個狀態', () => {
-    expect(percentileLine(createDefaultSave(1), 10)).toBeNull();
-  });
-
+describe('上榜', () => {
   it('送給伺服器的配置只帶得動重播需要的東西', () => {
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
@@ -148,6 +112,63 @@ describe('上榜與百分位', () => {
 });
 
 /**
+ * 哪一場算數。
+ *
+ * 這一組是為了一個**畫面上完全看不出來**的故障寫的：上報的那份配置快照
+ * 漏了指派，於是 submission 恆為 null，玩家一路通關到第 152 關，
+ * 榜上永遠沒有他，而結算頁一句話都不會說。那一段判斷當時藏在
+ * RunScene 的一行三元運算裡，沒有任何東西守著它。
+ */
+describe('哪一場算數', () => {
+  const main = { tutorial: false, abandoned: false, dungeonRules: null };
+
+  it('主線正常通關要上報', () => {
+    expect(runIsRankable(main)).toBe(true);
+  });
+
+  it('教學那一場不上報——它換過起手牌，重播不出來', () => {
+    expect(runIsRankable({ ...main, tutorial: true })).toBe(false);
+  });
+
+  it('中途放棄的一場不上報', () => {
+    expect(runIsRankable({ ...main, abandoned: true })).toBe(false);
+  });
+
+  it('副本不上報：它的深度是副本決定的，和「推到第幾關」不是同一件事', () => {
+    expect(runIsRankable({ ...main, dungeonRules: ['soloTalisman'] })).toBe(false);
+    expect(runIsRankable({ ...main, dungeonRules: ['hasteBoss'] })).toBe(false);
+  });
+
+  it('競技場是唯一的例外——它是副本，但它存在的理由就是那個榜', () => {
+    expect(runIsRankable({ ...main, dungeonRules: ['arena'] })).toBe(true);
+  });
+
+  it('競技場的一場放棄了還是不算', () => {
+    expect(runIsRankable({ ...main, abandoned: true, dungeonRules: ['arena'] })).toBe(false);
+  });
+});
+
+describe('一場成績進哪幾個榜', () => {
+  it('一般的一關只進深度榜', () => {
+    expect(boardsFor(40, false)).toEqual(['depth']);
+  });
+
+  it('主線最後一關同時進深度與速通——同一場既是深度也是秒數', () => {
+    expect(boardsFor(SPEED_STAGE, false)).toEqual(['depth', 'speed']);
+  });
+
+  it('競技場只進競技榜', () => {
+    expect(boardsFor(1, true)).toEqual(['arena']);
+  });
+
+  it('**看的是競技場，不是無限模式。** 聚寶洞也是無限，但它帶著全部的養成', () => {
+    // 這個 false 是重點：聚寶洞的一場不會因為「它也是無限模式」就混進競技榜。
+    // 混進去的話，那個榜比的就從操作變成洞府等級。
+    expect(boardsFor(120, false)).not.toContain('arena');
+  });
+});
+
+/**
  * 上榜的開通。
  *
  * 伺服器要求上榜的身分先被登記過（＝上傳過一次雲端存檔）。那個要求成立
@@ -162,7 +183,7 @@ describe('上榜開通', () => {
     steps: 10,
     actions: [],
     loadout: loadoutFor(playing()),
-    endless: false,
+    arena: false,
   };
 
   /** 一份「可以上榜」的存檔：有門派、也註冊過。 */
@@ -338,7 +359,7 @@ describe('上報的是開打那一刻的配置', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6, elapsedMs: 1000 });
-    await submitRun(save, 6, { runs: 0, steps: 10, actions: [], loadout: captured, endless: false });
+    await submitRun(save, 6, { runs: 0, steps: 10, actions: [], loadout: captured, arena: false });
 
     const sent = submit.mock.calls[0]?.[0];
     expect(sent?.loadout.sectClears).toBe(4);

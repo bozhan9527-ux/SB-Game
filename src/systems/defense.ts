@@ -1105,8 +1105,14 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
   // 級距本身隨波數往上爬：愈深，一波跨得愈遠。
   // 固定級距下，強度愈高的一場拖得愈久（實測滿級加仙緣要打六十波），
   // 而「打到打不贏為止」若要成立，它得對每一種強度都在合理時間內收斂。
-  const { endlessStep, endlessAccelWaves } = BALANCE.wave;
-  const step = endlessStep + Math.floor(state.clearedStages / Math.max(1, endlessAccelWaves));
+  //
+  // 競技場走自己的一組級距：聚寶洞那一組是對著「養成滿的人從第 130 關開場」
+  // 調的，套在「加成全關、從第 1 關、符從一階起」的競技場上，三波之內一定
+  // 守不住——而一個所有人都拿 3 分的榜等於沒有榜。
+  const { endlessStep, endlessAccelWaves, arenaStep, arenaAccelWaves } = BALANCE.wave;
+  const base = state.loadout.arena ? arenaStep : endlessStep;
+  const accel = state.loadout.arena ? arenaAccelWaves : endlessAccelWaves;
+  const step = base + Math.floor(state.clearedStages / Math.max(1, accel));
   state.stage += step;
   state.threat += step;
   state.clearedStages += 1;

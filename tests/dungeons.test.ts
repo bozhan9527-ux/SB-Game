@@ -30,6 +30,8 @@ import {
 import type { LoadoutSpec } from '../src/systems/loadout';
 import { buildLoadoutFromSpec, loadoutSpecOf } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
+import { ARENA_MAX_TIER, drawCard, tierCapFor } from '../src/systems/deck';
+import { MAX_REPLAY_STEPS, replayRun } from '../src/systems/replay';
 
 /**
  * 一份「這一世推到第 N 關」的存檔。
@@ -306,5 +308,99 @@ describe('副本的結構', () => {
     expect(loadout.goldMultiplier).toBeGreaterThan(
       buildLoadoutFromSpec(loadoutSpecOf(save, spec.stage)).goldMultiplier,
     );
+  });
+});
+
+/**
+ * 試劍台（競技場）。
+ *
+ * 這個副本存在的唯一理由是那個榜，而榜要有意義得先守住兩件事：
+ * **養成不能影響它**（否則比的是等級不是操作），以及**它要分得出高下**
+ * （所有人都拿同一個波數的榜等於沒有榜）。兩件都是靜靜就會壞掉的性質——
+ * 加一條新的加成、或者動一下無限模式的級距，都可能在沒有人察覺的情況下破壞它。
+ */
+describe('試劍台', () => {
+  const arena = dungeonById('arena');
+
+  /** 一份養成拉滿的存檔：轉世過、洞府滿級、修為與秘傳都很高。 */
+  function maxed(): SaveData {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.world.stage = 152;
+    save.world.highestStage = 152;
+    save.player.karma.claimedStage = 120;
+    save.player.karma.rebirths = 3;
+    save.player.sectClears = { sword: 200 };
+    for (const key of Object.keys(save.player.upgrades)) save.player.upgrades[key] = 99;
+    for (const key of Object.keys(save.player.karma.spent)) save.player.karma.spent[key] = 99;
+    return save;
+  }
+
+  function fresh(): SaveData {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    return save;
+  }
+
+  it('存在，而且是可重複、無限的一層', () => {
+    expect(arena).not.toBeNull();
+    expect(arena?.repeatable).toBe(true);
+    expect(arena?.endless).toBe(true);
+    expect(arena?.floors).toHaveLength(1);
+  });
+
+  it('第一天就打得到——榜要從煉氣期就開始排', () => {
+    expect(dungeonAvailable(fresh(), arena!)).toBe(true);
+    expect(floorOpen(fresh(), arena!, 1)).toBe(true);
+  });
+
+  it('**永遠從第 1 關開始，推得多深都一樣。**', () => {
+    // 這一條是固定賽道：跟著進度走的話，推得深的人反而開在更難的地方，
+    // 而他手上完全沒有多出來的力量——波數就不能拿來互相比了。
+    expect(floorDepth(fresh(), arena!, 1)).toBe(1);
+    expect(floorDepth(maxed(), arena!, 1)).toBe(1);
+  });
+
+  it('**養成全部不算**：滿級的人和第一天的人，倍率一模一樣', () => {
+    const a = buildLoadoutFromSpec(dungeonSpecOf(fresh(), arena!, 1));
+    const b = buildLoadoutFromSpec(dungeonSpecOf(maxed(), arena!, 1));
+    expect(b.damageMultiplier).toBe(a.damageMultiplier);
+    expect(b.fireRateMultiplier).toBe(a.fireRateMultiplier);
+    expect(b.drawSpeedMultiplier).toBe(a.drawSpeedMultiplier);
+    expect(b.disciples).toBe(a.disciples);
+    expect(b.tierBonus).toBe(a.tierBonus);
+    expect(b.favoredDamageBonus).toBe(a.favoredDamageBonus);
+    // 威脅度也一樣——轉世讓世界變硬那一條在這裡不生效。
+    expect(b.threat).toBe(a.threat);
+    expect(b.traitChance).toBe(a.traitChance);
+  });
+
+  it('抽到的符一律是一階，但階數沒有上限', () => {
+    const loadout = buildLoadoutFromSpec(dungeonSpecOf(maxed(), arena!, 1));
+    expect(loadout.arena).toBe(true);
+    const rng = createRng(7);
+    for (let i = 0; i < 40; i += 1) {
+      expect(drawCard(loadout, 30, rng).tier).toBe(1);
+    }
+    // 合成是這個模式唯一能推的那條指數，所以不能有天花板卡住它。
+    expect(tierCapFor(loadout, 1)).toBe(ARENA_MAX_TIER);
+    expect(tierCapFor(loadout, 60)).toBe(ARENA_MAX_TIER);
+  });
+
+  it('一場打得完，而且不會超過重播的上限', () => {
+    // 上限是靜靜生效的：超過就被退回，而症狀是「打得最好的人上不了榜」。
+    const loadout = buildLoadoutFromSpec({
+      ...dungeonSpecOf(fresh(), arena!, 1),
+      endless: true,
+    });
+    const result = replayRun(loadout, {
+      stage: 1,
+      runs: 0,
+      totalSteps: MAX_REPLAY_STEPS,
+      actions: [],
+    });
+    // 一步都不操作當然很快就輸了，這裡驗的是它真的會結束、不是跑到上限被截斷。
+    expect(result.outcome).toBe('defeated');
+    expect(result.steps).toBeLessThan(MAX_REPLAY_STEPS);
   });
 });

@@ -135,6 +135,8 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       waveIntervalMs: p(wave, 'waveIntervalMs', 'wave'),
       endlessStep: p(wave, 'endlessStep', 'wave'),
       endlessAccelWaves: p(wave, 'endlessAccelWaves', 'wave'),
+      arenaStep: p(wave, 'arenaStep', 'wave'),
+      arenaAccelWaves: p(wave, 'arenaAccelWaves', 'wave'),
       waveSpread: p(wave, 'waveSpread', 'wave'),
       minSpawnGapMs: p(wave, 'minSpawnGapMs', 'wave'),
       countBase: p(wave, 'countBase', 'wave'),

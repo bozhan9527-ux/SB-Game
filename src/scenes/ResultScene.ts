@@ -7,11 +7,8 @@ import { dungeonById, grantFloor, nextFloor } from "../systems/dungeons";
 import { detectAchievements } from "../systems/achievements";
 import { track } from "../telemetry";
 import { cloudEnabled } from "../net/client";
-import { MAX_NAME_LENGTH } from "../net/protocol";
 import {
   QUIET_FAILURE_BELOW_STAGE,
-  percentileLine,
-  refreshDistribution,
   submitRun,
 } from "../systems/leaderboard";
 import { updateRecords } from "../systems/records";
@@ -325,18 +322,10 @@ export class ResultScene extends Phaser.Scene {
     let board: string | null = null;
     let ok = false;
 
-    if (result.victory && result.submission !== null) {
-      // 第一次上榜才問名字。每次都問很煩，而且他多半只想看結算表。
-      if (save.player.name.length === 0) {
-        const typed = window.prompt(
-          "上榜要用什麼名字？（之後可以在「存檔」改）",
-          "無名修士",
-        );
-        if (typed !== null) {
-          save.player.name = typed.slice(0, MAX_NAME_LENGTH);
-          persist();
-        }
-      }
+    // **不要求 victory。** 競技場（和所有無限模式）一定是打到守不住為止，
+    // victory 永遠是 false——用它當條件的話，那個榜一筆都收不到。
+    // 該不該送已經在 RunScene 判完了（runIsRankable），這裡只看有沒有那一份。
+    if (result.submission !== null) {
       // 送出要跑一趟網路，慢的時候有兩三秒。那段時間留白會被讀成「沒有這個功能」。
       this.cloudLine?.setText("上榜中…").setColor(INK_DIM);
       const outcome = await submitRun(save, result.stage, result.submission);
@@ -356,18 +345,16 @@ export class ResultScene extends Phaser.Scene {
       }
     }
 
-    if (await refreshDistribution(save, Date.now())) persist();
-    const line = result.victory ? percentileLine(save, result.stage) : null;
-
-    const parts = [board, line].filter((part): part is string => part !== null);
-    if (parts.length === 0) {
+    // 這裡原本還接一行百分位。拿掉的理由是它幾乎永遠算不出來：
+    // 要榜上有二十個人才有意義，在那之前它只是一行不會變的字。
+    if (board === null) {
       this.cloudLine?.setText("");
       return;
     }
     this.cloudLine
-      ?.setText(parts.join("　"))
-      // 上榜成功用金色，失敗的說明只是資訊不是警告，百分位單獨出現時用玉色。
-      .setColor(ok ? GOLD : board !== null ? INK_DIM : JADE);
+      ?.setText(board)
+      // 上榜成功用金色；失敗的說明是資訊不是警告，所以不用紅色。
+      .setColor(ok ? GOLD : INK_DIM);
     if (this.cloudLine !== undefined) fitText(this.cloudLine, GAME_WIDTH - 40);
   }
 

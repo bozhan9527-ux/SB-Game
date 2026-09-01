@@ -7,14 +7,14 @@
  *
  * 本檔不 import Phaser。
  */
-import { fetchDistribution, getSave, putSave, submitScore } from '../net/client';
-import { SPEED_STAGE, percentileOf } from '../net/protocol';
+import { getSave, putSave, submitScore } from '../net/client';
+import { SPEED_STAGE } from '../net/protocol';
 import type { BoardKind, ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
 import { ensureCloudIdentity } from './cloud';
 import type { CloudIdentity } from '../save/types';
-import { loadoutSpecOf } from './loadout';
+import { ARENA_RULE, loadoutSpecOf } from './loadout';
 import type { LoadoutSpec } from './loadout';
 
 /**
@@ -63,10 +63,37 @@ export const QUIET_FAILURE_BELOW_STAGE = 6;
  * 打完主線最後一關的那一場**同時進兩個榜**：它既是一筆深度成績，
  * 也是一筆速通成績。在這裡判而不是丟給伺服器，是因為
  * 「一場成績算幾個榜」是遊戲規則，不是資料庫的事。
+ *
+ * **看的是競技場，不是無限模式。** 聚寶洞也是無限模式，但它帶著玩家
+ * 全部的養成——把它的波數丟進競技榜，那個榜就從「誰操作得好」
+ * 變成「誰洞府等級高」，而競技場存在的唯一理由正是不比那個。
  */
-export function boardsFor(stage: number, endless: boolean): BoardKind[] {
-  if (endless) return ['arena'];
+export function boardsFor(stage: number, arena: boolean): BoardKind[] {
+  if (arena) return ['arena'];
   return stage === SPEED_STAGE ? ['depth', 'speed'] : ['depth'];
+}
+
+/**
+ * 這一場的成績上不上報。
+ *
+ * 抽成一個純函式而不是留在 RunScene 的三元運算裡，理由很實際：那一段
+ * 判斷藏在一個兩千多行的場景中間，而它錯掉的症狀是**畫面上完全沒有跡象**——
+ * 玩家通關、結算表照跑、榜上就是永遠沒有他。真的發生過一次（配置快照那一行
+ * 漏了，於是 submission 恆為 null，一場都沒送出去）。
+ *
+ * 規則本身：教學那一場重播不出來；中途放棄的一場沒有意義；副本的深度是
+ * 副本決定的，拿去和「推到第幾關」比不是同一件事。**競技場是唯一的例外**——
+ * 它是個副本，但它存在的理由就是那個榜。
+ */
+export function runIsRankable(options: {
+  tutorial: boolean;
+  abandoned: boolean;
+  /** 這一場的副本規則。主線是 null。 */
+  dungeonRules: readonly string[] | null;
+}): boolean {
+  if (options.tutorial || options.abandoned) return false;
+  if (options.dungeonRules === null) return true;
+  return options.dungeonRules.includes(ARENA_RULE);
 }
 
 export type SubmitOutcome =
@@ -169,7 +196,7 @@ export async function submitRun(
 
   // 第一個榜是主榜——它的名次就是要顯示給玩家看的那一個。其餘的
   // （打完主線最後一關那一場同時算速通）在背景送，失敗也不吵他。
-  const boards = boardsFor(stage, submission.endless);
+  const boards = boardsFor(stage, submission.arena);
   const primary = boards[0] ?? 'depth';
   let result = await send(primary);
 
@@ -194,32 +221,4 @@ export async function submitRun(
     return { kind: 'failed', reason: '連不上伺服器，這一場沒有上榜' };
   }
   return { kind: 'ok', rank: result.rank, best: result.best };
-}
-
-/**
- * 更新關卡分布的快取。
- *
- * 拿不到就沿用上次的：百分位晚一天更新沒有人看得出來，
- * 但「這一格突然消失」很明顯。
- */
-export async function refreshDistribution(save: SaveData, now: number): Promise<boolean> {
-  const result = await fetchDistribution();
-  if (!result.ok) return false;
-  save.player.distribution = { buckets: result.buckets, total: result.total, fetchedAt: now };
-  return true;
-}
-
-/**
- * 「你超過了幾成修士」。
- *
- * 樣本太少時回 null——三個人裡排第一寫成「超過 67%」只是誤導，
- * 那個數字要有意義得先有夠多人。
- */
-export const MIN_SAMPLES_FOR_PERCENTILE = 20;
-
-export function percentileLine(save: SaveData, stage: number): string | null {
-  const cache = save.player.distribution;
-  if (cache === null || cache.total < MIN_SAMPLES_FOR_PERCENTILE) return null;
-  const share = percentileOf(cache.buckets, stage);
-  return `第 ${stage} 關　你已經超過 ${Math.round(share * 100)}% 的修士`;
 }

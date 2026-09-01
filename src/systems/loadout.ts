@@ -217,6 +217,15 @@ export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
   };
 }
 
+/**
+ * 競技場那條規則的字串。
+ *
+ * 拿出來當常數，是因為它現在有三個地方要認得它：組裝（把加成關掉）、
+ * 上報（決定進哪個榜）、伺服器（重播要跑無限模式）。三處各自寫死一次
+ * 'arena' 的話，打錯一個字的症狀是「競技場的成績安靜地驗不過」。
+ */
+export const ARENA_RULE = 'arena';
+
 export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   const sect = sectById(spec.sectId);
   if (sect === null) throw new Error('尚未選擇門派，無法開始挑戰');
@@ -256,7 +265,7 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   // （升級、修為、仙緣）是平衡模擬要能單獨掃的維度，為了一個模式在裡面
   // 加分支，等於讓每一次模擬都要多想一件事。這裡改的是算完之後的成品，
   // 讀起來也直接：這個模式就是「把加成拿掉」。
-  if (has('arena')) {
+  if (has(ARENA_RULE)) {
     const { power } = BALANCE;
     loadout.arena = true;
     loadout.disciples = Math.max(1, Math.round(power.baseDisciples * sect.discipleMultiplier));
@@ -270,11 +279,13 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
 
   applySectDepth(loadout, spec.sectDepth);
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
+  // 習性的機率也是養成的一部分，所以競技場一樣要關掉——**而且它是反過來的**：
+  // 轉世愈多次機率愈高，也就是說老玩家在競技場會遇到更硬的妖魔，
+  // 手上卻沒有任何多出來的力量。那不只是不公平，是把榜單的方向倒過來。
   const { traitChancePerLife, traitChanceMax } = BALANCE.rebirth;
-  loadout.traitChance = Math.min(
-    traitChanceMax,
-    Math.max(0, Math.floor(spec.rebirths)) * traitChancePerLife,
-  );
+  loadout.traitChance = loadout.arena
+    ? 0
+    : Math.min(traitChanceMax, Math.max(0, Math.floor(spec.rebirths)) * traitChancePerLife);
   loadout.endless = spec.endless === true;
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   return loadout;

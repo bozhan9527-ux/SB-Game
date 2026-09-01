@@ -31,6 +31,8 @@
     "waveIntervalMs": 9000,
     "endlessStep": 3,
     "endlessAccelWaves": 3,
+    "arenaStep": 1,
+    "arenaAccelWaves": 6,
     "waveSpread": 0.85,
     "minSpawnGapMs": 700,
     "countBase": 3,
