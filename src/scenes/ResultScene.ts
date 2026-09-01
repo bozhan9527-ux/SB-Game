@@ -9,6 +9,7 @@ import { track } from "../telemetry";
 import { cloudEnabled } from "../net/client";
 import { MAX_NAME_LENGTH } from "../net/protocol";
 import {
+  QUIET_FAILURE_BELOW_STAGE,
   percentileLine,
   refreshDistribution,
   submitRun,
@@ -345,7 +346,12 @@ export class ResultScene extends Phaser.Scene {
       if (outcome.kind === "ok") {
         ok = true;
         board = `已上榜 · 第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}`;
-      } else if (outcome.kind === "failed") {
+      } else if (
+        outcome.kind === "failed" &&
+        result.stage >= QUIET_FAILURE_BELOW_STAGE
+      ) {
+        // 前五關失敗就安靜：那幾筆成績在榜上沒有意義，而一行看不懂的紅字
+        // 對剛開始玩的人只會讀成「遊戲壞了」。
         board = outcome.reason;
       }
     }

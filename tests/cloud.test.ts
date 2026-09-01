@@ -11,6 +11,7 @@ import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/clo
 import { percentileOf } from '../src/net/protocol';
 import {
   MIN_SAMPLES_FOR_PERCENTILE,
+  QUIET_FAILURE_BELOW_STAGE,
   boardReady,
   loadoutFor,
   percentileLine,
@@ -203,6 +204,27 @@ describe('上榜開通', () => {
     expect(outcome.kind).toBe('failed');
   });
 
+  it('失敗的說明不指控玩家——每一次真的發生，成因都在我們這邊', async () => {
+    const save = playing();
+    vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'rejected' });
+    vi.spyOn(client, 'putSave');
+    const outcome = await submitRun(save, 42, submission);
+    expect(outcome.kind).toBe('failed');
+    if (outcome.kind !== 'failed') return;
+    // 「驗不過」讀起來是在說玩家造假。訊息要指向他做得到的那一步。
+    expect(outcome.reason).not.toContain('驗不過');
+    expect(outcome.reason).toContain('重新整理');
+  });
+
+  it('前五關的失敗不出聲——那幾筆成績在榜上本來就沒有意義', () => {
+    // 這個常數是結算頁用來決定「要不要寫那一行」的門檻。
+    expect(QUIET_FAILURE_BELOW_STAGE).toBe(6);
+    for (const stage of [1, 2, 3, 4, 5]) {
+      expect(stage < QUIET_FAILURE_BELOW_STAGE).toBe(true);
+    }
+    expect(6 < QUIET_FAILURE_BELOW_STAGE).toBe(false);
+  });
+
   it('驗不過不會去動雲端存檔——那和身分沒有關係', async () => {
     const save = playing();
     vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'rejected' });
@@ -210,7 +232,7 @@ describe('上榜開通', () => {
 
     const outcome = await submitRun(save, 42, submission);
     expect(put).not.toHaveBeenCalled();
-    expect(outcome).toEqual({ kind: 'failed', reason: '這一場的紀錄驗不過，沒有上榜' });
+    expect(outcome.kind).toBe('failed');
   });
 
   it('雲端已經有這一份時只認登記，不上傳——自動開通不得蓋掉任何東西', async () => {

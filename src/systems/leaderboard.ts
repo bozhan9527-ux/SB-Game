@@ -45,6 +45,18 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
   return scoreLoadoutOf(loadoutSpecOf(save, 1));
 }
 
+/**
+ * 比這一關淺的成績，上榜失敗時**什麼都不說**。
+ *
+ * 前五關是新玩家的前幾分鐘，而那幾關的成績在榜上本來就沒有意義（榜單只留
+ * 每個人最好的一筆，那幾筆很快就會被自己蓋掉）。為了一個沒有意義的成績，
+ * 在他第三次通關的結算頁跳一行紅字，代價遠大於收益——他會以為遊戲壞了，
+ * 而那一行字他也做不了任何事。
+ *
+ * 送還是照送：成功的話「已上榜」照樣顯示，只有失敗那一路安靜。
+ */
+export const QUIET_FAILURE_BELOW_STAGE = 6;
+
 export type SubmitOutcome =
   | { kind: 'ok'; rank: number; best: boolean }
   | { kind: 'skipped' }
@@ -149,7 +161,11 @@ export async function submitRun(
       return { kind: 'failed', reason: '這台裝置的身分對不上雲端那一份，先到「存檔」同步一次' };
     }
     if (result.error === 'rejected') {
-      return { kind: 'failed', reason: '這一場的紀錄驗不過，沒有上榜' };
+      // **不寫成「驗不過」。** 那三個字讀起來是在指控玩家造假，而實際上
+      // 每一次真的發生，成因都在我們這邊：伺服器重播出來的不是同一場仗
+      // （配置漏了一個欄位、或玩家的瀏覽器還在跑舊版本）。
+      // 訊息要指向他做得到的那一步，不是指向他的人格。
+      return { kind: 'failed', reason: '這一場沒上榜：紀錄和伺服器對不起來，重新整理一次再試' };
     }
     return { kind: 'failed', reason: '連不上伺服器，這一場沒有上榜' };
   }
