@@ -151,3 +151,53 @@ describe('出怪佇列', () => {
     expect(queue.filter((item) => item.boss).every((item) => item.trait === 'none')).toBe(true);
   });
 });
+
+/**
+ * 轉世加上去的習性。
+ *
+ * 這一組守的是「新周目」這件事有沒有真的發生：世數換來的不是一個看不見的乘數，
+ * 而是場上實際多出來的習性妖魔，而且那一批不吃滿血量折扣——
+ * 折扣給滿的話多出來的習性等於白加（實測勝率一格都不動）。
+ */
+describe('轉世加成的習性', () => {
+  function traitCounts(traitChance: number, seed: number): number {
+    const { queue } = buildSpawnQueue(40, createRng(seed), traitChance);
+    return queue.filter((entry) => !entry.boss && entry.trait !== 'none').length;
+  }
+
+  it('習性機率為 0 時，出怪表和沒有這個參數時一模一樣', () => {
+    const withParam = buildSpawnQueue(40, createRng(7), 0).queue;
+    const without = buildSpawnQueue(40, createRng(7)).queue;
+    expect(withParam).toEqual(without);
+  });
+
+  it('習性機率愈高，帶習性的妖魔愈多', () => {
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    const low = seeds.reduce((sum, seed) => sum + traitCounts(0, seed), 0);
+    const high = seeds.reduce((sum, seed) => sum + traitCounts(0.9, seed), 0);
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it('額外加上去的習性，血量折扣比原生的淺', () => {
+    // 第 1 關的妖魔沒有原生習性，所以這裡看到的一定是加上去的那一批。
+    const plain = buildSpawnQueue(1, createRng(3), 0).queue.filter((entry) => !entry.boss);
+    const hardened = buildSpawnQueue(1, createRng(3), 1).queue.filter((entry) => !entry.boss);
+    const withTrait = hardened.filter((entry) => entry.trait !== 'none');
+    expect(withTrait.length).toBeGreaterThan(0);
+    // 同一顆種子下波次結構相同，只有習性與血量會變。
+    for (const [index, entry] of hardened.entries()) {
+      const base = plain[index];
+      if (base === undefined || entry.trait === 'none') continue;
+      const fullDiscount = base.hp * traitHpRatioOf(entry.trait);
+      expect(entry.hp).toBeGreaterThan(fullDiscount);
+      expect(entry.hp).toBeLessThanOrEqual(base.hp);
+    }
+  });
+
+  function traitHpRatioOf(trait: MobTrait): number {
+    if (trait === 'armor') return BALANCE.trait.armorHpRatio;
+    if (trait === 'swift') return BALANCE.trait.swiftHpRatio;
+    if (trait === 'split') return BALANCE.trait.splitParentHpRatio;
+    return 1;
+  }
+});

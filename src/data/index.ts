@@ -131,6 +131,8 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
     wave: {
       wavesPerStage: p(wave, 'wavesPerStage', 'wave'),
       waveIntervalMs: p(wave, 'waveIntervalMs', 'wave'),
+      endlessStep: p(wave, 'endlessStep', 'wave'),
+      endlessAccelWaves: p(wave, 'endlessAccelWaves', 'wave'),
       waveSpread: p(wave, 'waveSpread', 'wave'),
       minSpawnGapMs: p(wave, 'minSpawnGapMs', 'wave'),
       countBase: p(wave, 'countBase', 'wave'),
@@ -148,6 +150,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       leakCostGrowth: p(wave, 'leakCostGrowth', 'wave'),
     },
     trait: {
+      addedTraitDiscount: p(trait, 'addedTraitDiscount', 'trait'),
       armorPercentOfMaxHp: p(trait, 'armorPercentOfMaxHp', 'trait'),
       armorMaxCut: p(trait, 'armorMaxCut', 'trait'),
       armorHpRatio: p(trait, 'armorHpRatio', 'trait'),

@@ -1,5 +1,5 @@
-import type { RunTelemetry } from '../systems/defense';
-import type { ReplayAction } from '../systems/replay';
+import type { RunTelemetry } from "../systems/defense";
+import type { ReplayAction } from "../systems/replay";
 
 /**
  * 上榜要用的原始資料。
@@ -44,11 +44,18 @@ export interface RunResultData {
    * 失敗原因，勝利時為 null。
    * breached：山門被攻破；timeout：時限內沒斬掉首領；abandon：玩家中途放棄。
    */
-  defeatReason: 'breached' | 'timeout' | 'abandon' | null;
+  defeatReason: "breached" | "timeout" | "abandon" | null;
   /** 這一場的戰績原始數字，結算頁的「戰報」用。 */
   telemetry: RunTelemetry;
   /** 這一場實際打了多久（ms），用來把總傷害換算成每秒。 */
   elapsedMs: number;
+  /**
+   * 無限模式下這一場連下了幾關。不是無限模式時為 null。
+   *
+   * 無限模式沒有「通關」這個結局，一定是打到守不住為止，所以 victory 永遠是 false。
+   * 結算頁要靠這個數字把那一場講成「深入到哪」而不是「又輸了」。
+   */
+  endlessCleared: number | null;
   /** 上榜用的重播資料；不可驗證的一場為 null。 */
   submission: RunSubmission | null;
   /**

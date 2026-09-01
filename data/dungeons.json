@@ -190,7 +190,7 @@
     "repeatable": true,
     "floors": [
       {
-        "stageRatio": 0.95,
+        "stageRatio": 0.85,
         "minStage": 30
       }
     ],

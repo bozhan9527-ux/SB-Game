@@ -1,29 +1,50 @@
-import Phaser from 'phaser';
-import { audio } from '../audio';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { CARDS } from '../data';
-import { recordClear, recordDefeat, recordDungeonRun } from '../save';
-import { dungeonById, grantFloor, nextFloor } from '../systems/dungeons';
-import { detectAchievements } from '../systems/achievements';
-import { track } from '../telemetry';
-import { cloudEnabled } from '../net/client';
-import { MAX_NAME_LENGTH } from '../net/protocol';
-import { percentileLine, refreshDistribution, submitRun } from '../systems/leaderboard';
-import { updateRecords } from '../systems/records';
-import type { RunTelemetry } from '../systems/defense';
+import Phaser from "phaser";
+import { audio } from "../audio";
+import { GAME_HEIGHT, GAME_WIDTH } from "../config";
+import { CARDS } from "../data";
+import { recordClear, recordDefeat, recordDungeonRun } from "../save";
+import { dungeonById, grantFloor, nextFloor } from "../systems/dungeons";
+import { detectAchievements } from "../systems/achievements";
+import { track } from "../telemetry";
+import { cloudEnabled } from "../net/client";
+import { MAX_NAME_LENGTH } from "../net/protocol";
+import {
+  percentileLine,
+  refreshDistribution,
+  submitRun,
+} from "../systems/leaderboard";
+import { updateRecords } from "../systems/records";
+import type { RunTelemetry } from "../systems/defense";
 import {
   averageDps,
   averageFormationBonus,
   damageShares,
   dpsCurve,
-} from '../systems/telemetry';
-import { persist, state } from '../state';
-import { realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
-import { createButton } from '../ui/button';
-import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, hexToNumber, textStyle, wrapText } from '../ui/theme';
-import type { RunResultData } from './types';
-import { fadeIn, fadeToScene } from '../ui/transition';
+} from "../systems/telemetry";
+import { persist, state } from "../state";
+import {
+  realmForStage,
+  realmIndexForStage,
+  realmTitle,
+} from "../systems/realms";
+import { createButton } from "../ui/button";
+import { drawBackdrop } from "../ui/backdrop";
+import {
+  BG_PANEL,
+  DANGER,
+  GOLD,
+  INK,
+  INK_DIM,
+  JADE,
+  LINE,
+  fitText,
+  formatNumber,
+  hexToNumber,
+  textStyle,
+  wrapText,
+} from "../ui/theme";
+import type { RunResultData } from "./types";
+import { fadeIn, fadeToScene } from "../ui/transition";
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
 export class ResultScene extends Phaser.Scene {
@@ -34,7 +55,7 @@ export class ResultScene extends Phaser.Scene {
   private dungeonRewards: string[] = [];
 
   constructor() {
-    super('Result');
+    super("Result");
   }
 
   init(data: RunResultData): void {
@@ -58,7 +79,8 @@ export class ResultScene extends Phaser.Scene {
     stats.totalKills += result.kills;
     if (result.victory && result.leaks === 0) stats.perfectClears += 1;
     const gold = result.goldCollected + result.goldReward;
-    const dungeon = result.dungeon === null ? null : dungeonById(result.dungeon.id);
+    const dungeon =
+      result.dungeon === null ? null : dungeonById(result.dungeon.id);
     // 副本的一場走另一條記帳：給錢、算次數，但不動主線進度。
     if (result.dungeon !== null) recordDungeonRun(save, gold);
     else if (result.victory) recordClear(save, gold);
@@ -71,7 +93,6 @@ export class ResultScene extends Phaser.Scene {
         ? grantFloor(save, dungeon, result.dungeon.floor).lines
         : [];
 
-
     const beaten = updateRecords(save, {
       victory: result.victory,
       stage: result.stage,
@@ -83,7 +104,7 @@ export class ResultScene extends Phaser.Scene {
     });
     // 流失漏斗與難度曲線都靠這一個事件。stage 報的是剛剛打的那一關，
     // 不是存檔已經推進到的下一關。
-    track('stage_end', {
+    track("stage_end", {
       stage: result.stage,
       victory: result.victory,
       reason: result.defeatReason,
@@ -94,7 +115,9 @@ export class ResultScene extends Phaser.Scene {
       merges: result.merges,
       boss_killed: result.bossKilled,
       dps: Math.round(averageDps(result.telemetry, result.elapsedMs)),
-      formation_bonus: Number(averageFormationBonus(result.telemetry).toFixed(3)),
+      formation_bonus: Number(
+        averageFormationBonus(result.telemetry).toFixed(3),
+      ),
     });
 
     // 只判定達成，不入帳——獎勵要玩家自己到仙途錄領。
@@ -107,36 +130,79 @@ export class ResultScene extends Phaser.Scene {
     audio.playMusic(realmIndexForStage(save.world.stage));
     drawBackdrop(this, afterRealm.color, afterRealm.scenery);
 
+    // 無限模式一定是打到守不住為止，victory 永遠是 false——
+    // 但那不是失敗，那就是這個模式的結局。寫「道消」會把玩家最好的一場罵成輸，
+    // 所以改寫深度，顏色也跟著換成金而不是血色。
+    const endless = result.endlessCleared;
+    const title =
+      endless !== null ? "力　盡" : result.victory ? "通　關" : "道　消";
+    const titleColor = endless !== null ? GOLD : result.victory ? JADE : DANGER;
     this.add
-      .text(cx, 168, result.victory ? '通　關' : '道　消', textStyle({ size: 64, color: result.victory ? JADE : DANGER, bold: true }))
+      .text(
+        cx,
+        168,
+        title,
+        textStyle({ size: 64, color: titleColor, bold: true }),
+      )
       .setOrigin(0.5);
 
     this.add
-      .text(cx, 226, wrapText(this.headline(result), GAME_WIDTH - 80, 22), textStyle({ size: 22, color: INK_DIM }))
+      .text(
+        cx,
+        226,
+        wrapText(this.headline(result), GAME_WIDTH - 80, 22),
+        textStyle({ size: 22, color: INK_DIM }),
+      )
       .setOrigin(0.5)
-      .setAlign('center');
+      .setAlign("center");
 
     // 失敗診斷：告訴玩家這場輸在哪、下次該補什麼，而不是只丟一句「道消」。
     if (result.diagnosis !== null) {
       this.add
-        .text(cx, 286, wrapText(result.diagnosis, GAME_WIDTH - 52, 19), textStyle({ size: 19, color: GOLD }))
+        .text(
+          cx,
+          286,
+          wrapText(result.diagnosis, GAME_WIDTH - 52, 19),
+          textStyle({ size: 19, color: GOLD }),
+        )
         .setOrigin(0.5)
-        .setAlign('center')
+        .setAlign("center")
         .setLineSpacing(6);
     }
 
     if (breakthrough) {
-      audio.play('breakthrough');
+      audio.play("breakthrough");
       const banner = this.add
-        .text(cx, 292, `突破！晉入 ${afterRealm.name}`, textStyle({ size: 34, color: afterRealm.color, bold: true }))
+        .text(
+          cx,
+          292,
+          `突破！晉入 ${afterRealm.name}`,
+          textStyle({ size: 34, color: afterRealm.color, bold: true }),
+        )
         .setOrigin(0.5);
-      this.tweens.add({ targets: banner, scale: 1.08, duration: 700, yoyo: true, repeat: -1 });
+      this.tweens.add({
+        targets: banner,
+        scale: 1.08,
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+      });
       this.add
-        .text(cx, 332, afterRealm.subtitle, textStyle({ size: 19, color: INK_DIM }))
+        .text(
+          cx,
+          332,
+          afterRealm.subtitle,
+          textStyle({ size: 19, color: INK_DIM }),
+        )
         .setOrigin(0.5);
     }
 
-    const panelBottom = this.buildPanel(cx, breakthrough ? 520 : 480, result, save.player.wallet.gold);
+    const panelBottom = this.buildPanel(
+      cx,
+      breakthrough ? 520 : 480,
+      result,
+      save.player.wallet.gold,
+    );
 
     // 破紀錄與試煉達成合成一行，寫在結算表**下面**。
     //
@@ -150,7 +216,12 @@ export class ResultScene extends Phaser.Scene {
     ];
     if (highlights.length > 0) {
       const line = this.add
-        .text(cx, panelBottom + 18, highlights.join('　'), textStyle({ size: 16, color: JADE, bold: true }))
+        .text(
+          cx,
+          panelBottom + 18,
+          highlights.join("　"),
+          textStyle({ size: 16, color: JADE, bold: true }),
+        )
         .setOrigin(0.5);
       fitText(line, GAME_WIDTH - 40);
     }
@@ -164,9 +235,11 @@ export class ResultScene extends Phaser.Scene {
         724,
         dungeon === null
           ? `下一關：第 ${save.world.stage} 關 · ${realmTitle(save.world.stage)}`
-          : upcoming === null
-            ? `${dungeon.name} 已全部通過`
-            : `${dungeon.name} 第 ${upcoming} 層`,
+          : dungeon.endless
+            ? `${dungeon.name} · 無限波次`
+            : upcoming === null
+              ? `${dungeon.name} 已全部通過`
+              : `${dungeon.name} 第 ${upcoming} 層`,
         textStyle({ size: 20, color: INK }),
       )
       .setOrigin(0.5);
@@ -176,37 +249,41 @@ export class ResultScene extends Phaser.Scene {
       height: 66,
       label:
         dungeon === null
-          ? (result.victory ? '繼續挑戰' : '再戰一次')
-          : upcoming === null
-            ? '回副本'
-            : `進第 ${upcoming} 層`,
+          ? result.victory
+            ? "繼續挑戰"
+            : "再戰一次"
+          : dungeon.endless
+            ? `再入${dungeon.name}`
+            : upcoming === null
+              ? "回副本"
+              : `進第 ${upcoming} 層`,
       fontSize: 28,
       strokeColor: 0x6f8b7a,
       onClick: () => {
         if (dungeon === null) {
-          fadeToScene(this, 'Run');
+          fadeToScene(this, "Run");
           return;
         }
         if (upcoming === null) {
-          fadeToScene(this, 'Dungeon');
+          fadeToScene(this, "Dungeon");
           return;
         }
-        fadeToScene(this, 'Run', { dungeonId: dungeon.id, floor: upcoming });
+        fadeToScene(this, "Run", { dungeonId: dungeon.id, floor: upcoming });
       },
     });
     createButton(this, cx, 856, {
       width: 340,
       height: 62,
-      label: '洞府 · 提升屬性',
+      label: "洞府 · 提升屬性",
       fontSize: 24,
-      onClick: () => fadeToScene(this, 'Upgrade'),
+      onClick: () => fadeToScene(this, "Upgrade"),
     });
     createButton(this, cx - 92, 926, {
       width: 156,
       height: 52,
-      label: '回主畫面',
+      label: "回主畫面",
       fontSize: 20,
-      onClick: () => fadeToScene(this, 'Title'),
+      onClick: () => fadeToScene(this, "Title"),
     });
     // 戰報放在一層蓋上去的面板裡，不是塞進結算表。
     // 結算表要在兩秒內讀完（守下來沒、拿多少錢、下一關是誰），戰報是給想深究的人看的，
@@ -214,7 +291,7 @@ export class ResultScene extends Phaser.Scene {
     createButton(this, cx + 92, 926, {
       width: 156,
       height: 52,
-      label: '戰報',
+      label: "戰報",
       fontSize: 20,
       onClick: () => this.showReport(),
     });
@@ -222,7 +299,7 @@ export class ResultScene extends Phaser.Scene {
     // 上榜與百分位都在背景做：玩家剛通關，正在看結算表，
     // 此時跳一個「連不上伺服器」只是掃興。成功才寫一行上去。
     this.cloudLine = this.add
-      .text(cx, panelBottom + 42, '', textStyle({ size: 16, color: INK_DIM }))
+      .text(cx, panelBottom + 42, "", textStyle({ size: 16, color: INK_DIM }))
       .setOrigin(0.5);
     void this.syncLeaderboard(result);
 
@@ -242,17 +319,24 @@ export class ResultScene extends Phaser.Scene {
     if (result.victory && result.submission !== null) {
       // 第一次上榜才問名字。每次都問很煩，而且他多半只想看結算表。
       if (save.player.name.length === 0) {
-        const typed = window.prompt('上榜要用什麼名字？（之後可以在「存檔」改）', '無名修士');
+        const typed = window.prompt(
+          "上榜要用什麼名字？（之後可以在「存檔」改）",
+          "無名修士",
+        );
         if (typed !== null) {
           save.player.name = typed.slice(0, MAX_NAME_LENGTH);
           persist();
         }
       }
       const outcome = await submitRun(save, result.stage, result.submission);
-      if (outcome.kind === 'ok') {
+      if (outcome.kind === "ok") {
         persist();
-        this.cloudLine?.setText(`榜上第 ${outcome.rank} 名${outcome.best ? '（新猷）' : ''}`).setColor(GOLD);
-      } else if (outcome.kind === 'failed') {
+        this.cloudLine
+          ?.setText(
+            `榜上第 ${outcome.rank} 名${outcome.best ? "（新猷）" : ""}`,
+          )
+          .setColor(GOLD);
+      } else if (outcome.kind === "failed") {
         this.cloudLine?.setText(outcome.reason).setColor(INK_DIM);
       }
     }
@@ -260,7 +344,8 @@ export class ResultScene extends Phaser.Scene {
     if (await refreshDistribution(save, Date.now())) persist();
     const line = percentileLine(save, result.stage);
     // 百分位比名次更值得佔那一行：名次只有前幾名的人在乎，百分位人人都有。
-    if (line !== null && result.victory) this.cloudLine?.setText(line).setColor(JADE);
+    if (line !== null && result.victory)
+      this.cloudLine?.setText(line).setColor(JADE);
   }
 
   /**
@@ -270,7 +355,9 @@ export class ResultScene extends Phaser.Scene {
    * 疊起來會把整張結算表蓋掉——這正是玩家最想看清楚的畫面。
    * 位置固定在標題上方的空白帶，任何數量都不會蓋到下面的內容。
    */
-  private showAchievements(unlocked: readonly { name: string; desc: string; reward: number }[]): void {
+  private showAchievements(
+    unlocked: readonly { name: string; desc: string; reward: number }[],
+  ): void {
     const cx = GAME_WIDTH / 2;
     const y = 66;
     const panel = this.add
@@ -279,12 +366,12 @@ export class ResultScene extends Phaser.Scene {
       .setDepth(90)
       .setAlpha(0);
     const label = this.add
-      .text(cx, y - 11, '', textStyle({ size: 21, color: GOLD, bold: true }))
+      .text(cx, y - 11, "", textStyle({ size: 21, color: GOLD, bold: true }))
       .setOrigin(0.5)
       .setDepth(91)
       .setAlpha(0);
     const sub = this.add
-      .text(cx, y + 14, '', textStyle({ size: 15, color: INK_DIM }))
+      .text(cx, y + 14, "", textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(0.5)
       .setDepth(91)
       .setAlpha(0);
@@ -298,7 +385,8 @@ export class ResultScene extends Phaser.Scene {
         return;
       }
       // 多條時標上序號，玩家才知道還有幾條在後面，而不是以為只有最後那一條。
-      const counter = unlocked.length > 1 ? `（${index + 1}/${unlocked.length}）` : '';
+      const counter =
+        unlocked.length > 1 ? `（${index + 1}/${unlocked.length}）` : "";
       label.setText(`成就達成　${item.name}${counter}`);
       sub.setText(`${item.desc}　獎勵 ${formatNumber(item.reward)} 金`);
       fitText(label, GAME_WIDTH - 80);
@@ -321,37 +409,93 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private headline(result: RunResultData): string {
+    if (result.endlessCleared !== null) {
+      return result.endlessCleared === 0
+        ? `第 ${result.stage} 關就沒能守住，這一趟連一關都沒過`
+        : `連下 ${result.endlessCleared} 關，止步於第 ${result.stage} 關`;
+    }
     if (result.victory) {
       return result.leaks === 0
         ? `${result.bossName} 伏誅，一隻妖魔都沒能踏進山門`
         : `斬殺 ${result.bossName}，山門尚存 ${formatNumber(result.survivors)}`;
     }
-    if (result.defeatReason === 'abandon') return '半途收兵，來日再戰';
-    if (result.defeatReason === 'timeout') return `久攻不下，${result.bossName} 始終未死`;
-    if (!result.bossKilled && result.bossFought) return `${result.bossName} 砸開了山門`;
+    if (result.defeatReason === "abandon") return "半途收兵，來日再戰";
+    if (result.defeatReason === "timeout")
+      return `久攻不下，${result.bossName} 始終未死`;
+    if (!result.bossKilled && result.bossFought)
+      return `${result.bossName} 砸開了山門`;
     return `妖魔攻破山門，${formatNumber(result.leaks)} 隻踏了進來`;
   }
 
   /** 回傳面板底緣的 y，讓上層知道下一行可以從哪裡開始寫。 */
-  private buildPanel(cx: number, cy: number, result: RunResultData, totalGold: number): number {
+  private buildPanel(
+    cx: number,
+    cy: number,
+    result: RunResultData,
+    totalGold: number,
+  ): number {
     const width = GAME_WIDTH - 64;
     const rows: [string, string, string][] = [
-      ['山門殘存', `${formatNumber(result.survivors)} / ${formatNumber(result.maxDisciples)}`, INK],
-      ['斬殺妖魔', `${formatNumber(result.kills)} 隻（漏 ${formatNumber(result.leaks)}）`, INK],
-      ['關底首領', result.bossKilled ? '已斬' : result.bossFought ? '未斬' : '未見', result.bossKilled ? JADE : DANGER],
-      ['最高法寶', `${result.peakTier} 階（合成 ${result.merges} 次）`, INK],
-      ['途中拾取', `${formatNumber(result.goldCollected)} 金`, GOLD],
-      [result.victory ? '通關獎勵' : '殘存所得', `${formatNumber(result.goldReward)} 金`, GOLD],
-      ['金幣總計', formatNumber(totalGold), GOLD],
+      [
+        "山門殘存",
+        `${formatNumber(result.survivors)} / ${formatNumber(result.maxDisciples)}`,
+        INK,
+      ],
+      [
+        "斬殺妖魔",
+        `${formatNumber(result.kills)} 隻（漏 ${formatNumber(result.leaks)}）`,
+        INK,
+      ],
+      [
+        "關底首領",
+        result.bossKilled ? "已斬" : result.bossFought ? "未斬" : "未見",
+        result.bossKilled ? JADE : DANGER,
+      ],
+      ["最高法寶", `${result.peakTier} 階（合成 ${result.merges} 次）`, INK],
+      ["途中拾取", `${formatNumber(result.goldCollected)} 金`, GOLD],
+      [
+        result.victory ? "通關獎勵" : "殘存所得",
+        `${formatNumber(result.goldReward)} 金`,
+        GOLD,
+      ],
     ];
+    // 無限模式的重點是深度，所以把它插在最上面——第一行就是這一趟的成績。
+    if (result.endlessCleared !== null) {
+      rows.unshift([
+        "連下關數",
+        `${formatNumber(result.endlessCleared)} 關`,
+        JADE,
+      ]);
+    }
+    rows.push(
+      ...([["金幣總計", formatNumber(totalGold), GOLD]] as [
+        string,
+        string,
+        string,
+      ][]),
+    );
     const height = rows.length * 40 + 24;
 
-    this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(2, LINE);
+    this.add
+      .rectangle(cx, cy, width, height, BG_PANEL, 0.9)
+      .setStrokeStyle(2, LINE);
     rows.forEach((row, index) => {
       const y = cy - height / 2 + 32 + index * 40;
-      this.add.text(cx - width / 2 + 24, y, row[0], textStyle({ size: 22, color: INK_DIM })).setOrigin(0, 0.5);
       this.add
-        .text(cx + width / 2 - 24, y, row[1], textStyle({ size: 24, color: row[2], bold: true }))
+        .text(
+          cx - width / 2 + 24,
+          y,
+          row[0],
+          textStyle({ size: 22, color: INK_DIM }),
+        )
+        .setOrigin(0, 0.5);
+      this.add
+        .text(
+          cx + width / 2 - 24,
+          y,
+          row[1],
+          textStyle({ size: 24, color: row[2], bold: true }),
+        )
         .setOrigin(1, 0.5);
     });
     return cy + height / 2;
@@ -378,10 +522,26 @@ export class ResultScene extends Phaser.Scene {
     parts.push(
       // 幾乎不透明：戰報是一張要逐行讀的表，底下的結算數字透上來會直接讓它讀不動。
       // setInteractive 用來吃掉輸入，否則會點到底下的按鈕。
-      this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0b0f14, 0.985).setInteractive(),
+      this.add
+        .rectangle(
+          cx,
+          GAME_HEIGHT / 2,
+          GAME_WIDTH,
+          GAME_HEIGHT,
+          0x0b0f14,
+          0.985,
+        )
+        .setInteractive(),
     );
     parts.push(
-      this.add.text(cx, 70, '戰　報', textStyle({ size: 38, color: GOLD, bold: true })).setOrigin(0.5),
+      this.add
+        .text(
+          cx,
+          70,
+          "戰　報",
+          textStyle({ size: 38, color: GOLD, bold: true }),
+        )
+        .setOrigin(0.5),
     );
     parts.push(
       this.add
@@ -402,7 +562,7 @@ export class ResultScene extends Phaser.Scene {
     const close = createButton(this, cx, 880, {
       width: 300,
       height: 64,
-      label: '關閉',
+      label: "關閉",
       fontSize: 24,
       onClick: () => this.report?.setVisible(false),
     });
@@ -424,11 +584,21 @@ export class ResultScene extends Phaser.Scene {
     const shares = damageShares(telemetry);
 
     parts.push(
-      this.add.text(left, top, '符籙貢獻', textStyle({ size: 20, color: INK, bold: true })),
+      this.add.text(
+        left,
+        top,
+        "符籙貢獻",
+        textStyle({ size: 20, color: INK, bold: true }),
+      ),
     );
     if (shares.length === 0) {
       parts.push(
-        this.add.text(left, top + 34, '這一場一發都沒打出去', textStyle({ size: 17, color: INK_DIM })),
+        this.add.text(
+          left,
+          top + 34,
+          "這一場一發都沒打出去",
+          textStyle({ size: 17, color: INK_DIM }),
+        ),
       );
       return parts;
     }
@@ -439,7 +609,12 @@ export class ResultScene extends Phaser.Scene {
       const def = CARDS.find((card) => card.id === entry.type);
       const color = def?.color ?? INK;
       parts.push(
-        this.add.text(left, y, def?.name ?? entry.type, textStyle({ size: 18, color, bold: true })),
+        this.add.text(
+          left,
+          y,
+          def?.name ?? entry.type,
+          textStyle({ size: 18, color, bold: true }),
+        ),
       );
       parts.push(
         this.add
@@ -453,10 +628,21 @@ export class ResultScene extends Phaser.Scene {
       );
       // 條長按「相對第一名」而不是「佔總量」：後者在四張符平均出力時全部擠成一團短棒，
       // 前者一眼就看得出第二名差第一名多少——那才是換牌時要判斷的事。
-      parts.push(this.add.rectangle(left, y + 30, width, 10, LINE, 0.35).setOrigin(0, 0.5));
       parts.push(
         this.add
-          .rectangle(left, y + 30, Math.max(2, width * (entry.damage / best)), 10, hexToNumber(color), 0.95)
+          .rectangle(left, y + 30, width, 10, LINE, 0.35)
+          .setOrigin(0, 0.5),
+      );
+      parts.push(
+        this.add
+          .rectangle(
+            left,
+            y + 30,
+            Math.max(2, width * (entry.damage / best)),
+            10,
+            hexToNumber(color),
+            0.95,
+          )
           .setOrigin(0, 0.5),
       );
     });
@@ -472,7 +658,12 @@ export class ResultScene extends Phaser.Scene {
     const left = cx - width / 2;
     const bonus = averageFormationBonus(telemetry);
     return [
-      this.add.text(left, top, '陣法', textStyle({ size: 20, color: INK, bold: true })),
+      this.add.text(
+        left,
+        top,
+        "陣法",
+        textStyle({ size: 20, color: INK, bold: true }),
+      ),
       this.add.text(
         left,
         top + 30,
@@ -492,19 +683,31 @@ export class ResultScene extends Phaser.Scene {
     const height = 190;
     const left = cx - width / 2;
     const parts: Phaser.GameObjects.GameObject[] = [
-      this.add.text(left, top, '輸出曲線', textStyle({ size: 20, color: INK, bold: true })),
+      this.add.text(
+        left,
+        top,
+        "輸出曲線",
+        textStyle({ size: 20, color: INK, bold: true }),
+      ),
     ];
 
     const curve = dpsCurve(telemetry);
     const peak = curve.reduce((max, value) => Math.max(max, value), 0);
     const chartTop = top + 34;
     parts.push(
-      this.add.rectangle(cx, chartTop + height / 2, width, height, BG_PANEL, 0.7).setStrokeStyle(2, LINE),
+      this.add
+        .rectangle(cx, chartTop + height / 2, width, height, BG_PANEL, 0.7)
+        .setStrokeStyle(2, LINE),
     );
     if (curve.length < 2 || peak <= 0) {
       parts.push(
         this.add
-          .text(cx, chartTop + height / 2, '資料不足', textStyle({ size: 17, color: INK_DIM }))
+          .text(
+            cx,
+            chartTop + height / 2,
+            "資料不足",
+            textStyle({ size: 17, color: INK_DIM }),
+          )
           .setOrigin(0.5),
       );
       return parts;
@@ -512,33 +715,53 @@ export class ResultScene extends Phaser.Scene {
 
     const g = this.add.graphics();
     const xAt = (i: number): number => left + (width * i) / (curve.length - 1);
-    const yAt = (v: number): number => chartTop + height - (height - 16) * (v / peak) - 8;
+    const yAt = (v: number): number =>
+      chartTop + height - (height - 16) * (v / peak) - 8;
     g.fillStyle(hexToNumber(GOLD), 0.16);
     g.beginPath();
     g.moveTo(left, chartTop + height);
-    for (let i = 0; i < curve.length; i += 1) g.lineTo(xAt(i), yAt(curve[i] ?? 0));
+    for (let i = 0; i < curve.length; i += 1)
+      g.lineTo(xAt(i), yAt(curve[i] ?? 0));
     g.lineTo(left + width, chartTop + height);
     g.closePath();
     g.fillPath();
     g.lineStyle(2, hexToNumber(GOLD), 0.95);
     g.beginPath();
     g.moveTo(xAt(0), yAt(curve[0] ?? 0));
-    for (let i = 1; i < curve.length; i += 1) g.lineTo(xAt(i), yAt(curve[i] ?? 0));
+    for (let i = 1; i < curve.length; i += 1)
+      g.lineTo(xAt(i), yAt(curve[i] ?? 0));
     g.strokePath();
     parts.push(g);
 
     parts.push(
       this.add
-        .text(left + 8, chartTop + 6, `峰值 ${formatNumber(peak)} / 秒`, textStyle({ size: 15, color: GOLD }))
+        .text(
+          left + 8,
+          chartTop + 6,
+          `峰值 ${formatNumber(peak)} / 秒`,
+          textStyle({ size: 15, color: GOLD }),
+        )
         .setOrigin(0, 0),
     );
     parts.push(
       this.add
-        .text(left + width - 8, chartTop + height - 6, '關底', textStyle({ size: 14, color: INK_DIM }))
+        .text(
+          left + width - 8,
+          chartTop + height - 6,
+          "關底",
+          textStyle({ size: 14, color: INK_DIM }),
+        )
         .setOrigin(1, 1),
     );
     parts.push(
-      this.add.text(left + 8, chartTop + height - 6, '開場', textStyle({ size: 14, color: INK_DIM })).setOrigin(0, 1),
+      this.add
+        .text(
+          left + 8,
+          chartTop + height - 6,
+          "開場",
+          textStyle({ size: 14, color: INK_DIM }),
+        )
+        .setOrigin(0, 1),
     );
     return parts;
   }

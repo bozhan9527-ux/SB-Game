@@ -193,6 +193,47 @@ describe('副本的結構', () => {
     expect(clearedFloors(save, 'pagoda')).toBe(1);
   });
 
+  it('聚寶洞是無限的：打完一波直接接下一波，深度往上跳', () => {
+    const save = saveAt();
+    const spec = dungeonSpecOf(save, dungeon('trove'), 1);
+    expect(spec.endless).toBe(true);
+    const state = createDefenseState(buildLoadoutFromSpec(spec), createRng(5));
+    const startStage = state.stage;
+    const startGold = state.gold;
+    // 直接把這一波打完：清空排程與場上，再讓 tickCombat 判定一次。
+    state.queue = [];
+    state.enemies = [];
+    state.bossKilled = true;
+    tickCombat(state, 16, createRng(5));
+    // 沒有結束，而是接上了下一波。
+    expect(state.outcome).toBe('running');
+    expect(state.clearedStages).toBe(1);
+    expect(state.stage).toBeGreaterThan(startStage);
+    expect(state.threat).toBeGreaterThan(startStage);
+    // 通關獎勵照發，而且新的一波真的排了怪。
+    expect(state.gold).toBeGreaterThan(startGold);
+    expect(state.queue.length).toBeGreaterThan(0);
+    expect(state.bossKilled).toBe(false);
+    // 新的一波從現在起算，HUD 的波次進度才不會一開始就滿格。
+    expect(state.stageStartMs).toBeGreaterThanOrEqual(state.elapsedMs);
+    expect(Math.min(...state.queue.map((entry) => entry.atMs))).toBeGreaterThanOrEqual(
+      state.stageStartMs,
+    );
+  });
+
+  it('有終點的副本打完就是打完，不會自己接下一關', () => {
+    const save = saveAt();
+    const spec = dungeonSpecOf(save, dungeon('pagoda'), 1);
+    expect(spec.endless).toBeFalsy();
+    const state = createDefenseState(buildLoadoutFromSpec(spec), createRng(5));
+    state.queue = [];
+    state.enemies = [];
+    state.bossKilled = true;
+    tickCombat(state, 16, createRng(5));
+    expect(state.outcome).toBe('cleared');
+    expect(state.clearedStages).toBe(0);
+  });
+
   it('副本走的是同一個組裝函式，規則與倍率都在裡面', () => {
     const save = saveAt();
     const spec = dungeonSpecOf(save, dungeon('trove'), 1);

@@ -59,6 +59,12 @@ export interface Loadout {
    * 純粹調高血量會直接卡死輸出最低的那一副牌組。
    */
   traitChance: number;
+  /**
+   * 無限模式：打完一關直接接下一關，沒有終點，直到守不住為止。
+   *
+   * 這種一場不談「通關」——它的成績是「走了多深」。
+   */
+  endless: boolean;
   /** 山門耐久：妖魔攻進山門就扣，歸零即失守。 */
   disciples: number;
   /** 所有法寶的傷害倍率（門派 × 淬鍊功法）。 */
@@ -136,6 +142,8 @@ export interface LoadoutSpec {
   bankedStage: number;
   /** 轉世次數。決定妖魔長出習性的機率。 */
   rebirths: number;
+  /** 無限模式。一般關卡與有終點的副本都是 false。 */
+  endless?: boolean;
 }
 
 /**
@@ -208,6 +216,7 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
     traitChanceMax,
     Math.max(0, Math.floor(spec.rebirths)) * traitChancePerLife,
   );
+  loadout.endless = spec.endless === true;
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   return loadout;
 }
@@ -266,6 +275,7 @@ export function buildLoadoutFor(
     // 平衡模擬與測試大多走這條路。
     threat: stage,
     traitChance: 0,
+    endless: false,
     disciples: Math.max(
       1,
       Math.round(

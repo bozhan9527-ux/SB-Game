@@ -112,6 +112,8 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   // 確認——和升級等級同一類的結構性限制，見 README。
   const banked = Number(record['bankedStage'] ?? 0);
   const lives = Number(record['rebirths'] ?? 0);
+  // endless 刻意不收：無限模式只存在於聚寶洞，而副本的一場本來就不上榜。
+  // 這裡不讀它，重播出來的世界就一定是有終點的那一種。
 
   return {
     sectId,

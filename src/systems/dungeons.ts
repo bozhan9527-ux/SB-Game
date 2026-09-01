@@ -127,6 +127,7 @@ export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number
     ...loadoutSpecOf(save, stage),
     rules: [...dungeon.rules],
     goldMultiplier: dungeon.goldMultiplier,
+    endless: dungeon.endless,
   };
 }
 

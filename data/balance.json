@@ -29,6 +29,8 @@
   "wave": {
     "wavesPerStage": 5,
     "waveIntervalMs": 9000,
+    "endlessStep": 3,
+    "endlessAccelWaves": 3,
     "waveSpread": 0.85,
     "minSpawnGapMs": 700,
     "countBase": 3,
@@ -54,6 +56,7 @@
     "traitChanceMax": 0.9
   },
   "trait": {
+    "addedTraitDiscount": 0.5,
     "armorPercentOfMaxHp": 0.02,
     "armorMaxCut": 0.5,
     "armorHpRatio": 0.62,

@@ -8,16 +8,22 @@
  * 天雷符一擊 40 點打在 20 血的小妖身上會浪費一半，風刃符則幾乎不浪費——
  * 四種符的取捨因此是從規則長出來的，不是寫死在說明文字裡。
  */
-import { BALANCE, ENEMIES } from '../data';
-import type { BossArt, BossDef, MobArt, MobTrait } from '../data/types';
-import type { Card } from './deck';
-import { cardDamage, cardDef, cardInterval, drawCard, maxTierForStage } from './deck';
-import type { SlotBonus } from './board';
-import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from './board';
-import { activeFormations } from './formation';
-import type { Loadout } from './loadout';
-import { realmForStage, realmIndexForStage } from './realms';
-import type { Rng } from './rng';
+import { BALANCE, ENEMIES } from "../data";
+import type { BossArt, BossDef, MobArt, MobTrait } from "../data/types";
+import type { Card } from "./deck";
+import {
+  cardDamage,
+  cardDef,
+  cardInterval,
+  drawCard,
+  maxTierForStage,
+} from "./deck";
+import type { SlotBonus } from "./board";
+import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from "./board";
+import { activeFormations } from "./formation";
+import type { Loadout } from "./loadout";
+import { realmForStage, realmIndexForStage } from "./realms";
+import type { Rng } from "./rng";
 
 export interface ActiveEnemy {
   id: number;
@@ -59,11 +65,20 @@ interface SpawnEntry {
   trait: MobTrait;
 }
 
-export type Outcome = 'running' | 'cleared' | 'defeated' | 'timeout';
+export type Outcome = "running" | "cleared" | "defeated" | "timeout";
 
 export interface DefenseState {
   loadout: Loadout;
   stage: number;
+  /** 無限模式下，這一場已經打完幾關。有終點的一場永遠是 0。 */
+  clearedStages: number;
+  /**
+   * 目前這一波是從整場的第幾毫秒開始的。
+   *
+   * 無限模式一場會連著打很多波，而 HUD 的波次與進度條算的是「這一波打到哪」。
+   * 沒有這個偏移的話，第二波開始進度條就永遠是滿的。
+   */
+  stageStartMs: number;
   /**
    * 妖魔強度、階數上限與金幣看的關卡數。
    *
@@ -189,7 +204,9 @@ export function waveCount(stage: number, wave: number): number {
   return Math.round(
     Math.min(
       cfg.countMax,
-      cfg.countBase + cfg.countPerWave * (wave - 1) + cfg.countPerRealm * realmIndexForStage(stage),
+      cfg.countBase +
+        cfg.countPerWave * (wave - 1) +
+        cfg.countPerRealm * realmIndexForStage(stage),
     ),
   );
 }
@@ -197,12 +214,19 @@ export function waveCount(stage: number, wave: number): number {
 /** 第 w 波每隻妖魔的血量。 */
 export function waveHp(stage: number, wave: number): number {
   const { wave: cfg } = BALANCE;
-  return cfg.hpBase * Math.pow(cfg.hpGrowth, stage - 1) * (1 + cfg.hpPerWave * (wave - 1));
+  return (
+    cfg.hpBase *
+    Math.pow(cfg.hpGrowth, stage - 1) *
+    (1 + cfg.hpPerWave * (wave - 1))
+  );
 }
 
 export function mobSpeed(stage: number): number {
   const { wave: cfg } = BALANCE;
-  return Math.min(cfg.speedMax, cfg.speedBase + cfg.speedPerStage * (stage - 1));
+  return Math.min(
+    cfg.speedMax,
+    cfg.speedBase + cfg.speedPerStage * (stage - 1),
+  );
 }
 
 /** 一隻妖魔攻進山門的代價。隨關卡成長，讓「堆耐久」不會變成唯一解。 */
@@ -224,13 +248,17 @@ export function bossHp(stage: number): number {
 export function killGold(state: DefenseState, boss: boolean): number {
   const { gold } = BALANCE;
   const base = gold.killBase * Math.pow(gold.killGrowth, state.threat - 1);
-  return base * (boss ? BALANCE.boss.goldBonus : 1) * state.loadout.goldMultiplier;
+  return (
+    base * (boss ? BALANCE.boss.goldBonus : 1) * state.loadout.goldMultiplier
+  );
 }
 
 export function clearReward(state: DefenseState): number {
   const { gold } = BALANCE;
   return Math.round(
-    gold.clearBase * Math.pow(gold.clearGrowth, state.threat - 1) * state.loadout.goldMultiplier,
+    gold.clearBase *
+      Math.pow(gold.clearGrowth, state.threat - 1) *
+      state.loadout.goldMultiplier,
   );
 }
 
@@ -238,8 +266,19 @@ export function defeatReward(state: DefenseState): number {
   return Math.round(clearReward(state) * BALANCE.gold.defeatRatio);
 }
 
-/** 整關的出怪排程，含關底首領。給定種子完全可重現。 */
-export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[]; boss: BossDef } {
+/**
+ * 整關的出怪排程，含關底首領。給定種子完全可重現。
+ *
+ * traitChance 是「本來沒有習性的那一波，被額外塞一種習性」的機率。
+ * 這是轉世之後世界變硬的主要手段：同樣的關卡編號，第三世遇到的護甲、
+ * 疾行與分裂會明顯變多，而每一種習性都自帶血量折扣（見 traitHpRatio），
+ * 所以變的是**要怎麼打**，不是數字直接加大。
+ */
+export function buildSpawnQueue(
+  stage: number,
+  rng: Rng,
+  traitChance = 0,
+): { queue: SpawnEntry[]; boss: BossDef } {
   const { wave: cfg } = BALANCE;
   const realm = realmForStage(stage);
   const mobs = ENEMIES.mobs.filter((mob) => mob.realm === realm.id);
@@ -256,18 +295,30 @@ export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[];
     // 同一波用同一種妖魔，畫面上才看得出「這一波是狼群」而不是雜燴。
     const mob = mobs[rng.int(0, Math.max(0, mobs.length - 1))];
     // 攤開整波的出場時間，妖魔才是連續推進而不是一次湧出後空場。
-    const gap = Math.max(cfg.minSpawnGapMs, (cfg.waveIntervalMs * cfg.waveSpread) / count);
+    const gap = Math.max(
+      cfg.minSpawnGapMs,
+      (cfg.waveIntervalMs * cfg.waveSpread) / count,
+    );
+    // 習性照整波擲一次，不是照隻擲：一波要嘛是「披甲的狼群」要嘛不是。
+    // 一隻一隻擲會變成同一波裡三種習性混雜，玩家讀不出這一波該怎麼應對。
+    const baseTrait = mob?.trait ?? "none";
+    const trait = rollTrait(baseTrait, traitChance, rng);
+    // 原生習性的血量折扣給滿，轉世加上去的只給一部分——見 addedTraitDiscount。
+    const hpRatio =
+      trait === baseTrait
+        ? traitHpRatio(trait)
+        : 1 + (traitHpRatio(trait) - 1) * BALANCE.trait.addedTraitDiscount;
     for (let i = 0; i < count; i += 1) {
-      const trait = mob?.trait ?? 'none';
       queue.push({
         atMs: (wave - 1) * cfg.waveIntervalMs + i * gap,
         lane: rng.int(0, LANES - 1),
-        name: mob?.name ?? '無名之敵',
-        art: mob?.art ?? 'bandit',
+        name: mob?.name ?? "無名之敵",
+        art: mob?.art ?? "bandit",
         bossArt: null,
         boss: false,
-        hp: hp * traitHpRatio(trait),
-        speed: trait === 'swift' ? speed * BALANCE.trait.swiftMultiplier : speed,
+        hp: hp * hpRatio,
+        speed:
+          trait === "swift" ? speed * BALANCE.trait.swiftMultiplier : speed,
         trait,
       });
     }
@@ -277,17 +328,32 @@ export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[];
     atMs: cfg.wavesPerStage * cfg.waveIntervalMs,
     lane: Math.floor(LANES / 2),
     name: boss.name,
-    art: 'demon',
+    art: "demon",
     bossArt: boss.art,
     boss: true,
     hp: bossHp(stage),
     speed: BALANCE.boss.speed,
     // 首領不帶習性：牠已經有厚血、砸門與時限三件事，再加一層只會變得看不懂。
-    trait: 'none',
+    trait: "none",
   });
 
   queue.sort((a, b) => a.atMs - b.atMs);
   return { queue, boss };
+}
+
+/** 額外習性的候選。首領不在此列，牠本來就不帶習性。 */
+const EXTRA_TRAITS: readonly MobTrait[] = ["armor", "swift", "split"];
+
+/**
+ * 這一波要不要被塞一種額外習性。
+ *
+ * 只加在本來素面的妖魔上：資料裡已經指定習性的妖魔（例如天生會分裂的）
+ * 保持原樣，否則轉世幾次之後所有妖魔都會被覆蓋成同一種，反而變單調。
+ */
+function rollTrait(base: MobTrait, chance: number, rng: Rng): MobTrait {
+  if (base !== "none" || chance <= 0) return base;
+  if (rng.next() >= chance) return "none";
+  return EXTRA_TRAITS[rng.int(0, EXTRA_TRAITS.length - 1)] ?? "none";
 }
 
 /**
@@ -300,9 +366,9 @@ export function buildSpawnQueue(stage: number, rng: Rng): { queue: SpawnEntry[];
  */
 function traitHpRatio(trait: MobTrait): number {
   const cfg = BALANCE.trait;
-  if (trait === 'armor') return cfg.armorHpRatio;
-  if (trait === 'swift') return cfg.swiftHpRatio;
-  if (trait === 'split') return cfg.splitParentHpRatio;
+  if (trait === "armor") return cfg.armorHpRatio;
+  if (trait === "swift") return cfg.swiftHpRatio;
+  if (trait === "split") return cfg.splitParentHpRatio;
   return 1;
 }
 
@@ -312,11 +378,19 @@ export const LANES = 5;
 export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
   const { field } = BALANCE;
   // 妖魔、階數上限與金幣全部看威脅度：飛升境每轉一世世界就更硬。
-  const { queue, boss } = buildSpawnQueue(loadout.threat, rng);
+  const { queue, boss } = buildSpawnQueue(
+    loadout.threat,
+    rng,
+    loadout.traitChance,
+  );
 
-  const hand: (Card | null)[] = new Array<Card | null>(field.handSlots).fill(null);
+  const hand: (Card | null)[] = new Array<Card | null>(field.handSlots).fill(
+    null,
+  );
   // 場上格位數受「陣法擴充」影響，因此看 loadout 而不是直接看 balance。
-  const slots: (Card | null)[] = new Array<Card | null>(loadout.fieldSlots).fill(null);
+  const slots: (Card | null)[] = new Array<Card | null>(
+    loadout.fieldSlots,
+  ).fill(null);
   for (let i = 0; i < field.startingField && i < slots.length; i += 1) {
     slots[i] = drawCard(loadout, loadout.threat, rng);
   }
@@ -328,6 +402,8 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     loadout,
     stage: loadout.stage,
     threat: loadout.threat,
+    clearedStages: 0,
+    stageStartMs: 0,
     disciples: loadout.disciples,
     maxDisciples: loadout.disciples,
     gold: 0,
@@ -350,7 +426,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     kills: 0,
     merges: 0,
     peakTier: 0,
-    outcome: 'running',
+    outcome: "running",
     telemetry: {
       damageByType: {},
       damagePerSecond: [],
@@ -365,8 +441,10 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
 
 export function highestTier(state: DefenseState): number {
   let best = 0;
-  for (const card of state.field) if (card !== null) best = Math.max(best, card.tier);
-  for (const card of state.hand) if (card !== null) best = Math.max(best, card.tier);
+  for (const card of state.field)
+    if (card !== null) best = Math.max(best, card.tier);
+  for (const card of state.hand)
+    if (card !== null) best = Math.max(best, card.tier);
   return best;
 }
 
@@ -375,12 +453,12 @@ export function highestTier(state: DefenseState): number {
 // ---------------------------------------------------------------- 玩家操作
 
 export interface CardSlot {
-  where: 'hand' | 'field';
+  where: "hand" | "field";
   index: number;
 }
 
-function listOf(state: DefenseState, where: 'hand' | 'field'): (Card | null)[] {
-  return where === 'hand' ? state.hand : state.field;
+function listOf(state: DefenseState, where: "hand" | "field"): (Card | null)[] {
+  return where === "hand" ? state.hand : state.field;
 }
 
 export function cardAt(state: DefenseState, slot: CardSlot): Card | null {
@@ -391,7 +469,7 @@ function place(state: DefenseState, slot: CardSlot, card: Card | null): void {
   listOf(state, slot.where)[slot.index] = card;
   // 換符就重置這一格的出手倒數與連射累積：累積屬於「那一張符一直在打」，
   // 不屬於格子本身，否則把太乙符搬進一個熱格會直接繼承別人的成果。
-  if (slot.where === 'field') {
+  if (slot.where === "field") {
     state.cooldowns[slot.index] = 0;
     state.ramps[slot.index] = 0;
   }
@@ -399,7 +477,11 @@ function place(state: DefenseState, slot: CardSlot, card: Card | null): void {
 }
 
 /** 把一張符搬到空的格位（手牌↔場上都行）。 */
-export function moveCard(state: DefenseState, from: CardSlot, to: CardSlot): boolean {
+export function moveCard(
+  state: DefenseState,
+  from: CardSlot,
+  to: CardSlot,
+): boolean {
   const card = cardAt(state, from);
   if (card === null || cardAt(state, to) !== null) return false;
   place(state, to, card);
@@ -408,7 +490,11 @@ export function moveCard(state: DefenseState, from: CardSlot, to: CardSlot): boo
 }
 
 /** 兩個格位互換內容。至少一邊有符才有意義。 */
-export function swapSlots(state: DefenseState, a: CardSlot, b: CardSlot): boolean {
+export function swapSlots(
+  state: DefenseState,
+  a: CardSlot,
+  b: CardSlot,
+): boolean {
   if (a.where === b.where && a.index === b.index) return false;
   const cardA = cardAt(state, a);
   const cardB = cardAt(state, b);
@@ -419,15 +505,27 @@ export function swapSlots(state: DefenseState, a: CardSlot, b: CardSlot): boolea
 }
 
 /** 把手牌的一張符放到空的場上格位。 */
-export function deployCard(state: DefenseState, handIndex: number, fieldIndex: number): boolean {
-  return moveCard(state, { where: 'hand', index: handIndex }, { where: 'field', index: fieldIndex });
+export function deployCard(
+  state: DefenseState,
+  handIndex: number,
+  fieldIndex: number,
+): boolean {
+  return moveCard(
+    state,
+    { where: "hand", index: handIndex },
+    { where: "field", index: fieldIndex },
+  );
 }
 
 /** 把場上的一張符收回手牌（手牌有空位才行），用來重新編排陣位。 */
 export function recallCard(state: DefenseState, fieldIndex: number): boolean {
   const slot = state.hand.indexOf(null);
   if (slot < 0) return false;
-  return moveCard(state, { where: 'field', index: fieldIndex }, { where: 'hand', index: slot });
+  return moveCard(
+    state,
+    { where: "field", index: fieldIndex },
+    { where: "hand", index: slot },
+  );
 }
 
 /**
@@ -436,8 +534,16 @@ export function recallCard(state: DefenseState, fieldIndex: number): boolean {
  * 沒有這個動作的話會出現死局：場上格位都被別種符佔滿、手上一直抽到合不了的符，
  * 玩家除了看著抽到的符流失之外什麼都不能做。互換讓「換掉最弱的那一張」永遠是選項。
  */
-export function swapCards(state: DefenseState, handIndex: number, fieldIndex: number): boolean {
-  return swapSlots(state, { where: 'hand', index: handIndex }, { where: 'field', index: fieldIndex });
+export function swapCards(
+  state: DefenseState,
+  handIndex: number,
+  fieldIndex: number,
+): boolean {
+  return swapSlots(
+    state,
+    { where: "hand", index: handIndex },
+    { where: "field", index: fieldIndex },
+  );
 }
 
 /** 棄掉手牌的一張符。手牌塞滿低階符時的最後手段。 */
@@ -453,7 +559,7 @@ export function discardHand(state: DefenseState, handIndex: number): boolean {
  * 收斂成一個入口是刻意的：拖曳只有一種手勢，若「合成／放置／換位」各有各的條件，
  * 玩家會遇到「拖了半天什麼都沒發生」的挫折，而那正是這類遊戲最容易勸退人的地方。
  */
-export type DropResult = 'merged' | 'moved' | 'swapped' | 'none';
+export type DropResult = "merged" | "moved" | "swapped" | "none";
 
 export function dropOn(
   state: DefenseState,
@@ -461,10 +567,12 @@ export function dropOn(
   target: CardSlot,
   rng: Rng,
 ): DropResult {
-  if (source.where === target.where && source.index === target.index) return 'none';
-  if (mergeInto(state, source, target, rng)) return 'merged';
-  if (cardAt(state, target) === null) return moveCard(state, source, target) ? 'moved' : 'none';
-  return swapSlots(state, source, target) ? 'swapped' : 'none';
+  if (source.where === target.where && source.index === target.index)
+    return "none";
+  if (mergeInto(state, source, target, rng)) return "merged";
+  if (cardAt(state, target) === null)
+    return moveCard(state, source, target) ? "moved" : "none";
+  return swapSlots(state, source, target) ? "swapped" : "none";
 }
 
 /**
@@ -481,7 +589,8 @@ export function mergeInto(
   target: CardSlot,
   rng: Rng,
 ): boolean {
-  if (source.where === target.where && source.index === target.index) return false;
+  if (source.where === target.where && source.index === target.index)
+    return false;
   // 不合之道：這一場沒有合成。擋在最底層而不是在畫面上把手勢關掉——
   // 規則要在模擬裡成立，否則平衡模擬跑出來的數字和玩家看到的不是同一件事。
   if (state.loadout.rules.noMerge) return false;
@@ -489,14 +598,20 @@ export function mergeInto(
   const into = listOf(state, target.where);
   const card = from[source.index];
   const onto = into[target.index];
-  if (card === undefined || card === null || onto === undefined || onto === null) return false;
+  if (
+    card === undefined ||
+    card === null ||
+    onto === undefined ||
+    onto === null
+  )
+    return false;
   if (card.type !== onto.type || card.tier !== onto.tier) return false;
   if (onto.tier >= maxTier(state)) return false;
 
   into[target.index] = { type: onto.type, tier: onto.tier + 1 };
   const refunded = rng.next() < state.loadout.sect.mergeRefundChance;
   if (!refunded) from[source.index] = null;
-  if (target.where === 'field') {
+  if (target.where === "field") {
     state.cooldowns[target.index] = 0;
     state.ramps[target.index] = 0;
   }
@@ -544,7 +659,10 @@ function fireOnce(
   // 太乙符：這一次出手用的是「出手前」累積到的倍率，累積本身在出手後才 +1。
   let ramp = 1;
   if (effect.rampPerShot > 0) {
-    ramp = Math.min(effect.rampMax, 1 + (state.ramps[slot] ?? 0) * effect.rampPerShot);
+    ramp = Math.min(
+      effect.rampMax,
+      1 + (state.ramps[slot] ?? 0) * effect.rampPerShot,
+    );
     state.ramps[slot] = (state.ramps[slot] ?? 0) + 1;
   }
 
@@ -565,10 +683,12 @@ function fireOnce(
 
     let damage = beyondTargets ? 0 : base * ramp;
     if (!beyondTargets) {
-      if (target.boss) damage *= state.loadout.bossDamageMultiplier * effect.bossMultiplier;
+      if (target.boss)
+        damage *= state.loadout.bossDamageMultiplier * effect.bossMultiplier;
       if (ratio <= 0.5) damage *= effect.woundedMultiplier;
       if (ratio >= 0.8) damage *= effect.freshMultiplier;
-      if (effect.critChance > 0 && rng.next() < effect.critChance) damage *= effect.critMultiplier;
+      if (effect.critChance > 0 && rng.next() < effect.critChance)
+        damage *= effect.critMultiplier;
     }
     damage += carried;
     carried = 0;
@@ -580,9 +700,12 @@ function fireOnce(
     // 但最多只削掉這一發的 armorMaxCut，任何一發都還打得進去一部分：
     // 完全免疫會讓某些牌組直接卡死一整關，而習性要造成的是「比較吃力」，
     // 不是「打不動」。
-    if (target.trait === 'armor') {
+    if (target.trait === "armor") {
       const { armorPercentOfMaxHp, armorMaxCut } = BALANCE.trait;
-      damage -= Math.min(target.maxHp * armorPercentOfMaxHp, damage * armorMaxCut);
+      damage -= Math.min(
+        target.maxHp * armorPercentOfMaxHp,
+        damage * armorMaxCut,
+      );
     }
 
     target.hp -= damage;
@@ -605,14 +728,25 @@ function fireOnce(
     }
 
     if (target.hp > 0) {
-      if (effect.slowPercent > 0) applySlow(state, target, effect.slowPercent, effect.slowMs);
+      if (effect.slowPercent > 0)
+        applySlow(state, target, effect.slowPercent, effect.slowMs);
       if (effect.burnPercent > 0 && effect.burnMs > 0) {
-        applyBurn(target, damage * effect.burnPercent, effect.burnMs, card.type);
+        applyBurn(
+          target,
+          damage * effect.burnPercent,
+          effect.burnMs,
+          card.type,
+        );
       }
     }
 
     creditDamage(state, card.type, damage);
-    report.shots.push({ slot, enemyId: target.id, damage, killed: target.hp <= 0 });
+    report.shots.push({
+      slot,
+      enemyId: target.id,
+      damage,
+      killed: target.hp <= 0,
+    });
   }
 }
 
@@ -628,7 +762,10 @@ function applySlow(
     enemy.slowPercent = percent;
     enemy.slowUntilMs = state.elapsedMs + durationMs;
   } else {
-    enemy.slowUntilMs = Math.max(enemy.slowUntilMs, state.elapsedMs + durationMs);
+    enemy.slowUntilMs = Math.max(
+      enemy.slowUntilMs,
+      state.elapsedMs + durationMs,
+    );
   }
 }
 
@@ -659,7 +796,11 @@ function applyBurn(
  * 結束那一瞬間的盤面完全代表不了整場。分母只算「場上有符」的時間，
  * 開場那幾秒空盤不該把平均拉低。
  */
-function recordFormation(state: DefenseState, bonuses: readonly SlotBonus[], deltaMs: number): void {
+function recordFormation(
+  state: DefenseState,
+  bonuses: readonly SlotBonus[],
+  deltaMs: number,
+): void {
   let filled = 0;
   let sum = 0;
   for (let i = 0; i < state.field.length; i += 1) {
@@ -684,8 +825,10 @@ function creditDamage(state: DefenseState, type: string, amount: number): void {
   const telemetry = state.telemetry;
   telemetry.damageByType[type] = (telemetry.damageByType[type] ?? 0) + amount;
   const second = Math.floor(state.elapsedMs / 1000);
-  while (telemetry.damagePerSecond.length <= second) telemetry.damagePerSecond.push(0);
-  telemetry.damagePerSecond[second] = (telemetry.damagePerSecond[second] ?? 0) + amount;
+  while (telemetry.damagePerSecond.length <= second)
+    telemetry.damagePerSecond.push(0);
+  telemetry.damagePerSecond[second] =
+    (telemetry.damagePerSecond[second] ?? 0) + amount;
 }
 
 /**
@@ -694,9 +837,13 @@ function creditDamage(state: DefenseState, type: string, amount: number): void {
  * 順序刻意是「開火 → 移動 → 判定漏怪」：這一拍打得死的妖魔就不會先攻進山門，
  * 否則在低畫格率的手機上會莫名其妙多漏幾隻。
  */
-export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): TickReport {
+export function tickCombat(
+  state: DefenseState,
+  deltaMs: number,
+  rng: Rng,
+): TickReport {
   const report = EMPTY_REPORT();
-  if (state.outcome !== 'running') return report;
+  if (state.outcome !== "running") return report;
 
   const { wave: waveCfg, field: fieldCfg } = BALANCE;
   state.elapsedMs += deltaMs;
@@ -704,7 +851,8 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
   // 1. 抽符
   // 在場被動每一拍重算：玩家隨時可能把招財符或疾風符搬下場。
   const passives = fieldPassives(state.field);
-  const drawSpeed = state.loadout.drawSpeedMultiplier * passives.drawSpeedMultiplier;
+  const drawSpeed =
+    state.loadout.drawSpeedMultiplier * passives.drawSpeedMultiplier;
   state.drawTimer -= deltaMs;
   while (state.drawTimer <= 0) {
     state.drawTimer += fieldCfg.drawIntervalMs / drawSpeed;
@@ -804,7 +952,7 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     //
     // 小妖身上的旗標保證牠不會再裂——沒有這條，一隻母體會炸成無限多隻，
     // 一場的計算量在幾秒內爆掉。
-    if (enemy.trait === 'split' && !enemy.spawnedBySplit) {
+    if (enemy.trait === "split" && !enemy.spawnedBySplit) {
       const { splitCount, splitHpRatio, splitSpeedMultiplier } = BALANCE.trait;
       for (let i = 0; i < splitCount; i += 1) {
         const hp = Math.max(1, enemy.maxHp * splitHpRatio);
@@ -818,14 +966,17 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
           maxHp: hp,
           y: enemy.y,
           // 兩隻分到相鄰的縱列，不然牠們會完全重疊，畫面上看起來只有一隻。
-          lane: Math.max(0, Math.min(LANES - 1, enemy.lane + (i === 0 ? -1 : 1))),
+          lane: Math.max(
+            0,
+            Math.min(LANES - 1, enemy.lane + (i === 0 ? -1 : 1)),
+          ),
           speed: enemy.speed * splitSpeedMultiplier,
           slowUntilMs: 0,
           slowPercent: 0,
           burnRemaining: 0,
           burnPerMs: 0,
           burnSource: null,
-          trait: 'split',
+          trait: "split",
           spawnedBySplit: true,
         };
         state.nextId += 1;
@@ -842,7 +993,8 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
   state.bossAtGate = false;
   for (const enemy of state.enemies) {
     // 減速只影響推進，不影響血量或砸門節奏——寒冰符買的是時間，不是傷害。
-    const slowed = enemy.slowUntilMs > state.elapsedMs ? 1 - enemy.slowPercent : 1;
+    const slowed =
+      enemy.slowUntilMs > state.elapsedMs ? 1 - enemy.slowPercent : 1;
     enemy.y += enemy.speed * slowed * step;
     if (enemy.y < waveCfg.trackPx) {
       stillOnTrack.push(enemy);
@@ -863,13 +1015,23 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
     // 若體修的被動能擋掉它，那對體修來說這條挑戰等於白開。
     if (state.loadout.rules.suddenDeath) {
       state.disciples = 0;
-      report.leaks.push({ enemyId: enemy.id, loss: state.maxDisciples, immune: false, boss: false });
+      report.leaks.push({
+        enemyId: enemy.id,
+        loss: state.maxDisciples,
+        immune: false,
+        boss: false,
+      });
       continue;
     }
     // 體修：每關前幾次漏怪由門人硬擋，山門不掉耐久。
     if (state.leakImmunityUsed < state.loadout.sect.leakImmunityCount) {
       state.leakImmunityUsed += 1;
-      report.leaks.push({ enemyId: enemy.id, loss: 0, immune: true, boss: false });
+      report.leaks.push({
+        enemyId: enemy.id,
+        loss: 0,
+        immune: true,
+        boss: false,
+      });
       continue;
     }
     const loss = leakCost(state.threat, enemy.boss);
@@ -882,7 +1044,10 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
   if (state.bossAtGate) {
     state.bossGateAccum += deltaMs;
     const boss = state.enemies.find((enemy) => enemy.boss);
-    while (state.bossGateAccum >= BALANCE.boss.gateHitIntervalMs && boss !== undefined) {
+    while (
+      state.bossGateAccum >= BALANCE.boss.gateHitIntervalMs &&
+      boss !== undefined
+    ) {
       state.bossGateAccum -= BALANCE.boss.gateHitIntervalMs;
       state.leaks += 1;
       const loss = leakCost(state.threat, true);
@@ -895,24 +1060,75 @@ export function tickCombat(state: DefenseState, deltaMs: number, rng: Rng): Tick
 
   // 7. 勝負
   if (state.disciples <= 0) {
-    state.outcome = 'defeated';
-  } else if (state.queue.length === 0 && state.enemies.length === 0 && state.bossKilled) {
+    state.outcome = "defeated";
+  } else if (
+    state.queue.length === 0 &&
+    state.enemies.length === 0 &&
+    state.bossKilled
+  ) {
     // 首領沒死就不算通關。首領不會自己離開場上，所以這個條件在實作上也是必然的，
     // 但仍然明寫出來——這是規則，不是副作用。
-    state.outcome = 'cleared';
+    if (state.loadout.endless) advanceEndless(state, rng);
+    else state.outcome = "cleared";
   } else if (
     state.bossSpawnedAtMs !== null &&
     state.elapsedMs - state.bossSpawnedAtMs >=
       BALANCE.boss.timeLimitMs * state.loadout.rules.bossTimeMultiplier
   ) {
-    state.outcome = 'timeout';
+    state.outcome = "timeout";
   }
 
   return report;
 }
 
+/**
+ * 無限模式的續關。
+ *
+ * 打完一關不結束，直接把下一關的出怪排進同一場：深度 +1、首領重置、
+ * 妖魔按新的深度重新產生。三個細節缺一不可——
+ *
+ * - **出場時間要平移**。queue 的 atMs 是從「這一場開始」起算的絕對值，
+ *   直接接上去的話整批的時間都是過去式，下一關會在同一瞬間全部湧出。
+ * - **首領的計時要清掉**。bossSpawnedAtMs 不重置的話，下一關的首領一出場
+ *   就已經超時了。
+ * - **rng 照舊往前走**，不重新播種：整場仍然是一條確定性的序列，重播才對得上。
+ *
+ * 中間刻意留半個波次的空檔：連續兩關之間完全不喘息的話，
+ * 玩家沒有機會重新整理盤面，而那正是這個模式唯一的操作空間。
+ */
+function advanceEndless(state: DefenseState, rng: Rng): void {
+  // 通關獎勵照樣發，只是不回結算頁領——無限模式沒有「通關」那一刻，
+  // 若只算沿路撿的金幣，同樣深度的一場會比主線少掉一大截收益。
+  state.gold += clearReward(state);
+  // 一波往前推 endlessStep 關，不是一關：接著打的一波省掉了整段「從低階疊上去」，
+  // 若只加一關，同一場可以連打四十幾波，那不是無限模式，那是一台印鈔機。
+  // 級距本身隨波數往上爬：愈深，一波跨得愈遠。
+  // 固定級距下，強度愈高的一場拖得愈久（實測滿級加仙緣要打六十波），
+  // 而「打到打不贏為止」若要成立，它得對每一種強度都在合理時間內收斂。
+  const { endlessStep, endlessAccelWaves } = BALANCE.wave;
+  const step = endlessStep + Math.floor(state.clearedStages / Math.max(1, endlessAccelWaves));
+  state.stage += step;
+  state.threat += step;
+  state.clearedStages += 1;
+
+  const { queue, boss } = buildSpawnQueue(
+    state.threat,
+    rng,
+    state.loadout.traitChance,
+  );
+  const offset = state.elapsedMs + BALANCE.wave.waveIntervalMs * 0.5;
+  state.queue = queue.map((entry) => ({ ...entry, atMs: entry.atMs + offset }));
+  state.stageStartMs = offset;
+  state.bossDef = boss;
+  state.bossKilled = false;
+  state.bossSpawnedAtMs = null;
+  state.bossGateAccum = 0;
+}
+
 /** 首領當前的血量比例，沒有首領在場時為 null。 */
-export function bossProgress(state: DefenseState): { enemy: ActiveEnemy; ratio: number } | null {
+export function bossProgress(
+  state: DefenseState,
+): { enemy: ActiveEnemy; ratio: number } | null {
   const boss = state.enemies.find((enemy) => enemy.boss);
   if (boss === undefined) return null;
   return { enemy: boss, ratio: Math.max(0, boss.hp / boss.maxHp) };
