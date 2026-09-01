@@ -19,10 +19,13 @@
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
 import {
+  ANSWER_LOCK_MS,
+  MAX_ANSWER_ATTEMPTS,
   RECOVERY_CODE_LENGTH,
   RECOVERY_TTL_MS,
   cleanEmail,
   cleanName,
+  cleanQuestion,
   nameKey,
 } from '../../src/net/protocol';
 import { sendRecoveryMail } from './mail';
@@ -335,4 +338,163 @@ export async function accountOf(env: Env, playerId: string): Promise<string | nu
     .bind(playerId)
     .first<{ name: string }>();
   return row === null ? null : row.name;
+}
+
+/**
+ * 設定（或更換）救援問題。
+ *
+ * 要先證明是本人——用現在的身分密鑰，和改道號同一種比對。所以這件事
+ * **只有登入中的人做得到**，不是一支任何人都能打的端點。
+ *
+ * 答案的密鑰是客戶端推的，這裡一樣只收雜湊。伺服器從頭到尾不知道答案是什麼，
+ * 也就無從「把密碼顯示出來」——那正是這套設計的重點。
+ */
+export async function setRecoveryQuestion(
+  request: Request,
+  env: Env,
+  origin: string | null,
+): Promise<Response> {
+  const body = await readJson(request);
+  if (typeof body !== 'object' || body === null) return fail('badRequest', env, origin);
+  const record = body as Record<string, unknown>;
+
+  if (!isNonEmptyString(record['playerId'], 64) || !isNonEmptyString(record['secret'], 128)) {
+    return fail('badRequest', env, origin, '缺少身分');
+  }
+  const question = cleanQuestion(record['question']);
+  if (question === null) return fail('badRequest', env, origin, '問題不合法');
+  if (!isNonEmptyString(record['answerHash'], 128)) {
+    return fail('badRequest', env, origin, '缺少答案');
+  }
+
+  const row = await env.DB.prepare('SELECT email, secret_hash FROM accounts WHERE player_id = ?')
+    .bind(record['playerId'])
+    .first<{ email: string; secret_hash: string }>();
+  if (row === null) return fail('unauthorized', env, origin, '沒有這個帳號');
+  if (!timingSafeEqual(row.secret_hash, await sha256(record['secret']))) {
+    return fail('unauthorized', env, origin, '密鑰對不上');
+  }
+
+  // 換一個新問題時把猜錯次數與鎖一起清掉：那些是舊答案的帳，
+  // 留著等於讓上一次被人亂猜的紀錄繼續懲罰他。
+  await env.DB.prepare(
+    `INSERT INTO account_recovery (email, question, answer_hash, attempts, locked_at, set_at)
+     VALUES (?, ?, ?, 0, NULL, ?)
+     ON CONFLICT(email) DO UPDATE SET question = excluded.question,
+                                      answer_hash = excluded.answer_hash,
+                                      attempts = 0,
+                                      locked_at = NULL,
+                                      set_at = excluded.set_at`,
+  )
+    .bind(row.email, question, record['answerHash'], Date.now())
+    .run();
+
+  return json({ ok: true, question }, env, origin);
+}
+
+/**
+ * 問這個信箱的救援問題是什麼。
+ *
+ * **沒有帳號、和有帳號但沒設問題，回的是同一個 null。** 分開回等於在這一支
+ * 上多開一個「哪些信箱註冊過」的查詢工具。
+ */
+export async function recoveryQuestion(
+  request: Request,
+  env: Env,
+  origin: string | null,
+): Promise<Response> {
+  const body = await readJson(request);
+  if (typeof body !== 'object' || body === null) return fail('badRequest', env, origin);
+  const record = body as Record<string, unknown>;
+
+  const email = cleanEmail(record['email']);
+  if (email === null) return fail('badRequest', env, origin, '電子信箱不合法');
+
+  const row = await env.DB.prepare('SELECT question FROM account_recovery WHERE email = ?')
+    .bind(email)
+    .first<{ question: string }>();
+
+  return json({ ok: true, question: row?.question ?? null }, env, origin);
+}
+
+/**
+ * 答對問題，設一組新密碼。
+ *
+ * **答對拿到的是「設一組新的」，不是「看到舊的」。** 舊密碼在這個系統裡
+ * 從來沒有存在過——存的只有它推導出來的密鑰的雜湊。要顯示密碼就得反過來
+ * 存一份可還原的，那等於資料庫外洩就是所有人的密碼外流；而玩家會重複用密碼，
+ * 傷害會跑到這個遊戲以外的地方去。
+ *
+ * 猜錯次數的上限是這裡唯一真正的煞車，見 MAX_ANSWER_ATTEMPTS。
+ */
+export async function resetByAnswer(
+  request: Request,
+  env: Env,
+  origin: string | null,
+): Promise<Response> {
+  const body = await readJson(request);
+  if (typeof body !== 'object' || body === null) return fail('badRequest', env, origin);
+  const record = body as Record<string, unknown>;
+
+  const email = cleanEmail(record['email']);
+  if (email === null) return fail('badRequest', env, origin, '電子信箱不合法');
+  if (!isNonEmptyString(record['answerHash'], 128)) {
+    return fail('badRequest', env, origin, '缺少答案');
+  }
+  if (!isNonEmptyString(record['secretHash'], 128)) {
+    return fail('badRequest', env, origin, '缺少密鑰');
+  }
+
+  const row = await env.DB.prepare(
+    'SELECT answer_hash, attempts, locked_at FROM account_recovery WHERE email = ?',
+  )
+    .bind(email)
+    .first<{ answer_hash: string; attempts: number; locked_at: number | null }>();
+  const account = await env.DB.prepare(
+    'SELECT email, name, player_id, salt, secret_hash FROM accounts WHERE email = ?',
+  )
+    .bind(email)
+    .first<AccountRow>();
+
+  // 沒有帳號、沒設問題、答案不對——三種一律同一句話。
+  if (row === null || account === null) {
+    return fail('unauthorized', env, origin, '答案不對');
+  }
+
+  const now = Date.now();
+  // 鎖還在有效期內就直接擋掉，連比對都不做。
+  if (row.locked_at !== null && now - row.locked_at < ANSWER_LOCK_MS) {
+    const minutes = Math.max(1, Math.ceil((ANSWER_LOCK_MS - (now - row.locked_at)) / 60000));
+    return fail('rejected', env, origin, `猜錯太多次了，${minutes} 分鐘後再試`);
+  }
+  // 鎖過期了就把帳一併清掉，重新給滿次數。
+  const attempts = row.locked_at !== null ? 0 : row.attempts;
+
+  if (!timingSafeEqual(row.answer_hash, record['answerHash'])) {
+    const next = attempts + 1;
+    const locked = next >= MAX_ANSWER_ATTEMPTS;
+    await env.DB.prepare('UPDATE account_recovery SET attempts = ?, locked_at = ? WHERE email = ?')
+      .bind(locked ? 0 : next, locked ? now : null, email)
+      .run();
+    if (locked) {
+      const minutes = Math.ceil(ANSWER_LOCK_MS / 60000);
+      return fail('rejected', env, origin, `猜錯太多次了，${minutes} 分鐘後再試`);
+    }
+    return fail('unauthorized', env, origin, '答案不對');
+  }
+
+  // 答對了。**只換密鑰，進度一個位元組都不動。**
+  await env.DB.prepare('UPDATE accounts SET secret_hash = ? WHERE email = ?')
+    .bind(record['secretHash'], email)
+    .run();
+  await env.DB.prepare('UPDATE saves SET secret_hash = ? WHERE player_id = ?')
+    .bind(record['secretHash'], account.player_id)
+    .run();
+  await env.DB.prepare(
+    'UPDATE account_recovery SET attempts = 0, locked_at = NULL WHERE email = ?',
+  )
+    .bind(email)
+    .run();
+
+  return json({ ok: true, name: account.name, playerId: account.player_id }, env, origin);
 }

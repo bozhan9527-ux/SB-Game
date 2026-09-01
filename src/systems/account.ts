@@ -18,14 +18,24 @@
  *   而忘記密碼是靠信箱收驗證碼救回來的。
  */
 import {
+  accountAnswerReset,
   accountLogin,
+  accountQuestion,
   accountRecover,
   accountRegister,
   accountRename,
   accountReset,
   accountSalt,
+  accountSetQuestion,
 } from '../net/client';
-import { cleanEmail } from '../net/protocol';
+import {
+  ANSWER_PREFIX,
+  MAX_QUESTION_LENGTH,
+  MIN_ANSWER_LENGTH,
+  cleanAnswer,
+  cleanEmail,
+  cleanQuestion,
+} from '../net/protocol';
 import type { SaveData } from '../save/types';
 import { ensureCloudIdentity } from './cloud';
 
@@ -228,6 +238,107 @@ export async function rename(save: SaveData, name: string): Promise<AccountOutco
   });
   if (!result.ok) return { kind: 'failed', reason: result.detail ?? '改名沒有成功' };
   save.player.account = { ...account, name: result.name };
+  save.player.name = result.name;
+  return { kind: 'ok', name: result.name };
+}
+
+/**
+ * 從答案推出那一把救援密鑰。
+ *
+ * 和密碼**完全同一條路**（PBKDF2 + 帳號的鹽），只差一個前綴。
+ * 前綴是域分離：沒有它的話，有人把答案設成和密碼一樣的字，
+ * 兩把密鑰就會一模一樣——猜中答案等於直接拿到身分本身。
+ */
+async function answerSecret(answer: string, salt: string): Promise<string> {
+  const cleaned = cleanAnswer(answer);
+  if (cleaned === null) return '';
+  return deriveSecret(ANSWER_PREFIX + cleaned, salt);
+}
+
+/**
+ * 設定或更換救援問題。
+ *
+ * 要先登入（身分密鑰就是證明），所以這是「已經進得去的人替未來的自己
+ * 留一條路」，不是任何人都能打的端點。
+ */
+export async function setQuestion(
+  save: SaveData,
+  question: string,
+  answer: string,
+): Promise<AccountOutcome> {
+  const account = save.player.account;
+  if (account === null) return { kind: 'failed', reason: '還沒註冊' };
+  if (cleanQuestion(question) === null) {
+    return { kind: 'failed', reason: `問題不能空白，也不要超過 ${MAX_QUESTION_LENGTH} 個字` };
+  }
+  if (cleanAnswer(answer) === null) {
+    return { kind: 'failed', reason: `答案至少要 ${MIN_ANSWER_LENGTH} 個字` };
+  }
+
+  const identity = ensureCloudIdentity(save);
+  const result = await accountSetQuestion({
+    playerId: identity.playerId,
+    secret: identity.secret,
+    question,
+    answerHash: await sha256(await answerSecret(answer, account.salt)),
+  });
+  if (!result.ok) return { kind: 'failed', reason: result.detail ?? '設定沒有成功' };
+  return { kind: 'ok', name: result.question };
+}
+
+/** 這個信箱的救援問題。沒有帳號、或還沒設過，都是 null。 */
+export async function questionFor(email: string): Promise<string | null> {
+  const cleaned = cleanEmail(email);
+  if (cleaned === null) return null;
+  const result = await accountQuestion({ email: cleaned });
+  return result.ok ? result.question : null;
+}
+
+/**
+ * 答對救援問題，設一組新密碼。
+ *
+ * **拿到的是「設一組新的」，不是「看到舊的」。** 舊密碼在這整套系統裡從來
+ * 沒有存在過——存的只有它推導出來的密鑰的雜湊，而雜湊不可逆。要能顯示密碼
+ * 就得另外存一份還原得回來的，那等於資料庫外洩就是所有人的密碼外流；
+ * 而玩家會重複用密碼，傷害會跑到這個遊戲以外的地方。
+ *
+ * 和信箱驗證碼那條路一樣：**進度一個位元組都不會變**，只換身分密鑰。
+ */
+export async function resetByQuestion(
+  save: SaveData,
+  email: string,
+  answer: string,
+  password: string,
+): Promise<AccountOutcome> {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return { kind: 'failed', reason: `密碼至少要 ${MIN_PASSWORD_LENGTH} 個字` };
+  }
+  const cleaned = cleanEmail(email);
+  if (cleaned === null) return { kind: 'failed', reason: '電子信箱看起來不對' };
+  if (cleanAnswer(answer) === null) {
+    return { kind: 'failed', reason: `答案至少要 ${MIN_ANSWER_LENGTH} 個字` };
+  }
+
+  const salted = await accountSalt({ email: cleaned });
+  if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
+  // 沒註冊過就一定算不出對的答案雜湊。回和答錯同一句話：分開回等於
+  // 送人一份「哪些信箱註冊過」的查詢工具。
+  if (!salted.taken) return { kind: 'failed', reason: '答案不對' };
+
+  // 鹽不變，所以新密碼推出來的密鑰和伺服器接下來要存的是同一把。
+  const secret = await deriveSecret(password, salted.salt);
+  const result = await accountAnswerReset({
+    email: cleaned,
+    answerHash: await sha256(await answerSecret(answer, salted.salt)),
+    secretHash: await sha256(secret),
+  });
+  if (!result.ok) return { kind: 'failed', reason: result.detail ?? '答案不對' };
+
+  const identity = ensureCloudIdentity(save);
+  identity.playerId = result.playerId;
+  identity.secret = secret;
+  identity.syncedAt = 0;
+  save.player.account = { email: cleaned, name: result.name, salt: salted.salt };
   save.player.name = result.name;
   return { kind: 'ok', name: result.name };
 }

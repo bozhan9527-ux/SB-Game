@@ -13,6 +13,9 @@ import {
   renameAccount,
   requestRecovery,
   resetPassword,
+  recoveryQuestion,
+  resetByAnswer,
+  setRecoveryQuestion,
 } from './accounts';
 import { getSave, putSave } from './saves';
 import { distribution, leaderboard, submitScore } from './scores';
@@ -49,6 +52,16 @@ export default {
       }
       if (path === `/${API_VERSION}/account/reset` && request.method === 'POST') {
         return await resetPassword(request, env, origin);
+      }
+      // 救援問題：信箱寄不出去時唯一能用的那條路。
+      if (path === `/${API_VERSION}/account/question/set` && request.method === 'POST') {
+        return await setRecoveryQuestion(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/account/question` && request.method === 'POST') {
+        return await recoveryQuestion(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/account/question/reset` && request.method === 'POST') {
+        return await resetByAnswer(request, env, origin);
       }
       if (path === `/${API_VERSION}/save/put` && request.method === 'POST') {
         return await putSave(request, env, origin);

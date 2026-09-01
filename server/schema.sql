@@ -104,3 +104,29 @@ CREATE TABLE IF NOT EXISTS board_runs (
 CREATE INDEX IF NOT EXISTS board_runs_high ON board_runs (board, hidden, score DESC, elapsed_ms ASC);
 -- 速通榜：分數（秒數）小的在前。
 CREATE INDEX IF NOT EXISTS board_runs_low ON board_runs (board, hidden, score ASC, verified_at ASC);
+
+-- 救援問題。忘記密碼時的第二條路。
+--
+-- **為什麼是獨立一張表，不是 accounts 多兩欄。** schema.sql 每次部署都會整份
+-- 重跑，而 CREATE TABLE IF NOT EXISTS 是冪等的、ALTER TABLE 不是——加欄位那條
+-- 路第二次部署就會失敗。獨立一張表同時解決另一件事：既有帳號不必遷移，
+-- 他們只是還沒有這一列而已。
+--
+-- **answer_hash 和密碼同一種待遇**：客戶端用「前綴 + 正規化過的答案 + 帳號的鹽」
+-- 推導出一把密鑰（PBKDF2），這裡存的只有它的 SHA-256。資料庫外洩拿不到答案，
+-- 也拿不到密碼——這正是「答對只能設新密碼、不能看舊密碼」的原因：
+-- 舊密碼從來沒有存在過這裡。
+CREATE TABLE IF NOT EXISTS account_recovery (
+  email       TEXT PRIMARY KEY,
+  -- 問題是明文。它本來就要顯示給「知道這個信箱的人」看，不是秘密——
+  -- 所以註冊畫面要提醒玩家不要把答案寫進問題裡。
+  question    TEXT NOT NULL,
+  answer_hash TEXT NOT NULL,
+  -- 連續猜錯幾次。答對就歸零。**這是這套救援唯一真正的煞車**：
+  -- 答案的熵很低，沒有次數上限的話它等於一個四位數的鎖。
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  -- 猜錯太多次之後鎖到什麼時候。是冷卻不是永久鎖定——永久的話，
+  -- 任何知道你信箱的人都能故意猜錯把你的救援管道關掉。
+  locked_at   INTEGER,
+  set_at      INTEGER NOT NULL
+);

@@ -24,12 +24,22 @@ import {
   MIN_PASSWORD_LENGTH,
   hasAccount,
   login,
+  questionFor,
   register,
   rename,
   requestRecovery,
+  resetByQuestion,
   resetPassword,
+  setQuestion,
 } from '../systems/account';
 import { showForm, showNotice } from '../ui/form';
+import {
+  MAX_ANSWER_ATTEMPTS,
+  MAX_QUESTION_LENGTH,
+  MIN_ANSWER_LENGTH,
+  cleanAnswer,
+  cleanQuestion,
+} from '../net/protocol';
 import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
@@ -115,12 +125,20 @@ export class LeaderboardScene extends Phaser.Scene {
     // 有帳號就只需要一顆改名鍵；沒帳號的話這裡是整頁最重要的東西——
     // 他上不了榜，而且在此之前沒有任何地方告訴過他為什麼。
     if (hasAccount(save)) {
-      createButton(this, cx, 208, {
-        width: 220,
+      createButton(this, cx - 58, 208, {
+        width: 160,
         height: 42,
         label: `改名：${save.player.name}`,
-        fontSize: 17,
+        fontSize: 15,
         onClick: () => void this.rename(),
+      });
+      // 註冊之前就存在的帳號沒有救援問題，這顆是他們補上的地方。
+      createButton(this, cx + 84, 208, {
+        width: 116,
+        height: 42,
+        label: '救援問題',
+        fontSize: 15,
+        onClick: () => void this.doSetQuestion(),
       });
     } else {
       createButton(this, cx - 110, 208, {
@@ -226,12 +244,20 @@ export class LeaderboardScene extends Phaser.Scene {
       note:
         '註冊之後才能上榜，換裝置也能把進度接回來。\n' +
         `密碼至少 ${MIN_PASSWORD_LENGTH} 個字。\n` +
-        '信箱只用來在你忘記密碼時寄驗證碼，不做別的事。',
+        '救援問題是忘記密碼時的救命繩，答對就能重設一組新的。\n' +
+        '注意：問題本身任何人查得到，別把答案寫進問題裡。',
       fields: [
         { key: 'email', label: '電子信箱（就是帳號）', email: true, maxLength: 254 },
         { key: 'name', label: '道號（榜上顯示的名字）', maxLength: MAX_NAME_LENGTH },
         { key: 'password', label: '密碼', password: true, maxLength: 64 },
         { key: 'again', label: '再輸入一次密碼', password: true, maxLength: 64 },
+        {
+          key: 'question',
+          label: '救援問題（忘記密碼時問你這個）',
+          placeholder: '例：我國中養的狗叫什麼',
+          maxLength: MAX_QUESTION_LENGTH,
+        },
+        { key: 'answer', label: '答案', maxLength: 40 },
       ],
       // 在表單上擋，不送出去再回一句錯誤：他打的東西不該因為一個錯字全沒。
       validate: (v) => {
@@ -239,6 +265,10 @@ export class LeaderboardScene extends Phaser.Scene {
           return `密碼至少要 ${MIN_PASSWORD_LENGTH} 個字`;
         }
         if (v['password'] !== v['again']) return '兩次輸入的密碼不一樣';
+        if (cleanQuestion(v['question']) === null) return '救援問題不能空白';
+        if (cleanAnswer(v['answer']) === null) {
+          return `答案至少要 ${MIN_ANSWER_LENGTH} 個字`;
+        }
         return null;
       },
       submit: '註冊',
@@ -257,7 +287,58 @@ export class LeaderboardScene extends Phaser.Scene {
       return;
     }
     persist();
-    await showNotice('註冊完成', `道號：${outcome.name}\n之後通關就會自動上榜。`);
+
+    // 問題要等註冊完才設得了：它要用剛拿到的身分密鑰證明是本人。
+    // 失敗不擋著他——帳號已經開好了，問題可以之後再補。
+    const saved = await setQuestion(state(), values['question'] ?? '', values['answer'] ?? '');
+    persist();
+    await showNotice(
+      '註冊完成',
+      saved.kind === 'ok'
+        ? `道號：${outcome.name}\n之後通關就會自動上榜。`
+        : `道號：${outcome.name}\n之後通關就會自動上榜。\n（救援問題沒設成功，可以到「救援問題」再設一次）`,
+    );
+    this.scene.restart({ board: this.board });
+  }
+
+  /**
+   * 設定或更換救援問題。
+   *
+   * 給的是「已經進得去的人替未來的自己留一條路」——所以它要先登入。
+   * 註冊前就存在的帳號沒有問題可用，這顆按鈕是他們補上的地方。
+   */
+  private async doSetQuestion(): Promise<void> {
+    const values = await showForm({
+      title: '救援問題',
+      note:
+        '忘記密碼時會問你這一題，答對就能設一組新密碼。\n' +
+        '挑一個只有你答得出來、而且半年後還記得的。\n' +
+        '不要把答案寫進問題裡——問題本身任何人查得到。',
+      fields: [
+        {
+          key: 'question',
+          label: '問題',
+          placeholder: '例：我國中養的狗叫什麼',
+          maxLength: MAX_QUESTION_LENGTH,
+        },
+        { key: 'answer', label: '答案', maxLength: 40 },
+      ],
+      validate: (v) => {
+        if (cleanQuestion(v['question']) === null) return '問題不能空白';
+        if (cleanAnswer(v['answer']) === null) return `答案至少要 ${MIN_ANSWER_LENGTH} 個字`;
+        return null;
+      },
+      submit: '設定',
+    });
+    if (values === null) return;
+
+    this.mine.setText('設定中…').setColor(INK_DIM);
+    const outcome = await setQuestion(state(), values['question'] ?? '', values['answer'] ?? '');
+    if (outcome.kind === 'failed') {
+      this.mine.setText(outcome.reason).setColor(DANGER);
+      return;
+    }
+    await showNotice('設定完成', '忘記密碼時就會問這一題。\n答案的空白與大小寫不影響對錯。');
     this.scene.restart({ board: this.board });
   }
 
@@ -294,18 +375,28 @@ export class LeaderboardScene extends Phaser.Scene {
   /**
    * 忘記密碼。
    *
-   * 兩張表單：先要信箱，再收驗證碼與新密碼。分兩步是因為中間隔著一封信——
-   * 硬塞在同一張表上，玩家會對著一個還拿不到答案的欄位發呆。
+   * **兩條路，自己挑得起來的那一條。** 先問信箱，再看那個帳號有沒有設救援問題：
+   * 有就當場問問題（不必等信，也不需要寄件網域），沒有才走驗證碼那條。
+   *
+   * 分兩步都是因為中間隔著一個「還拿不到的東西」——一封信、或一個還沒看到的
+   * 問題。硬塞在同一張表上，玩家會對著一個答不了的欄位發呆。
    */
   private async doRecover(): Promise<void> {
     const asked = await showForm({
       title: '忘記密碼',
-      note: '輸入註冊時留的信箱，我們寄一組六位數驗證碼過去。',
+      note: '輸入註冊時留的信箱。',
       fields: [{ key: 'email', label: '電子信箱', email: true, maxLength: 254 }],
-      submit: '寄驗證碼',
+      submit: '下一步',
     });
     if (asked === null) return;
     const email = asked['email'] ?? '';
+
+    this.mine.setText('查詢中…').setColor(INK_DIM);
+    const question = await questionFor(email);
+    if (question !== null) {
+      await this.recoverByQuestion(email, question);
+      return;
+    }
 
     this.mine.setText('寄送中…').setColor(INK_DIM);
     const sent = await requestRecovery(email);
@@ -348,6 +439,54 @@ export class LeaderboardScene extends Phaser.Scene {
     }
     persist();
     await showNotice('密碼已重設', `道號：${outcome.name}\n進度沒有任何變動。要接回雲端那份的話，到「存檔」按下載。`);
+    this.scene.restart({ board: this.board });
+  }
+
+  /**
+   * 答對救援問題，設一組新密碼。
+   *
+   * **答對拿到的是「設一組新的」，不是「看到舊的」。** 舊密碼在這整套系統裡
+   * 從來沒有存在過——伺服器存的只有它推導出來的密鑰的雜湊，而雜湊不可逆。
+   * 要能顯示密碼就得另外存一份還原得回來的，那等於資料庫外洩就是所有人的
+   * 密碼外流；而玩家會重複用密碼，傷害會跑到這個遊戲以外的地方去。
+   */
+  private async recoverByQuestion(email: string, question: string): Promise<void> {
+    const values = await showForm({
+      title: '回答救援問題',
+      note: `${question}\n\n答案的空白與大小寫不影響對錯。\n答錯 ${MAX_ANSWER_ATTEMPTS} 次會先鎖一段時間。`,
+      fields: [
+        { key: 'answer', label: '答案', maxLength: 40 },
+        { key: 'password', label: '新密碼', password: true, maxLength: 64 },
+        { key: 'again', label: '再輸入一次新密碼', password: true, maxLength: 64 },
+      ],
+      validate: (v) => {
+        if (cleanAnswer(v['answer']) === null) return `答案至少要 ${MIN_ANSWER_LENGTH} 個字`;
+        if ((v['password'] ?? '').length < MIN_PASSWORD_LENGTH) {
+          return `密碼至少要 ${MIN_PASSWORD_LENGTH} 個字`;
+        }
+        if (v['password'] !== v['again']) return '兩次輸入的密碼不一樣';
+        return null;
+      },
+      submit: '設定新密碼',
+    });
+    if (values === null) return;
+
+    this.mine.setText('確認中…').setColor(INK_DIM);
+    const outcome = await resetByQuestion(
+      state(),
+      email,
+      values['answer'] ?? '',
+      values['password'] ?? '',
+    );
+    if (outcome.kind === 'failed') {
+      this.mine.setText(outcome.reason).setColor(DANGER);
+      return;
+    }
+    persist();
+    await showNotice(
+      '密碼已重設',
+      `道號：${outcome.name}\n進度沒有任何變動。要接回雲端那份的話，到「存檔」按下載。`,
+    );
     this.scene.restart({ board: this.board });
   }
 

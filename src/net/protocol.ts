@@ -15,6 +15,21 @@
 /** 目前的 API 版本。路徑前綴，改協定時整組換掉，不做欄位相容。 */
 export const API_VERSION = 'v1';
 
+/**
+ * 重播契約的版本。**任何會改變「同一組操作跑出什麼結果」的東西改了就要 +1。**
+ *
+ * 存在的理由是一個實際發生過兩次的故障：玩家的瀏覽器快取住舊的那包 JS，
+ * 於是他打的那一場和伺服器重播的規則不是同一套，成績被退回——而畫面上
+ * 只寫得出「紀錄和伺服器對不起來」，玩家完全無從得知自己在跑舊版本。
+ * 兩次我都只能叫他重新整理，那不是答案，那是把我的問題丟給他。
+ *
+ * 有了它，同一個情況會直接說「你的遊戲是舊版本，重新整理就好」。
+ *
+ * 要 +1 的例子：戰鬥數值（balance.json）、tickCombat 的邏輯、抽符規則、
+ * 無限模式的級距、上報欄位的意義。純畫面的改動不必動它。
+ */
+export const REPLAY_CONTRACT_VERSION = 2;
+
 /** 上傳的存檔最大幾個位元組。目前一份完整存檔約 1KB，64KB 是很寬鬆的上限。 */
 export const MAX_BLOB_BYTES = 64 * 1024;
 /** 排行榜名稱長度上限。 */
@@ -62,6 +77,73 @@ export const RECOVERY_CODE_LENGTH = 6;
 /** 驗證碼多久過期。太長等於把信箱外洩的風險放大。 */
 export const RECOVERY_TTL_MS = 30 * 60 * 1000;
 
+/** 提示問題的長度上限。 */
+export const MAX_QUESTION_LENGTH = 40;
+
+/**
+ * 答案的最短長度（正規化之後）。
+ *
+ * 這個下限比密碼那個低很多，因為答案本來就是短的（「台北」兩個字）。
+ * 它擋的是「a」這種等於沒設的答案，不是拿來當強度保證——
+ * 真正的煞車是猜錯次數的上限。
+ */
+export const MIN_ANSWER_LENGTH = 2;
+
+/**
+ * 答案推導密鑰時加的前綴。
+ *
+ * **域分離。** 沒有它的話，一個人如果把答案設成和密碼一樣的字，
+ * 答案推出來的密鑰就會和身分密鑰完全相同——那等於把答案的雜湊
+ * 變成身分密鑰的雜湊，猜中答案就直接拿到身分本身。
+ */
+export const ANSWER_PREFIX = 'answer:';
+
+/**
+ * 答案可以猜錯幾次。
+ *
+ * **這是這套救援唯一真正的煞車。** 提示問題的答案熵很低（「你出生的城市」
+ * 猜個十次就中了），所以能不能守住完全看猜的次數有沒有上限——
+ * 沒有上限的話，這個機制等於把帳號的密碼換成一個四位數的鎖。
+ */
+export const MAX_ANSWER_ATTEMPTS = 5;
+
+/**
+ * 猜錯太多次之後鎖多久。
+ *
+ * **是冷卻不是永久鎖定。** 永久鎖定的話，任何知道你信箱的人都可以故意
+ * 猜錯五次把你的救援管道關掉——防守變成攻擊面。
+ */
+export const ANSWER_LOCK_MS = 15 * 60 * 1000;
+
+/**
+ * 答案的正規化。
+ *
+ * **比名稱那一份更用力，而且是刻意的。** 玩家半年後打的不會是當初那個字串：
+ * 「台北」「台北市」擋不掉（那是不同答案），但「 台北 」「台 北」「ＴＡＩＰＥＩ」
+ * 都應該算對。空白全部去掉、NFKC、小寫。
+ *
+ * 這裡每寬鬆一分，答案就好猜一分——但一個記不起來的答案救不了任何人，
+ * 而**打錯字被鎖在外面**是這種機制最常見的失敗方式，不是被猜中。
+ */
+export function cleanAnswer(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const cleaned = raw
+    .normalize('NFKC')
+    .replace(INVISIBLE, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+  if (cleaned.length < MIN_ANSWER_LENGTH) return null;
+  return cleaned;
+}
+
+/** 清過的提示問題。它會顯示給「知道這個信箱」的任何人看，不是秘密。 */
+export function cleanQuestion(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const cleaned = raw.replace(INVISIBLE, '').trim();
+  if (cleaned.length === 0 || cleaned.length > MAX_QUESTION_LENGTH) return null;
+  return cleaned;
+}
+
 export type ApiError =
   | 'badRequest'
   | 'unauthorized'
@@ -76,6 +158,16 @@ export type ApiResponse<T> = ({ ok: true } & T) | { ok: false; error: ApiError; 
 export interface AccountSaltResult {
   salt: string;
   taken: boolean;
+}
+
+/**
+ * 這個信箱的提示問題。
+ *
+ * **沒有帳號、和有帳號但沒設問題，回的是同一種東西（null）。**
+ * 分開回等於在這一支上多開一個「哪些信箱註冊過」的查詢工具。
+ */
+export interface RecoveryQuestionResult {
+  question: string | null;
 }
 
 /** 註冊與登入回的都是「你是哪個帳號、哪個身分」。 */
@@ -118,6 +210,13 @@ export interface ScoreSubmitRequest extends Identity {
   loadout: ScoreLoadout;
   /** 這一筆要進哪個榜。 */
   board: BoardKind;
+  /**
+   * 客戶端手上的重播契約版本。
+   *
+   * 對不上的話伺服器會直接說「你的遊戲是舊版本」，而不是丟一句
+   * 「紀錄和伺服器對不起來」讓玩家自己猜。
+   */
+  contract: number;
 }
 
 /**

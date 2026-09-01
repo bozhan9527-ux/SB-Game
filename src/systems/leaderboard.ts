@@ -8,7 +8,7 @@
  * 本檔不 import Phaser。
  */
 import { getSave, putSave, submitScore } from '../net/client';
-import { SPEED_STAGE } from '../net/protocol';
+import { REPLAY_CONTRACT_VERSION, SPEED_STAGE } from '../net/protocol';
 import type { BoardKind, ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
@@ -194,6 +194,9 @@ export async function submitRun(
       // 所以看起來像隨機。種子那一半（runs）當初就是為了同一個理由當場記下來的，
       // 配置這一半漏了。
       loadout: submission.loadout,
+      // 對不上的話伺服器直接說「你的遊戲是舊版本」，而不是丟一句
+      // 「紀錄和伺服器對不起來」讓玩家自己猜。
+      contract: REPLAY_CONTRACT_VERSION,
     });
 
   // 第一個榜是主榜——它的名次就是要顯示給玩家看的那一個。其餘的

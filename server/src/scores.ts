@@ -16,7 +16,7 @@
  */
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
-import { SPEED_STAGE } from '../../src/net/protocol';
+import { REPLAY_CONTRACT_VERSION, SPEED_STAGE } from '../../src/net/protocol';
 import type {
   DistributionResult,
   LeaderboardEntry,
@@ -245,6 +245,21 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   // 真正的規則在這裡。榜上每一筆都對得到一個帳號，檢舉與改名才有對象。
   const account = await accountOf(env, playerId);
   if (account === null) return fail('unauthorized', env, origin, '要註冊帳號才能上榜');
+
+  // **版本對不上就直說。**
+  //
+  // 玩家的瀏覽器快取住舊的那包 JS 時，他打的那一場和伺服器重播的規則不是
+  // 同一套，成績一定被退回——而原本的訊息只寫得出「紀錄和伺服器對不起來」，
+  // 他完全無從得知自己在跑舊版本。這個故障已經發生過兩次，兩次的解法都是
+  // 「請重新整理」，而那不該由玩家自己猜出來。
+  const contract = Number(record['contract'] ?? 0);
+  if (!Number.isFinite(contract) || contract < REPLAY_CONTRACT_VERSION) {
+    return fail('rejected', env, origin, '你的遊戲是舊版本，重新整理頁面就會更新');
+  }
+  if (contract > REPLAY_CONTRACT_VERSION) {
+    // 前端比後端新：兩個部署是分開的，網站那邊偶爾會早個一分鐘上線。
+    return fail('rejected', env, origin, '伺服器正在更新，過一下再試');
+  }
 
   const loadout = sanitizeLoadout(record['loadout']);
   if (loadout === null) return fail('badRequest', env, origin, '配置不合法');

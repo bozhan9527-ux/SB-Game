@@ -16,6 +16,7 @@ import type {
   DistributionResult,
   Identity,
   LeaderboardResult,
+  RecoveryQuestionResult,
   SaveGetResult,
   SavePutResult,
   ScoreSubmitRequest,
@@ -90,6 +91,32 @@ export function accountReset(body: {
 }
 
 /** 改道號。帳號是信箱，所以這裡只動顯示用的名字。 */
+/** 設定或更換救援問題。要先登入——身分密鑰就是證明。 */
+export function accountSetQuestion(body: {
+  playerId: string;
+  secret: string;
+  question: string;
+  answerHash: string;
+}): Promise<ApiResponse<{ question: string }>> {
+  return call('/account/question/set', body);
+}
+
+/** 問這個信箱的救援問題。沒帳號和沒設問題回的都是 null。 */
+export function accountQuestion(body: {
+  email: string;
+}): Promise<ApiResponse<RecoveryQuestionResult>> {
+  return call('/account/question', body);
+}
+
+/** 答對問題，設一組新密碼。 */
+export function accountAnswerReset(body: {
+  email: string;
+  answerHash: string;
+  secretHash: string;
+}): Promise<ApiResponse<AccountResult>> {
+  return call('/account/question/reset', body);
+}
+
 export function accountRename(body: {
   playerId: string;
   secret: string;

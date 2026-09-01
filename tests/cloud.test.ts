@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultSave, recordClear } from '../src/save';
 import { SAVE_VERSION } from '../src/save/types';
 import { adoptCloudBlob, compare, ensureCloudIdentity } from '../src/systems/cloud';
-import { SPEED_STAGE } from '../src/net/protocol';
+import { REPLAY_CONTRACT_VERSION, SPEED_STAGE } from '../src/net/protocol';
 import {
   QUIET_FAILURE_BELOW_STAGE,
   boardReady,
@@ -175,6 +175,39 @@ describe('上報的關卡是種子那一半', () => {
 
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit.mock.calls[0]?.[0]).toMatchObject({ board: 'arena', stage: 1, runs: 3 });
+  });
+});
+
+describe('版本對不上就直說', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('上報時一定帶著重播契約的版本', async () => {
+    // 玩家的瀏覽器快取住舊的那包 JS 時，他打的那一場和伺服器重播的規則
+    // 不是同一套，成績一定被退回——而原本只寫得出「紀錄和伺服器對不起來」，
+    // 他完全無從得知自己在跑舊版本。這個故障發生過兩次。
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.account = { email: 'a@b.co', name: '劍修', salt: 'abc' };
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+
+    const submit = vi
+      .spyOn(client, 'submitScore')
+      .mockResolvedValue({ ok: true, rank: 1, best: true, elapsedMs: 1 } as never);
+
+    await submitRun(save, {
+      stage: 40,
+      runs: 0,
+      steps: 10,
+      actions: [],
+      loadout: loadoutFor(save),
+      arena: false,
+    });
+    expect(submit.mock.calls[0]?.[0]).toMatchObject({ contract: REPLAY_CONTRACT_VERSION });
+  });
+
+  it('版本是整數而且大於零——0 是「沒帶」的意思，不能和合法值撞在一起', () => {
+    expect(Number.isInteger(REPLAY_CONTRACT_VERSION)).toBe(true);
+    expect(REPLAY_CONTRACT_VERSION).toBeGreaterThan(0);
   });
 });
 
