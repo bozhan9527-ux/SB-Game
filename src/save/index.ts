@@ -144,14 +144,16 @@ function normalizeDungeons(raw: unknown): Record<string, number> {
  * 沒綁的後果只是「不能上榜」，不是「玩不下去」——所以這裡寧可回 null，
  * 也不要為了修補一份殘缺的資料而讓遊戲開不起來。
  */
-function normalizeAccount(raw: unknown): { name: string; salt: string } | null {
+function normalizeAccount(raw: unknown): { email: string; name: string; salt: string } | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const record = raw as Record<string, unknown>;
+  const email = record['email'];
   const name = record['name'];
   const salt = record['salt'];
+  if (typeof email !== 'string' || email.length === 0) return null;
   if (typeof name !== 'string' || name.length === 0) return null;
   if (typeof salt !== 'string' || salt.length === 0) return null;
-  return { name, salt };
+  return { email, name, salt };
 }
 
 function normalizeSectClears(raw: unknown): Record<string, number> {

@@ -20,6 +20,8 @@ export interface RunSubmission {
    * 伺服器重播就走散了。種子的另一半（runs）當初就是為了同一個理由當場記下來的。
    */
   loadout: ScoreLoadout;
+  /** 這一場是不是無限模式。決定它進競技榜，還是主線那兩個榜。 */
+  endless: boolean;
 }
 
 /** 場景之間傳遞的資料結構。 */

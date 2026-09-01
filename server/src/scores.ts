@@ -16,6 +16,7 @@
  */
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
+import { SPEED_STAGE } from '../../src/net/protocol';
 import type {
   DistributionResult,
   LeaderboardEntry,
@@ -173,11 +174,44 @@ function actionsOf(raw: unknown): ReplayAction[] | null {
   return actions;
 }
 
-/** 仙緣換算成乘區。和 src/systems/loadout.ts 的 karmaBonuses 是同一組公式。 */
-async function rankOf(env: Env, stage: number): Promise<number> {
-  const row = await env.DB.prepare('SELECT COUNT(*) AS ahead FROM scores WHERE hidden = 0 AND stage > ?')
-    .bind(stage)
-    .first<{ ahead: number }>();
+/**
+ * 榜別。
+ *
+ * - depth：主線推得最深。同深度比誰快——那是這個榜唯一分得出高下的第二個維度。
+ * - speed：主線終點（第 81 關）的速通。**賽道必須固定**：不同關卡的秒數
+ *   不能比，否則「第 1 關 40 秒」會贏過「第 81 關 3 分鐘」，榜單就退化成
+ *   「誰最快打完最簡單的一關」。
+ * - arena：競技場連下幾波。
+ */
+export type BoardKind = 'depth' | 'speed' | 'arena';
+
+const BOARDS: readonly BoardKind[] = ['depth', 'speed', 'arena'];
+
+/** 這個榜是分數大的贏，還是小的贏。 */
+function lowerIsBetter(board: BoardKind): boolean {
+  return board === 'speed';
+}
+
+function boardOf(raw: unknown): BoardKind {
+  return BOARDS.includes(raw as BoardKind) ? (raw as BoardKind) : 'depth';
+}
+
+/**
+ * 這一筆在榜上第幾名。
+ *
+ * 算「有幾個人比你好」而不是排序後找位置：後者要把整張榜拉回來，
+ * 而榜可以很長，這一個查詢卻永遠只回一個數字。
+ */
+async function rankOf(env: Env, board: BoardKind, score: number, elapsed: number): Promise<number> {
+  // 同分時比秒數：秒數也一樣的才算並列。
+  const sql = lowerIsBetter(board)
+    ? 'SELECT COUNT(*) AS ahead FROM board_runs WHERE board = ? AND hidden = 0 AND score < ?'
+    : `SELECT COUNT(*) AS ahead FROM board_runs
+       WHERE board = ? AND hidden = 0 AND (score > ? OR (score = ? AND elapsed_ms < ?))`;
+  const statement = lowerIsBetter(board)
+    ? env.DB.prepare(sql).bind(board, score)
+    : env.DB.prepare(sql).bind(board, score, score, elapsed);
+  const row = await statement.first<{ ahead: number }>();
   return (row?.ahead ?? 0) + 1;
 }
 
@@ -244,27 +278,54 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   // 而且改名只要改帳號那一列，不必等他再破一次自己的紀錄。
   const name = account;
   const now = Date.now();
-  const existing = await env.DB.prepare('SELECT stage FROM scores WHERE player_id = ?')
-    .bind(playerId)
-    .first<{ stage: number }>();
-  const best = existing === null || claimed > existing.stage;
+
+  // **秒數用伺服器重播算出來的，不收客戶端報的。** 它和關卡數一樣是分數，
+  // 自報的分數沒有意義。而且它是模擬時間——加速鍵改的是「一幀補幾格」，
+  // 所以開 3× 打完這個數字完全一樣，拿來排名是公平的。
+  const elapsed = Math.round(replayed.elapsedMs);
+  const board = boardOf(record['board']);
+  // 速通榜只收固定賽道那一關：不同關的秒數不能比。
+  if (board === 'speed' && claimed !== SPEED_STAGE) {
+    return fail('rejected', env, origin, `速通榜只收第 ${SPEED_STAGE} 關`);
+  }
+  const score =
+    board === 'speed' ? elapsed : board === 'arena' ? replayed.clearedStages : claimed;
+
+  const existing = await env.DB.prepare(
+    'SELECT score, elapsed_ms FROM board_runs WHERE board = ? AND player_id = ?',
+  )
+    .bind(board, playerId)
+    .first<{ score: number; elapsed_ms: number }>();
+
+  const best =
+    existing === null ||
+    (lowerIsBetter(board)
+      ? score < existing.score
+      : score > existing.score ||
+        (score === existing.score && elapsed < existing.elapsed_ms));
 
   if (best) {
     await env.DB.prepare(
-      `INSERT INTO scores (player_id, name, stage, runs, steps, actions, loadout, verified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(player_id) DO UPDATE SET name = excluded.name,
-                                            stage = excluded.stage,
-                                            runs = excluded.runs,
-                                            steps = excluded.steps,
-                                            actions = excluded.actions,
-                                            loadout = excluded.loadout,
-                                            verified_at = excluded.verified_at`,
+      `INSERT INTO board_runs
+         (board, player_id, name, score, stage, elapsed_ms, runs, steps, actions, loadout, verified_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(board, player_id) DO UPDATE SET name = excluded.name,
+                                                   score = excluded.score,
+                                                   stage = excluded.stage,
+                                                   elapsed_ms = excluded.elapsed_ms,
+                                                   runs = excluded.runs,
+                                                   steps = excluded.steps,
+                                                   actions = excluded.actions,
+                                                   loadout = excluded.loadout,
+                                                   verified_at = excluded.verified_at`,
     )
       .bind(
+        board,
         playerId,
         name,
+        score,
         claimed,
+        elapsed,
         runs,
         replayed.steps,
         JSON.stringify(actions),
@@ -274,30 +335,92 @@ export async function submitScore(request: Request, env: Env, origin: string | n
       .run();
   }
 
-  const rank = await rankOf(env, best ? claimed : (existing?.stage ?? claimed));
-  return json<ScoreSubmitResult>({ ok: true, stage: claimed, rank, best }, env, origin);
+  const kept = best ? { score, elapsed } : { score: existing.score, elapsed: existing.elapsed_ms };
+  const rank = await rankOf(env, board, kept.score, kept.elapsed);
+  return json<ScoreSubmitResult>(
+    { ok: true, stage: claimed, rank, best, elapsedMs: elapsed },
+    env,
+    origin,
+  );
 }
 
-export async function leaderboard(env: Env, origin: string | null): Promise<Response> {
-  const rows = await env.DB.prepare(
-    // 同分時先到的排前面：後來的人追平不該把先達成的人擠下去。
-    'SELECT name, stage FROM scores WHERE hidden = 0 ORDER BY stage DESC, verified_at ASC LIMIT ?',
-  )
-    .bind(TOP_N)
-    .all<{ name: string; stage: number }>();
-  const total = await env.DB.prepare('SELECT COUNT(*) AS n FROM scores WHERE hidden = 0').first<{
-    n: number;
-  }>();
+interface BoardRow {
+  player_id: string;
+  name: string;
+  score: number;
+  stage: number;
+  elapsed_ms: number;
+}
 
-  const entries: LeaderboardEntry[] = (rows.results ?? []).map((row, index) => ({
-    rank: index + 1,
+function toEntry(row: BoardRow, rank: number): LeaderboardEntry {
+  return {
+    rank,
     name: row.name,
+    score: row.score,
     stage: row.stage,
-  }));
-  return json<LeaderboardResult>({ ok: true, entries, total: total?.n ?? 0 }, env, origin, 200, {
-    // 榜單不需要即時。快取一分鐘，讓 CDN 擋掉絕大多數的請求。
-    'cache-control': 'public, max-age=60',
-  });
+    elapsedMs: row.elapsed_ms,
+  };
+}
+
+/**
+ * 一個榜的前 N 名，外加呼叫者自己那一列。
+ *
+ * **playerId 是選填的，而且不必附密鑰**：這裡只讀公開的榜單資料，
+ * 拿別人的 id 來查也只會看到那個人本來就公開在榜上的東西。
+ * 要求密鑰的話這一頁就不能被 CDN 快取，代價遠大於收益。
+ */
+export async function leaderboard(
+  request: Request,
+  env: Env,
+  origin: string | null,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const board = boardOf(url.searchParams.get('board'));
+  const playerId = url.searchParams.get('playerId');
+
+  // 同分時比秒數，秒數也一樣就先到的排前面——後來的人追平不該把先達成的擠下去。
+  const order = lowerIsBetter(board)
+    ? 'score ASC, verified_at ASC'
+    : 'score DESC, elapsed_ms ASC, verified_at ASC';
+  const rows = await env.DB.prepare(
+    `SELECT player_id, name, score, stage, elapsed_ms FROM board_runs
+     WHERE board = ? AND hidden = 0 ORDER BY ${order} LIMIT ?`,
+  )
+    .bind(board, TOP_N)
+    .all<BoardRow>();
+  const total = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM board_runs WHERE board = ? AND hidden = 0',
+  )
+    .bind(board)
+    .first<{ n: number }>();
+
+  const entries = (rows.results ?? []).map((row, index) => toEntry(row, index + 1));
+
+  let mine: LeaderboardEntry | null = null;
+  if (playerId !== null && playerId.length > 0 && playerId.length <= 64) {
+    // 已經在前 N 名裡就直接用那一列，省一次查詢。
+    const listed = entries.find((_, index) => rows.results?.[index]?.player_id === playerId);
+    if (listed !== undefined) {
+      mine = listed;
+    } else {
+      const row = await env.DB.prepare(
+        `SELECT player_id, name, score, stage, elapsed_ms FROM board_runs
+         WHERE board = ? AND player_id = ? AND hidden = 0`,
+      )
+        .bind(board, playerId)
+        .first<BoardRow>();
+      if (row !== null) mine = toEntry(row, await rankOf(env, board, row.score, row.elapsed_ms));
+    }
+  }
+
+  return json<LeaderboardResult>(
+    { ok: true, entries, total: total?.n ?? 0, mine },
+    env,
+    origin,
+    200,
+    // 帶了 playerId 的那一份是個人化的，不能給 CDN 快取給所有人。
+    playerId === null ? { 'cache-control': 'public, max-age=60' } : { 'cache-control': 'no-store' },
+  );
 }
 
 /**
@@ -308,7 +431,8 @@ export async function leaderboard(env: Env, origin: string | null): Promise<Resp
  */
 export async function distribution(env: Env, origin: string | null): Promise<Response> {
   const rows = await env.DB.prepare(
-    'SELECT stage, COUNT(*) AS n FROM scores WHERE hidden = 0 GROUP BY stage ORDER BY stage ASC',
+    `SELECT stage, COUNT(*) AS n FROM board_runs
+     WHERE board = 'depth' AND hidden = 0 GROUP BY stage ORDER BY stage ASC`,
   ).all<{ stage: number; n: number }>();
 
   const buckets: number[] = [];

@@ -10,6 +10,7 @@
  */
 import type {
   AccountResult,
+  BoardKind,
   AccountSaltResult,
   ApiResponse,
   DistributionResult,
@@ -59,11 +60,12 @@ async function call<T>(path: string, body: unknown | null): Promise<ApiResponse<
   }
 }
 
-export function accountSalt(body: { name: string }): Promise<ApiResponse<AccountSaltResult>> {
+export function accountSalt(body: { email: string }): Promise<ApiResponse<AccountSaltResult>> {
   return call('/account/salt', body);
 }
 
 export function accountRegister(body: {
+  email: string;
   name: string;
   playerId: string;
   salt: string;
@@ -73,8 +75,31 @@ export function accountRegister(body: {
   return call('/account/register', body);
 }
 
-export function accountLogin(body: {
+export function accountRecover(body: {
+  email: string;
+}): Promise<ApiResponse<Record<string, never>>> {
+  return call('/account/recover', body);
+}
+
+export function accountReset(body: {
+  email: string;
+  code: string;
+  secretHash: string;
+}): Promise<ApiResponse<AccountResult>> {
+  return call('/account/reset', body);
+}
+
+/** 改道號。帳號是信箱，所以這裡只動顯示用的名字。 */
+export function accountRename(body: {
+  playerId: string;
+  secret: string;
   name: string;
+}): Promise<ApiResponse<AccountResult>> {
+  return call('/account/rename', body);
+}
+
+export function accountLogin(body: {
+  email: string;
   secretHash: string;
 }): Promise<ApiResponse<AccountResult>> {
   return call('/account/login', body);
@@ -92,8 +117,12 @@ export function submitScore(body: ScoreSubmitRequest): Promise<ApiResponse<Score
   return call<ScoreSubmitResult>('/score', body);
 }
 
-export function fetchLeaderboard(): Promise<ApiResponse<LeaderboardResult>> {
-  return call<LeaderboardResult>('/leaderboard', null);
+export function fetchLeaderboard(
+  board: BoardKind,
+  playerId: string | null,
+): Promise<ApiResponse<LeaderboardResult>> {
+  const query = playerId === null ? `?board=${board}` : `?board=${board}&playerId=${encodeURIComponent(playerId)}`;
+  return call(`/leaderboard${query}`, null);
 }
 
 export function fetchDistribution(): Promise<ApiResponse<DistributionResult>> {

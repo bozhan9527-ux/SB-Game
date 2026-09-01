@@ -6,7 +6,14 @@
  */
 import type { Env } from './http';
 import { corsHeaders, fail } from './http';
-import { accountSalt, loginAccount, registerAccount } from './accounts';
+import {
+  accountSalt,
+  loginAccount,
+  registerAccount,
+  renameAccount,
+  requestRecovery,
+  resetPassword,
+} from './accounts';
 import { getSave, putSave } from './saves';
 import { distribution, leaderboard, submitScore } from './scores';
 import { API_VERSION } from '../../src/net/protocol';
@@ -34,6 +41,15 @@ export default {
       if (path === `/${API_VERSION}/account/login` && request.method === 'POST') {
         return await loginAccount(request, env, origin);
       }
+      if (path === `/${API_VERSION}/account/rename` && request.method === 'POST') {
+        return await renameAccount(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/account/recover` && request.method === 'POST') {
+        return await requestRecovery(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/account/reset` && request.method === 'POST') {
+        return await resetPassword(request, env, origin);
+      }
       if (path === `/${API_VERSION}/save/put` && request.method === 'POST') {
         return await putSave(request, env, origin);
       }
@@ -44,7 +60,7 @@ export default {
         return await submitScore(request, env, origin);
       }
       if (path === `/${API_VERSION}/leaderboard` && request.method === 'GET') {
-        return await leaderboard(env, origin);
+        return await leaderboard(request, env, origin);
       }
       if (path === `/${API_VERSION}/distribution` && request.method === 'GET') {
         return await distribution(env, origin);

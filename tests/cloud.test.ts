@@ -162,13 +162,14 @@ describe('上榜開通', () => {
     steps: 10,
     actions: [],
     loadout: loadoutFor(playing()),
+    endless: false,
   };
 
   /** 一份「可以上榜」的存檔：有門派、也註冊過。 */
   function playing() {
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
-    save.player.account = { name: '劍修', salt: 'abc' };
+    save.player.account = { email: 'a@b.co', name: '劍修', salt: 'abc' };
     return save;
   }
 
@@ -179,7 +180,7 @@ describe('上榜開通', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValueOnce({ ok: false, error: 'unauthorized' })
-      .mockResolvedValueOnce({ ok: true, rank: 3, best: true, stage: 42 });
+      .mockResolvedValueOnce({ ok: true, rank: 3, best: true, stage: 42, elapsedMs: 1000 });
     const put = vi
       .spyOn(client, 'putSave')
       .mockResolvedValue({ ok: true, savedAt: 1 });
@@ -242,7 +243,7 @@ describe('上榜開通', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValueOnce({ ok: false, error: 'unauthorized' })
-      .mockResolvedValueOnce({ ok: true, rank: 1, best: true, stage: 42 });
+      .mockResolvedValueOnce({ ok: true, rank: 1, best: true, stage: 42, elapsedMs: 1000 });
     vi.spyOn(client, 'getSave').mockResolvedValue({
       ok: true,
       savedAt: 999,
@@ -327,7 +328,7 @@ describe('上報的是開打那一刻的配置', () => {
   it('submitRun 送的是 submission 裡那一份，不是從存檔現算的', async () => {
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
-    save.player.account = { name: '劍修', salt: 'abc' };
+    save.player.account = { email: 'a@b.co', name: '劍修', salt: 'abc' };
     save.player.sectClears['sword'] = 4;
     const captured = scoreLoadoutOf(loadoutSpecOf(save, 6));
 
@@ -336,8 +337,8 @@ describe('上報的是開打那一刻的配置', () => {
 
     const submit = vi
       .spyOn(client, 'submitScore')
-      .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6 });
-    await submitRun(save, 6, { runs: 0, steps: 10, actions: [], loadout: captured });
+      .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6, elapsedMs: 1000 });
+    await submitRun(save, 6, { runs: 0, steps: 10, actions: [], loadout: captured, endless: false });
 
     const sent = submit.mock.calls[0]?.[0];
     expect(sent?.loadout.sectClears).toBe(4);

@@ -59,6 +59,15 @@ export function maxTierForStage(stage: number, bonus = 0): number {
   return Math.max(steady, ascended) + Math.max(0, Math.floor(bonus));
 }
 
+/**
+ * 競技場的階數上限。
+ *
+ * 「沒有上限」在程式裡還是要有一個數字：合成每階乘 1.35，到了三十幾階
+ * 就已經超過任何一波妖魔的血量，再往上只是讓 Number 變得難看。
+ * 這個值大到玩家碰不到，小到不會讓傷害溢位。
+ */
+export const ARENA_MAX_TIER = 40;
+
 /** 抽到的符大約落在上限往下數幾階，偶爾多一階。 */
 export function drawTierForStage(stage: number, rng: Rng, tierBonus = 0): number {
   const { field } = BALANCE;
@@ -77,7 +86,15 @@ export function drawTierForStage(stage: number, rng: Rng, tierBonus = 0): number
  */
 export function drawCard(loadout: Loadout, stage: number, rng: Rng): Card {
   const def = rng.pickWeighted(loadout.talismans, (card) => card.weight);
-  return { type: def.id, tier: drawTierForStage(stage, rng, loadout.tierBonus) };
+  // 競技場一律抽 1 階。**所有人的起點完全一樣**是這個模式唯一的規則，
+  // 而「抽到的符跟著關卡上限走」會讓深一點的波次直接發高階符給你。
+  const tier = loadout.arena ? 1 : drawTierForStage(stage, rng, loadout.tierBonus);
+  return { type: def.id, tier };
+}
+
+/** 這一場的階數上限。競技場沒有上限（見 ARENA_MAX_TIER）。 */
+export function tierCapFor(loadout: Loadout, stage: number): number {
+  return loadout.arena ? ARENA_MAX_TIER : maxTierForStage(stage, loadout.tierBonus);
 }
 
 /** 兩張符能不能合：同一種符、同一階，且還沒到這一關的上限。 */

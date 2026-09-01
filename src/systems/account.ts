@@ -6,15 +6,26 @@
  * 也就是說整套帳號沒有引進任何一種新的秘密，只是把「隨機產生的 secret」
  * 換成「從密碼算出來的 secret」。
  *
- * 三個後果，寫在這裡而不是散在各處：
+ * **帳號是電子信箱，道號只負責顯示。** 登入要的是一個唯一、記得住、
+ * 能拿來找回帳號的東西；榜上要的是一個看得順眼的名字。綁在一起的話，
+ * 改個名就變成換一個帳號。
+ *
+ * 兩個後果，寫在這裡而不是散在各處：
  *
  * - **登入 = 重新算出同一把 secret**。所以換裝置登入之後，下載存檔、上榜
  *   全部走既有的路，一行都不必改。
- * - **密碼有多強，身分就有多強。** PBKDF2 的迭代數是唯一的緩衝。
- * - **忘記密碼救不回來**（沒有 email）。救援手段是既有的存檔碼——
- *   它本來就把身分整組帶著走。這一點要在註冊畫面上講清楚。
+ * - **密碼有多強，身分就有多強。** PBKDF2 的迭代數是唯一的緩衝，
+ *   而忘記密碼是靠信箱收驗證碼救回來的。
  */
-import { accountLogin, accountRegister, accountSalt } from '../net/client';
+import {
+  accountLogin,
+  accountRecover,
+  accountRegister,
+  accountRename,
+  accountReset,
+  accountSalt,
+} from '../net/client';
+import { cleanEmail } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import { ensureCloudIdentity } from './cloud';
 
@@ -74,21 +85,25 @@ export function hasAccount(save: SaveData): boolean {
  */
 export async function register(
   save: SaveData,
+  email: string,
   name: string,
   password: string,
 ): Promise<AccountOutcome> {
   if (password.length < MIN_PASSWORD_LENGTH) {
     return { kind: 'failed', reason: `密碼至少要 ${MIN_PASSWORD_LENGTH} 個字` };
   }
+  const cleaned = cleanEmail(email);
+  if (cleaned === null) return { kind: 'failed', reason: '電子信箱看起來不對' };
   const identity = ensureCloudIdentity(save);
 
-  const salted = await accountSalt({ name });
+  const salted = await accountSalt({ email: cleaned });
   if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  if (salted.taken) return { kind: 'failed', reason: '這個名字已經有人用了' };
+  if (salted.taken) return { kind: 'failed', reason: '這個信箱已經註冊過了' };
 
   const secret = await deriveSecret(password, salted.salt);
   const result = await accountRegister({
     name,
+    email: cleaned,
     playerId: identity.playerId,
     salt: salted.salt,
     secretHash: await sha256(secret),
@@ -101,7 +116,7 @@ export async function register(
 
   // 身分的密鑰換成密碼推導出來的那一把——伺服器那邊已經同步改過了。
   identity.secret = secret;
-  save.player.account = { name: result.name, salt: salted.salt };
+  save.player.account = { email: cleaned, name: result.name, salt: salted.salt };
   save.player.name = result.name;
   return { kind: 'ok', name: result.name };
 }
@@ -115,25 +130,104 @@ export async function register(
  */
 export async function login(
   save: SaveData,
-  name: string,
+  email: string,
   password: string,
 ): Promise<AccountOutcome> {
-  const salted = await accountSalt({ name });
+  const cleaned = cleanEmail(email);
+  if (cleaned === null) return { kind: 'failed', reason: '電子信箱看起來不對' };
+
+  const salted = await accountSalt({ email: cleaned });
   if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  // 名字沒人用過就一定不是這個帳號的鹽，密碼再對也算不出同一把密鑰。
-  if (!salted.taken) return { kind: 'failed', reason: '名稱或密碼不對' };
+  // 沒註冊過就一定不是這個帳號的鹽，密碼再對也算不出同一把密鑰。
+  // 回和密碼錯誤同一句話：分開回等於送人一份「哪些信箱註冊過」的查詢工具。
+  if (!salted.taken) return { kind: 'failed', reason: '信箱或密碼不對' };
 
   const secret = await deriveSecret(password, salted.salt);
-  const result = await accountLogin({ name, secretHash: await sha256(secret) });
+  const result = await accountLogin({ email: cleaned, secretHash: await sha256(secret) });
   if (!result.ok) {
-    return { kind: 'failed', reason: result.detail ?? '名稱或密碼不對' };
+    return { kind: 'failed', reason: result.detail ?? '信箱或密碼不對' };
   }
 
   const identity = ensureCloudIdentity(save);
   identity.playerId = result.playerId;
   identity.secret = secret;
   identity.syncedAt = 0;
-  save.player.account = { name: result.name, salt: salted.salt };
+  save.player.account = { email: cleaned, name: result.name, salt: salted.salt };
+  save.player.name = result.name;
+  return { kind: 'ok', name: result.name };
+}
+
+/**
+ * 忘記密碼：請伺服器寄一組驗證碼。
+ *
+ * **回傳永遠是成功**，即使那個帳號不存在——伺服器那邊也是同一個規則。
+ * 分開回等於送人一份「哪些名字有註冊、綁哪個信箱」的查詢工具。
+ */
+export async function requestRecovery(email: string): Promise<AccountOutcome> {
+  const cleaned = cleanEmail(email);
+  if (cleaned === null) return { kind: 'failed', reason: '電子信箱看起來不對' };
+  const result = await accountRecover({ email: cleaned });
+  if (!result.ok) return { kind: 'failed', reason: '連不上伺服器' };
+  return { kind: 'ok', name: cleaned };
+}
+
+/**
+ * 用驗證碼設一組新密碼，順便登入。
+ *
+ * 新的身分密鑰一樣是用新密碼推出來的。**進度不會有任何變化**：
+ * 雲端存檔那一列只換密鑰，內容原封不動。
+ */
+export async function resetPassword(
+  save: SaveData,
+  email: string,
+  code: string,
+  password: string,
+): Promise<AccountOutcome> {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return { kind: 'failed', reason: `密碼至少要 ${MIN_PASSWORD_LENGTH} 個字` };
+  }
+  const cleaned = cleanEmail(email);
+  if (cleaned === null) return { kind: 'failed', reason: '電子信箱看起來不對' };
+
+  const salted = await accountSalt({ email: cleaned });
+  if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
+  if (!salted.taken) return { kind: 'failed', reason: '驗證碼不對或已經過期' };
+
+  // 鹽不變，所以新密碼推出來的密鑰和伺服器接下來要存的是同一把。
+  const secret = await deriveSecret(password, salted.salt);
+  const result = await accountReset({
+    email: cleaned,
+    code: code.trim(),
+    secretHash: await sha256(secret),
+  });
+  if (!result.ok) return { kind: 'failed', reason: result.detail ?? '驗證碼不對或已經過期' };
+
+  const identity = ensureCloudIdentity(save);
+  identity.playerId = result.playerId;
+  identity.secret = secret;
+  identity.syncedAt = 0;
+  save.player.account = { email: cleaned, name: result.name, salt: salted.salt };
+  save.player.name = result.name;
+  return { kind: 'ok', name: result.name };
+}
+
+/**
+ * 改道號。
+ *
+ * 帳號是信箱，所以這裡只動顯示用的名字——身分、進度、雲端存檔全部不變，
+ * 而且榜上那幾列會跟著改掉，不必再破一次自己的紀錄。
+ */
+export async function rename(save: SaveData, name: string): Promise<AccountOutcome> {
+  const account = save.player.account;
+  if (account === null) return { kind: 'failed', reason: '還沒註冊' };
+  const identity = ensureCloudIdentity(save);
+  const result = await accountRename({
+    playerId: identity.playerId,
+    secret: identity.secret,
+    name,
+  });
+  if (!result.ok) return { kind: 'failed', reason: result.detail ?? '改名沒有成功' };
+  save.player.account = { ...account, name: result.name };
   save.player.name = result.name;
   return { kind: 'ok', name: result.name };
 }

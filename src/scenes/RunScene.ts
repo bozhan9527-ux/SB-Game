@@ -2499,6 +2499,7 @@ export class RunScene extends Phaser.Scene {
               steps: this.stepIndex,
               actions: this.actions,
               loadout: this.runLoadout,
+              endless: this.run.loadout.endless,
             },
       dungeon: this.dungeonRun,
     };

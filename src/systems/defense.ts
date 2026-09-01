@@ -16,7 +16,7 @@ import {
   cardDef,
   cardInterval,
   drawCard,
-  maxTierForStage,
+  tierCapFor,
 } from "./deck";
 import type { SlotBonus } from "./board";
 import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from "./board";
@@ -621,7 +621,7 @@ export function mergeInto(
 }
 
 function maxTier(state: DefenseState): number {
-  return maxTierForStage(state.threat, state.loadout.tierBonus);
+  return tierCapFor(state.loadout, state.threat);
 }
 
 // ---------------------------------------------------------------- 每一拍

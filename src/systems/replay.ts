@@ -61,6 +61,10 @@ export interface ReplayInput {
 export interface ReplayResult {
   outcome: Outcome;
   stage: number;
+  /** 這一場的模擬時間。速通榜看它。 */
+  elapsedMs: number;
+  /** 無限模式連下幾波。競技榜看它。 */
+  clearedStages: number;
   steps: number;
   disciples: number;
   kills: number;
@@ -132,6 +136,11 @@ export function replayRun(loadout: Loadout, input: ReplayInput): ReplayResult {
   return {
     outcome: state.outcome,
     stage: state.stage,
+    // 模擬時間，不是牆上時間。加速鍵改的是「一幀補幾格」，所以開 3× 打完
+    // 這個數字完全一樣——它才有資格拿來排速通榜。
+    elapsedMs: state.elapsedMs,
+    // 無限模式打了幾波。有終點的一場永遠是 0。
+    clearedStages: state.clearedStages,
     steps,
     disciples: state.disciples,
     kills: state.kills,

@@ -16,8 +16,12 @@
 export interface FormField {
   key: string;
   label: string;
-  /** 密碼欄會遮蔽，而且不進瀏覽器的自動完成紀錄。 */
+  /** 密碼欄會遮蔽。 */
   password?: boolean;
+  /** 信箱欄：手機鍵盤會換成帶 @ 的那一組。 */
+  email?: boolean;
+  /** 只收數字（驗證碼）：手機直接跳數字鍵盤。 */
+  numeric?: boolean;
   placeholder?: string;
   maxLength?: number;
 }
@@ -28,6 +32,11 @@ export interface FormOptions {
   note?: string;
   fields: FormField[];
   submit: string;
+  /**
+   * 送出前的檢查。回一句話就顯示它並且**不關閉表單**——
+   * 打錯一個字就把整張表清掉重來，是這種畫面最讓人火大的地方。
+   */
+  validate?: (values: Record<string, string>) => string | null;
 }
 
 /** 送出時回傳每個欄位的值；取消回 null。 */
@@ -115,9 +124,14 @@ export function showForm(options: FormOptions): Promise<FormResult> {
       const label = document.createElement('label');
       label.textContent = field.label;
       const input = document.createElement('input');
-      input.type = field.password === true ? 'password' : 'text';
-      // 帳號用 username、密碼用 current-password：密碼管理員才認得出來。
-      input.autocomplete = field.password === true ? 'current-password' : 'username';
+      input.type = field.password === true ? 'password' : field.email === true ? 'email' : 'text';
+      // 密碼管理員靠 autocomplete 認欄位：信箱用 username、密碼用 current-password。
+      input.autocomplete =
+        field.password === true ? 'current-password' : field.email === true ? 'username' : 'off';
+      if (field.numeric === true) {
+        input.inputMode = 'numeric';
+        input.autocomplete = 'one-time-code';
+      }
       if (field.placeholder !== undefined) input.placeholder = field.placeholder;
       if (field.maxLength !== undefined) input.maxLength = field.maxLength;
       label.appendChild(input);
@@ -163,6 +177,12 @@ export function showForm(options: FormOptions): Promise<FormResult> {
       event.preventDefault();
       const values: Record<string, string> = {};
       for (const [key, input] of inputs) values[key] = input.value;
+      const complaint = options.validate?.(values) ?? null;
+      if (complaint !== null) {
+        // 留在表單上：他已經打的東西不該因為一個錯字全部消失。
+        error.textContent = complaint;
+        return;
+      }
       close(values);
     });
   });

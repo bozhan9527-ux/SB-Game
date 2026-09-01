@@ -8,8 +8,8 @@
  * 本檔不 import Phaser。
  */
 import { fetchDistribution, getSave, putSave, submitScore } from '../net/client';
-import { percentileOf } from '../net/protocol';
-import type { ScoreLoadout } from '../net/protocol';
+import { SPEED_STAGE, percentileOf } from '../net/protocol';
+import type { BoardKind, ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
 import { ensureCloudIdentity } from './cloud';
@@ -56,6 +56,18 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
  * 送還是照送：成功的話「已上榜」照樣顯示，只有失敗那一路安靜。
  */
 export const QUIET_FAILURE_BELOW_STAGE = 6;
+
+/**
+ * 這一場該進哪幾個榜。
+ *
+ * 打完主線最後一關的那一場**同時進兩個榜**：它既是一筆深度成績，
+ * 也是一筆速通成績。在這裡判而不是丟給伺服器，是因為
+ * 「一場成績算幾個榜」是遊戲規則，不是資料庫的事。
+ */
+export function boardsFor(stage: number, endless: boolean): BoardKind[] {
+  if (endless) return ['arena'];
+  return stage === SPEED_STAGE ? ['depth', 'speed'] : ['depth'];
+}
 
 export type SubmitOutcome =
   | { kind: 'ok'; rank: number; best: boolean }
@@ -132,8 +144,9 @@ export async function submitRun(
   }
   const identity = ensureCloudIdentity(save);
 
-  const send = (): Promise<Awaited<ReturnType<typeof submitScore>>> =>
+  const send = (board: BoardKind): Promise<Awaited<ReturnType<typeof submitScore>>> =>
     submitScore({
+      board,
       playerId: identity.playerId,
       secret: identity.secret,
       name: save.player.name,
@@ -154,13 +167,18 @@ export async function submitRun(
       loadout: submission.loadout,
     });
 
-  let result = await send();
+  // 第一個榜是主榜——它的名次就是要顯示給玩家看的那一個。其餘的
+  // （打完主線最後一關那一場同時算速通）在背景送，失敗也不吵他。
+  const boards = boardsFor(stage, submission.endless);
+  const primary = boards[0] ?? 'depth';
+  let result = await send(primary);
 
   if (!result.ok && result.error === 'unauthorized') {
     // 自己補登記再重送一次。只重試這一次：登記完還是 unauthorized 的話
     // 成因是另一件事（密鑰對不上），再送幾次也一樣。
-    if (await registerForBoard(save)) result = await send();
+    if (await registerForBoard(save)) result = await send(primary);
   }
+  for (const board of boards.slice(1)) await send(board);
 
   if (!result.ok) {
     if (result.error === 'unauthorized') {

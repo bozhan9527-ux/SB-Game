@@ -7,6 +7,9 @@ import { MAX_BLOB_BYTES } from '../../src/net/protocol';
 export interface Env {
   DB: D1Database;
   ALLOWED_ORIGIN: string;
+  /** 寄信服務（忘記密碼的驗證碼）。沒設定時整包是 no-op，見 mail.ts。 */
+  RESEND_KEY?: string;
+  RESEND_FROM?: string;
 }
 
 /**

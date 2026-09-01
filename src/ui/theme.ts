@@ -103,3 +103,19 @@ export function fitText(text: Phaser.GameObjects.Text, maxWidth: number): void {
 export function formatNumber(value: number): string {
   return Math.round(value).toLocaleString('en-US');
 }
+
+/**
+ * 毫秒 → 「2:14」。
+ *
+ * 秒數是榜單上的分數，所以格式要能讓人一眼比大小：固定兩位的秒、
+ * 分鐘不補零。超過一小時的一場寫成 h:mm:ss——那種紀錄不常見，
+ * 但寫成「87:03」會被讀成八十七秒。
+ */
+export function formatTime(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const seconds = total % 60;
+  const minutes = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+  const mm = hours > 0 ? String(minutes).padStart(2, '0') : String(minutes);
+  return `${hours > 0 ? `${hours}:` : ''}${mm}:${String(seconds).padStart(2, '0')}`;
+}

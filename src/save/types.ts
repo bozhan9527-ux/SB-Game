@@ -151,11 +151,11 @@ export interface PlayerState {
   /**
    * 綁定的帳號。沒註冊就是 null——**沒有帳號就不上榜**。
    *
-   * 只存名字與鹽，不存密碼：密碼從來沒有離開過這台裝置，
-   * 身分那一把密鑰是用它現算出來的（見 src/systems/account.ts）。
+   * **帳號是信箱，name 只是榜上顯示的道號。** 不存密碼：密碼從來沒有
+   * 離開過這台裝置，身分那一把密鑰是用它現算出來的（見 src/systems/account.ts）。
    * 鹽留著是為了之後要重算密鑰時不必再問伺服器一次。
    */
-  account: { name: string; salt: string } | null;
+  account: { email: string; name: string; salt: string } | null;
   /** 上榜用的名字。沒取過名字是空字串，第一次上榜時才問。 */
   name: string;
   stats: StatsState;

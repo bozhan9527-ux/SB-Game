@@ -94,6 +94,14 @@ export interface Loadout {
   /** 仙緣「宿慧未泯」帶來的階數上限加值。跨世永久生效。 */
   tierBonus: number;
   /**
+   * 競技場：符從 1 階起、階數沒有上限、所有養成的倍率全部關掉。
+   *
+   * 這一場的目的是**讓所有人的起點完全一樣**，榜上那個波數才只反映操作。
+   * 階數上限拿掉是為了讓合成一路長上去——養成被關掉之後，
+   * 「疊到幾階」就是玩家自己唯一能推的那條指數。
+   */
+  arena: boolean;
+  /**
    * 門派秘傳加在**專精那一張符**上的額外傷害（0.27 = 再 +27%）。
    *
    * 加在門派本身的專精倍率上，不是另外乘一層：兩者是同一件事的兩段，
@@ -242,6 +250,24 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   if (has('thinGate')) {
     loadout.disciples = Math.max(1, Math.round(loadout.disciples * 0.3));
   }
+  // 競技場：把所有養成的倍率打回門派本身的基準值。
+  //
+  // **在這裡做，不是在 buildLoadoutFor 裡多開一條路。** 那個函式的參數
+  // （升級、修為、仙緣）是平衡模擬要能單獨掃的維度，為了一個模式在裡面
+  // 加分支，等於讓每一次模擬都要多想一件事。這裡改的是算完之後的成品，
+  // 讀起來也直接：這個模式就是「把加成拿掉」。
+  if (has('arena')) {
+    const { power } = BALANCE;
+    loadout.arena = true;
+    loadout.disciples = Math.max(1, Math.round(power.baseDisciples * sect.discipleMultiplier));
+    loadout.damageMultiplier = sect.damageMultiplier;
+    loadout.fireRateMultiplier = 1;
+    loadout.drawSpeedMultiplier = sect.drawSpeedMultiplier;
+    loadout.goldMultiplier = sect.goldMultiplier;
+    loadout.tierBonus = 0;
+    loadout.favoredDamageBonus = 0;
+  }
+
   applySectDepth(loadout, spec.sectDepth);
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
   const { traitChancePerLife, traitChanceMax } = BALANCE.rebirth;
@@ -262,6 +288,8 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
  * 而這裡一眼就看得出「哪一派加在哪一格」。
  */
 function applySectDepth(loadout: Loadout, level: number): void {
+  // 競技場把所有養成關掉了，秘傳也是養成。
+  if (loadout.arena) return;
   const track = sectTrackFor(loadout.sect.id);
   if (track === null) return;
   const amount = sectUpgradeAmount(track, Math.max(0, Math.floor(level)));
@@ -329,6 +357,7 @@ export function buildLoadoutFor(
     sect,
     stage,
     favoredDamageBonus: 0,
+    arena: false,
     // 沒有轉世資訊時威脅度就是關卡本身、妖魔也不額外長習性。
     // 平衡模擬與測試大多走這條路。
     threat: stage,

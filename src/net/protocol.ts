@@ -41,6 +41,27 @@ export function cleanName(raw: unknown): string | null {
   return cleaned;
 }
 
+/**
+ * 電子信箱。**只用來找回帳號，不做任何別的事。**
+ *
+ * 驗證刻意寬鬆：只確認「看起來是一個信箱」。嚴格的正則會擋掉合法的位址
+ * （加號、子網域、新的頂級網域都常被擋），而真正能證明信箱有效的只有
+ * 「寄一封信過去，他收得到」——那件事在忘記密碼的流程裡本來就會做一次。
+ */
+export function cleanEmail(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const cleaned = raw.trim().toLowerCase();
+  if (cleaned.length === 0 || cleaned.length > 254) return null;
+  if (!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(cleaned)) return null;
+  return cleaned;
+}
+
+/** 找回帳號的驗證碼長度。六位數字：夠短到可以用手打，夠長到猜不中。 */
+export const RECOVERY_CODE_LENGTH = 6;
+
+/** 驗證碼多久過期。太長等於把信箱外洩的風險放大。 */
+export const RECOVERY_TTL_MS = 30 * 60 * 1000;
+
 export type ApiError =
   | 'badRequest'
   | 'unauthorized'
@@ -95,6 +116,8 @@ export interface ScoreSubmitRequest extends Identity {
   actions: unknown[];
   /** 重播時要用的配置。伺服器會夾在合法範圍內。 */
   loadout: ScoreLoadout;
+  /** 這一筆要進哪個榜。 */
+  board: BoardKind;
 }
 
 /**
@@ -146,18 +169,43 @@ export interface ScoreSubmitResult {
   stage: number;
   rank: number;
   best: boolean;
+  /** 伺服器重播算出來的模擬時間。速通榜與同分比較都看它。 */
+  elapsedMs: number;
 }
 
 export interface LeaderboardEntry {
   rank: number;
   name: string;
+  /** 這個榜的分數：深度／秒數／波數，由 board 決定怎麼讀。 */
+  score: number;
   stage: number;
+  elapsedMs: number;
 }
 
 export interface LeaderboardResult {
   entries: LeaderboardEntry[];
   total: number;
+  /**
+   * 呼叫者自己那一列。
+   *
+   * **前 N 名之外的人也要看得到自己。** 沒有這一欄的話，第 400 名的玩家
+   * 在這一頁永遠找不到自己——而他才是絕大多數。
+   */
+  mine: LeaderboardEntry | null;
 }
+
+/** 三個榜。字串直接進網址與資料庫，改名等於改協定。 */
+export type BoardKind = 'depth' | 'speed' | 'arena';
+
+/**
+ * 速通榜的賽道：主線的最後一關。
+ *
+ * **賽道必須固定，而且兩邊必須是同一個數字。** 不同關卡的秒數不能比——
+ * 「第 1 關 40 秒」會贏過「第 81 關 3 分鐘」，榜單就退化成
+ * 「誰最快打完最簡單的一關」。前後端各寫一份的話，客戶端會送出
+ * 一筆伺服器一定退回的成績，而畫面上說不出原因。
+ */
+export const SPEED_STAGE = 81;
 
 /**
  * 關卡分布。索引就是關卡編號，值是「最深只到這一關的人數」。
