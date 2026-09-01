@@ -1815,7 +1815,16 @@ export class RunScene extends Phaser.Scene {
         .setOrigin(0.5, 0.6)
         .setScale(scale);
       sprite.play(enemyWalkKey(enemy.art));
-      sprite.anims.setProgress(this.rng.next());
+      // **這裡一定要用 Math.random，不能用 this.rng。**
+      //
+      // 錯開走路動畫是純粹的畫面效果，但 this.rng 是驅動整場戰鬥的那一條。
+      // 每生一隻妖魔的圖就從它身上取走一個值，而伺服器重播時不會取——
+      // 從第一隻妖魔開始，兩邊的序列就永久錯開，重播出來是另一場仗。
+      //
+      // 這個 bug 真的上線過：症狀是「正常通關卻說紀錄和伺服器對不起來」，
+      // 而且**強度碾壓的那幾場照樣會過**（序列錯開也還是打得贏），
+      // 所以它看起來像偶發。凡是只影響畫面的隨機，都必須離模擬的亂數遠一點。
+      sprite.anims.setProgress(Math.random());
       container.add(sprite);
       container.setData("body", sprite);
     }

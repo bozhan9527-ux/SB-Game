@@ -9,6 +9,8 @@
  * 而且是慢慢飄，前十秒看起來還一模一樣，那種錯最難發現。
  */
 import { describe, expect, it } from 'vitest';
+// ?raw 讓 Vite 直接把檔案內容當字串給進來——不必動 node 的型別。
+import runSceneSource from '../src/scenes/RunScene.ts?raw';
 import { SECTS } from '../src/data';
 import type { Sect } from '../src/data/types';
 import { createDefenseState, dropOn, tickCombat } from '../src/systems/defense';
@@ -278,5 +280,59 @@ describe('教學那一場也重播得出來', () => {
     expect(withFlag.elapsedMs).toBe(state.elapsedMs);
     // 沒有旗標的那一份起手牌完全不同，所以它不是同一場仗。
     expect(without.kills).not.toBe(withFlag.kills);
+  });
+});
+
+/**
+ * 模擬用的亂數不准被畫面碰。
+ *
+ * 這是一個**真的上線過**的故障：RunScene 為了錯開妖魔的走路動畫，寫了
+ * `sprite.anims.setProgress(this.rng.next())`——而 this.rng 正是驅動整場
+ * 戰鬥的那一條。每生一隻妖魔的圖就取走一個值，伺服器重播時不會取，
+ * 於是兩邊的序列從第一隻妖魔開始就永久錯開。
+ *
+ * 症狀最惡劣的地方在於它看起來像偶發：**強度碾壓的那幾場照樣會過**
+ * （序列錯開也還是打得贏），只有勢均力敵的才會被判「重播的結果是 running」。
+ * 所以它在榜上的表現是「有些人有成績、有些人沒有」，查了很久。
+ *
+ * 純函式的測試抓不到這一類 bug——它發生在 Phaser 場景裡，而場景不進單元測試。
+ * 所以這裡直接掃原始碼：**this.rng 只准出現在那四個地方**。
+ */
+describe('模擬的亂數只准給模擬用', () => {
+  it('RunScene 裡的 this.rng 只出現在建立、拖放、推進這三件事上', () => {
+    // 只看程式碼，註解裡提到 this.rng 是在說明這條規則本身。
+    const code = runSceneSource
+      .split('\n')
+      .filter((line: string) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join('\n');
+    const uses = code.match(/this\.rng/g) ?? [];
+
+    // createRng（建立）、createDefenseState、dropOn、tickCombat——就這四個。
+    const allowed = [
+      /this\.rng = createRng\(/,
+      /createDefenseState\([^)]*this\.rng\)/,
+      /dropOn\([^)]*this\.rng\)/,
+      /tickCombat\([^)]*this\.rng\)/,
+    ];
+    const found = allowed.filter((pattern) => pattern.test(code)).length;
+    expect(found).toBe(allowed.length);
+    expect(uses).toHaveLength(allowed.length);
+  });
+
+  it('少消耗一個亂數值就足以讓兩邊走散——這就是那個 bug 的形狀', () => {
+    const loadout = buildLoadoutFor(sect(), {}, 12);
+    const fingerprint = (steal: boolean): string => {
+      const rng = createRng(runSeed(12, 0));
+      const state = createDefenseState(loadout, rng);
+      if (steal) rng.next(); // ← 那一行動畫偷走的值
+      for (let i = 0; i < 1200 && state.outcome === 'running'; i += 1) {
+        tickCombat(state, STEP_MS, rng);
+      }
+      // 抽到的符就是最直接的證據：序列一錯開，手上的牌就不是同一副。
+      return state.hand.map((card) => (card === null ? '-' : `${card.type}${card.tier}`)).join(',');
+    };
+
+    // 一個值就夠了。這正是為什麼那個 bug 那麼難查：它不會炸，只是慢慢走散。
+    expect(fingerprint(true)).not.toBe(fingerprint(false));
   });
 });
