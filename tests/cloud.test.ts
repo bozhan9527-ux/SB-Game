@@ -324,6 +324,40 @@ describe('上榜開通', () => {
     expect(outcome.reason).toContain('重新整理');
   });
 
+  it('**伺服器說了原因就用伺服器那一句。**', async () => {
+    // 這裡原本一律換成一句通用的話，於是「你的遊戲是舊版本」永遠傳不到
+    // 玩家眼前——為了那句話加的一整套版本檢查，被客戶端這一行丟掉了。
+    // 實測：製作人玩到第四關，每一場都收到通用訊息，猜了三輪才發現
+    // 真正的原因就寫在被丟掉的那個欄位裡。
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+    vi.spyOn(client, 'submitScore').mockResolvedValue({
+      ok: false,
+      error: 'rejected',
+      detail: '你的遊戲是舊版本，重新整理頁面就會更新',
+    } as never);
+
+    const outcome = await submitRun(save, submission);
+    expect(outcome.kind).toBe('failed');
+    if (outcome.kind === 'failed') {
+      expect(outcome.reason).toBe('你的遊戲是舊版本，重新整理頁面就會更新');
+    }
+  });
+
+  it('伺服器沒說原因時才用通用那一句', async () => {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.cloud = { playerId: 'p', secret: 's', syncedAt: 1 };
+    vi.spyOn(client, 'submitScore').mockResolvedValue({ ok: false, error: 'rejected' } as never);
+
+    const outcome = await submitRun(save, submission);
+    if (outcome.kind === 'failed') {
+      expect(outcome.reason).toContain('對不起來');
+      expect(outcome.reason).not.toContain('驗不過');
+    }
+  });
+
   it('**失敗的理由一律說得出來，不分關卡。**', () => {
     // 結算頁曾經在前五關把失敗訊息整個藏起來，理由是「那幾筆成績在榜上
     // 沒有意義」。速通改成一關一個榜之後那個理由就不成立了，而它擋住的
