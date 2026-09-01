@@ -46,15 +46,30 @@ import {
 import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatTime, hexToNumber, textStyle } from '../ui/theme';
+import { BG_PANEL, BG_PANEL_ALT, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatTime, hexToNumber, textStyle } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 const LIST_TOP = 240;
-const ROW_HEIGHT = 34;
-const VISIBLE_ROWS = 14;
+const ROW_HEIGHT = 40;
+const VISIBLE_ROWS = 12;
+
+/**
+ * 前三名的獎牌顏色：金、銀、銅。
+ *
+ * 第 4～10 名不給顏色，只給一圈框——**顏色要留給真的稀有的東西**。
+ * 十個名次十種顏色的話，前三名就不再顯眼了，而那正是最該被獎勵的位置。
+ */
+const MEDALS = ['#e8c46a', '#cdd6de', '#c98a52'] as const;
+/** 給到第幾名為止有牌。再往下就只是一個數字。 */
+const MEDAL_RANKS = 10;
 
 export class LeaderboardScene extends Phaser.Scene {
-  private rows: Phaser.GameObjects.Text[] = [];
+  private rows: {
+    medal: Phaser.GameObjects.Arc;
+    rank: Phaser.GameObjects.Text;
+    name: Phaser.GameObjects.Text;
+    score: Phaser.GameObjects.Text;
+  }[] = [];
   /** 榜的版面。速通分頁多一列賽道，所以這兩個是算出來的，不是常數。 */
   private listTop = LIST_TOP;
   private visibleRows = VISIBLE_ROWS;
@@ -172,6 +187,7 @@ export class LeaderboardScene extends Phaser.Scene {
       .text(cx, 174 + shift, '', textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(0.5);
 
+
     // 有帳號就只需要一顆改名鍵；沒帳號的話這裡是整頁最重要的東西——
     // 他上不了榜，而且在此之前沒有任何地方告訴過他為什麼。
     if (hasAccount(save)) {
@@ -221,12 +237,26 @@ export class LeaderboardScene extends Phaser.Scene {
     this.add
       .rectangle(cx, this.listTop + height / 2, width, height, BG_PANEL, 0.9)
       .setStrokeStyle(2, LINE);
+    // 一列拆成三塊：獎牌、名字、成績。
+    //
+    // 原本是一整條字串，於是名字只能和名次、成績共用同一個字級——而**名字
+    // 才是這一頁在看的東西**（「我朋友在不在上面」是這一頁最常被問的問題）。
+    // 拆開之後名字放大到 21，成績退到 15 並靠右對齊，名次則變成一枚牌。
+    const left = cx - width / 2;
     for (let i = 0; i < this.visibleRows; i += 1) {
-      this.rows.push(
-        this.add
-          .text(cx - width / 2 + 20, this.listTop + 22 + i * ROW_HEIGHT, '', textStyle({ size: 17, color: INK }))
+      const y = this.listTop + 24 + i * ROW_HEIGHT;
+      this.rows.push({
+        medal: this.add.circle(left + 32, y, 15).setStrokeStyle(2, LINE).setVisible(false),
+        rank: this.add
+          .text(left + 32, y, '', textStyle({ size: 15, color: INK_DIM, bold: true }))
+          .setOrigin(0.5),
+        name: this.add
+          .text(left + 60, y, '', textStyle({ size: 21, color: INK, bold: true }))
           .setOrigin(0, 0.5),
-      );
+        score: this.add
+          .text(left + width - 18, y, '', textStyle({ size: 15, color: INK_DIM }))
+          .setOrigin(1, 0.5),
+      });
     }
 
     // 你自己那一列，釘在名單底下。
@@ -271,23 +301,37 @@ export class LeaderboardScene extends Phaser.Scene {
    * 他要的是上榜。所以進到這一頁就順手補掉，並且**只在還沒登記時做**，
    * 因此不可能蓋掉雲端已經有的任何東西。
    */
+  /**
+   * 寫那一行狀態。
+   *
+   * **一定要夾寬度。** 這一行的內容長度完全不受控：一般狀態很短，但失敗的
+   * 理由（伺服器回的那一句）和「榜上叫你無名修士」都長得多，不夾就從兩邊
+   * 溢出畫面——而它是玩家唯一的線索，看不完等於沒寫。
+   */
+  private say(text: string, color: string): void {
+    this.mine.setText(text).setColor(color);
+    fitText(this.mine, GAME_WIDTH - 32);
+  }
+
   private async prepare(): Promise<void> {
     if (!cloudEnabled()) return;
     const save = state();
     // 沒註冊也上得了榜，只是榜上是一個系統給的名字。這一行要說清楚
     // 「你已經在榜上了」和「註冊能拿到什麼」——講成「你不會出現在榜上」
     // 是錯的，而且那正是這一頁原本說的話。
-    const ready = `上榜已開通，通關就會自動送出${hasAccount(save) ? '' : '（榜上顯示無名修士，註冊就換成你的道號）'}`;
+    const ready = hasAccount(save)
+      ? '上榜已開通，通關就會自動送出'
+      : '上榜已開通　榜上叫你無名修士，註冊可換道號';
     if (boardReady(save)) {
-      this.mine.setText(ready).setColor(INK_DIM);
+      this.say(ready, INK_DIM);
       return;
     }
-    this.mine.setText('開通上榜中…').setColor(INK_DIM);
+    this.say('開通上榜中…', INK_DIM);
     if (await registerForBoard(save)) {
       persist();
-      this.mine.setText(ready).setColor(JADE);
+      this.say(ready, JADE);
     } else {
-      this.mine.setText('開通失敗，通關時會再試一次').setColor(DANGER);
+      this.say('開通失敗，通關時會再試一次', DANGER);
     }
   }
 
@@ -335,7 +379,7 @@ export class LeaderboardScene extends Phaser.Scene {
     });
     if (values === null) return;
 
-    this.mine.setText('註冊中…').setColor(INK_DIM);
+    this.say('註冊中…', INK_DIM);
     const outcome = await register(
       state(),
       values['email'] ?? '',
@@ -343,7 +387,7 @@ export class LeaderboardScene extends Phaser.Scene {
       values['password'] ?? '',
     );
     if (outcome.kind === 'failed') {
-      this.mine.setText(outcome.reason).setColor(DANGER);
+      this.say(outcome.reason, DANGER);
       return;
     }
     persist();
@@ -392,10 +436,10 @@ export class LeaderboardScene extends Phaser.Scene {
     });
     if (values === null) return;
 
-    this.mine.setText('設定中…').setColor(INK_DIM);
+    this.say('設定中…', INK_DIM);
     const outcome = await setQuestion(state(), values['question'] ?? '', values['answer'] ?? '');
     if (outcome.kind === 'failed') {
-      this.mine.setText(outcome.reason).setColor(DANGER);
+      this.say(outcome.reason, DANGER);
       return;
     }
     await showNotice('設定完成', '忘記密碼時就會問這一題。\n答案的空白與大小寫不影響對錯。');
@@ -420,11 +464,11 @@ export class LeaderboardScene extends Phaser.Scene {
     });
     if (values === null) return;
 
-    this.mine.setText('登入中…').setColor(INK_DIM);
+    this.say('登入中…', INK_DIM);
     const outcome = await login(state(), values['email'] ?? '', values['password'] ?? '');
     if (outcome.kind === 'failed') {
       // 登入失敗最常見的原因是忘記密碼，所以順手把那條路指出來。
-      this.mine.setText(`${outcome.reason}（可用「忘記密碼」重設）`).setColor(DANGER);
+      this.say(`${outcome.reason}（可用「忘記密碼」重設）`, DANGER);
       return;
     }
     persist();
@@ -451,17 +495,17 @@ export class LeaderboardScene extends Phaser.Scene {
     if (asked === null) return;
     const email = asked['email'] ?? '';
 
-    this.mine.setText('查詢中…').setColor(INK_DIM);
+    this.say('查詢中…', INK_DIM);
     const question = await questionFor(email);
     if (question !== null) {
       await this.recoverByQuestion(email, question);
       return;
     }
 
-    this.mine.setText('寄送中…').setColor(INK_DIM);
+    this.say('寄送中…', INK_DIM);
     const sent = await requestRecovery(email);
     if (sent.kind === 'failed') {
-      this.mine.setText(sent.reason).setColor(DANGER);
+      this.say(sent.reason, DANGER);
       return;
     }
 
@@ -486,7 +530,7 @@ export class LeaderboardScene extends Phaser.Scene {
     });
     if (values === null) return;
 
-    this.mine.setText('重設中…').setColor(INK_DIM);
+    this.say('重設中…', INK_DIM);
     const outcome = await resetPassword(
       state(),
       email,
@@ -494,7 +538,7 @@ export class LeaderboardScene extends Phaser.Scene {
       values['password'] ?? '',
     );
     if (outcome.kind === 'failed') {
-      this.mine.setText(outcome.reason).setColor(DANGER);
+      this.say(outcome.reason, DANGER);
       return;
     }
     persist();
@@ -531,7 +575,7 @@ export class LeaderboardScene extends Phaser.Scene {
     });
     if (values === null) return;
 
-    this.mine.setText('確認中…').setColor(INK_DIM);
+    this.say('確認中…', INK_DIM);
     const outcome = await resetByQuestion(
       state(),
       email,
@@ -539,7 +583,7 @@ export class LeaderboardScene extends Phaser.Scene {
       values['password'] ?? '',
     );
     if (outcome.kind === 'failed') {
-      this.mine.setText(outcome.reason).setColor(DANGER);
+      this.say(outcome.reason, DANGER);
       return;
     }
     persist();
@@ -567,7 +611,7 @@ export class LeaderboardScene extends Phaser.Scene {
     if (values === null) return;
     const outcome = await rename(save, values['name'] ?? '');
     if (outcome.kind === 'failed') {
-      this.mine.setText(outcome.reason).setColor(DANGER);
+      this.say(outcome.reason, DANGER);
       return;
     }
     persist();
@@ -609,16 +653,34 @@ export class LeaderboardScene extends Phaser.Scene {
     }
 
     const mineId = save.player.cloud?.playerId ?? null;
+    const width = GAME_WIDTH - 44;
     result.entries.slice(0, this.visibleRows).forEach((entry, index) => {
       const row = this.rows[index];
       if (row === undefined) return;
-      row.setText(`${String(entry.rank).padStart(2, ' ')}　${entry.name}　${this.describe(entry)}`);
-      // 名字是別人打的字，長度不受這裡控制——夾住寬度，撐不破版面。
-      fitText(row, GAME_WIDTH - 80);
-      // 自己那一列標成金色，前三名也是——兩者同時成立時自己優先。
+      const medal = MEDALS[entry.rank - 1];
       const isMine = mineId !== null && result.mine !== null && result.mine.rank === entry.rank;
-      if (isMine) row.setColor(JADE);
-      else if (entry.rank <= 3) row.setColor(GOLD);
+
+      // 前三名是實心的牌，第 4～10 名只有一圈框，再往下什麼都沒有——
+      // 一眼要分得出「頒獎台上那三個」和「榜上前段」是兩件事。
+      if (medal !== undefined) {
+        row.medal
+          .setVisible(true)
+          .setFillStyle(hexToNumber(medal))
+          .setStrokeStyle(2, hexToNumber(medal));
+        row.rank.setColor('#1a1408');
+      } else if (entry.rank <= MEDAL_RANKS) {
+        row.medal.setVisible(true).setFillStyle(BG_PANEL_ALT).setStrokeStyle(2, LINE);
+        row.rank.setColor(INK_DIM);
+      } else {
+        row.medal.setVisible(false);
+        row.rank.setColor(INK_DIM);
+      }
+      row.rank.setText(String(entry.rank));
+
+      row.name.setText(entry.name).setColor(isMine ? JADE : INK);
+      // 名字是別人打的字，長度不受這裡控制——夾住寬度，撐不破成績那一欄。
+      fitText(row.name, width - 160);
+      row.score.setText(this.describe(entry)).setColor(isMine ? JADE : INK_DIM);
     });
 
     this.selfRow.setText(
