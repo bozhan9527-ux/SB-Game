@@ -268,7 +268,14 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   if (has(ARENA_RULE)) {
     const { power } = BALANCE;
     loadout.arena = true;
-    loadout.disciples = Math.max(1, Math.round(power.baseDisciples * sect.discipleMultiplier));
+    // 耐久放大是這個模式唯一往上調的東西，而它調的其實是**操作時間預算**：
+    // 見 PowerBalance.arenaDiscipleMultiplier。不放大的話，手機上動作稍慢的人
+    // 有六成連第 1 波都過不了，而 0 波的紀錄會被伺服器退回——
+    // 他連榜上一列都拿不到。
+    loadout.disciples = Math.max(
+      1,
+      Math.round(power.baseDisciples * sect.discipleMultiplier * power.arenaDiscipleMultiplier),
+    );
     loadout.damageMultiplier = sect.damageMultiplier;
     loadout.fireRateMultiplier = 1;
     loadout.drawSpeedMultiplier = sect.drawSpeedMultiplier;

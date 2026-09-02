@@ -184,6 +184,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
     power: {
       baseDisciples: p(power, 'baseDisciples', 'power'),
       maxDisciples: p(power, 'maxDisciples', 'power'),
+      arenaDiscipleMultiplier: p(power, 'arenaDiscipleMultiplier', 'power'),
     },
     boss: {
       hpBase: p(boss, 'hpBase', 'boss'),

@@ -28,7 +28,7 @@ export const API_VERSION = 'v1';
  * 要 +1 的例子：戰鬥數值（balance.json）、tickCombat 的邏輯、抽符規則、
  * 無限模式的級距、上報欄位的意義。純畫面的改動不必動它。
  */
-export const REPLAY_CONTRACT_VERSION = 4;
+export const REPLAY_CONTRACT_VERSION = 5;
 
 /** 上傳的存檔最大幾個位元組。目前一份完整存檔約 1KB，64KB 是很寬鬆的上限。 */
 export const MAX_BLOB_BYTES = 64 * 1024;
