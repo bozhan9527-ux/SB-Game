@@ -23,6 +23,7 @@ import {
   looksAnon,
   MAX_ANSWER_ATTEMPTS,
   RECOVERY_CODE_LENGTH,
+  RECOVERY_RESEND_MS,
   RECOVERY_TTL_MS,
   cleanEmail,
   cleanName,
@@ -264,11 +265,16 @@ export async function requestRecovery(
   const email = cleanEmail(record['email']);
   if (email === null) return fail('badRequest', env, origin, '電子信箱不合法');
 
-  const row = await env.DB.prepare('SELECT name FROM accounts WHERE email = ?')
+  const row = await env.DB.prepare('SELECT name, reset_at FROM accounts WHERE email = ?')
     .bind(email)
-    .first<{ name: string }>();
+    .first<{ name: string; reset_at: number | null }>();
 
-  if (row !== null) {
+  // 剛剛才寄過就不再寄。**冷卻期間一樣回成功**——回一句「太頻繁了」
+  // 等於承認這個信箱存在，見 RECOVERY_RESEND_MS。
+  const recent = row?.reset_at !== null && row?.reset_at !== undefined
+    && Date.now() - row.reset_at < RECOVERY_RESEND_MS;
+
+  if (row !== null && !recent) {
     const digits = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
     const code = String(digits).padStart(RECOVERY_CODE_LENGTH, '0').slice(-RECOVERY_CODE_LENGTH);
     await env.DB.prepare('UPDATE accounts SET reset_hash = ?, reset_at = ? WHERE email = ?')

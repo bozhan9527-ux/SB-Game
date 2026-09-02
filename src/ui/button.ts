@@ -3,7 +3,7 @@
  */
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, textStyle } from './theme';
+import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, fitText, textStyle } from './theme';
 
 export interface ButtonOptions {
   width: number;
@@ -45,17 +45,38 @@ export function createButton(
 
   const children: Phaser.GameObjects.GameObject[] = [background, text];
 
+  const hasIcon = options.icon !== undefined && scene.textures.exists(options.icon);
+  const iconSize = hasIcon ? (options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15)) : 0;
+  const gap = 10;
+
+  /**
+   * 把標籤夾進按鈕裡。
+   *
+   * **標籤是動態的，按鈕寬度不是。** 道號最長 16 字、深度升級的金幣數會長到
+   * 十幾位——不夾的話那些字會直接畫到隔壁那顆按鈕上，而且畫面上看起來
+   * 不像壞掉，只像排版很醜，所以不會有人回報。夾在這裡而不是各個場景各夾一次：
+   * 漏掉的那一顆才是會出事的那一顆。
+   */
+  const fitLabel = (): void => {
+    // 先還原縮放再量。不還原的話，換成短標籤時它會一直維持上一次縮小的比例。
+    text.setScale(1);
+    fitText(text, width - 16 - (hasIcon ? iconSize + gap : 0));
+  };
+  fitLabel();
+
   // 圖示與文字當成**一組**置中，不是圖示靠左、文字置中。
   // 後者在窄按鈕上會讓圖示貼著邊，看起來像沒對齊；而這一組的重心
   // 要落在按鈕中央，眼睛才不會覺得歪。
-  if (options.icon !== undefined && scene.textures.exists(options.icon)) {
-    const iconSize = options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15);
-    const gap = 10;
-    const groupWidth = iconSize + gap + text.width;
-    const icon = scene.add
-      .image(-groupWidth / 2 + iconSize / 2, 0, options.icon)
-      .setDisplaySize(iconSize, iconSize);
-    text.setX(groupWidth / 2 - text.width / 2);
+  let icon: Phaser.GameObjects.Image | null = null;
+  const layoutIcon = (): void => {
+    if (icon === null) return;
+    const groupWidth = iconSize + gap + text.displayWidth;
+    icon.setX(-groupWidth / 2 + iconSize / 2);
+    text.setX(groupWidth / 2 - text.displayWidth / 2);
+  };
+  if (options.icon !== undefined && hasIcon) {
+    icon = scene.add.image(0, 0, options.icon).setDisplaySize(iconSize, iconSize);
+    layoutIcon();
     children.push(icon);
   }
 
@@ -80,6 +101,8 @@ export function createButton(
     container,
     setLabel(value: string) {
       text.setText(value);
+      fitLabel();
+      layoutIcon();
     },
     setEnabled(value: boolean) {
       enabled = value;

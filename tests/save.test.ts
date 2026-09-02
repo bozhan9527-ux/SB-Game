@@ -12,6 +12,7 @@ import {
 import { migrate } from '../src/save/migrations';
 import { createMemoryStorage } from '../src/save/storage';
 import { SAVE_KEY, SAVE_VERSION } from '../src/save/types';
+import type { SaveData } from '../src/save/types';
 import { upgradeCost } from '../src/systems/upgrades';
 import { trackById } from '../src/systems/upgrades';
 
@@ -281,3 +282,118 @@ describe('關卡進度', () => {
     expect(loadSave(storage).settings.speed).toBe(2);
   });
 });
+
+/**
+ * 近幾版的遷移。
+ *
+ * 已有的遷移測試涵蓋 v1～v5，那是很久以前的形狀；**真正會有人走的是最近
+ * 這幾版**——現在手上有存檔的玩家，就是從 v19／v20／v21 升上來的。
+ * 那三支各自做一件不可逆的事（拿掉格位欄位、補上門派秘傳、補上帳號），
+ * 而它們一條測試都沒有。
+ *
+ * 這裡不逐版手刻舊格式（那會抄一份很快就過期的形狀），而是**從現在的存檔
+ * 倒推**：把某一版之後才加的欄位拿掉、版本號改回去，再讓它走一次遷移。
+ * 進度必須原封不動。
+ */
+describe('近幾版的遷移', () => {
+  /** 一份玩了很久的存檔：推到第 96 關、轉過世、洞府點了不少。 */
+  function veteran(): Record<string, unknown> {
+    const save = createDefaultSave(1);
+    save.player.sectId = 'sword';
+    save.player.wallet.gold = 987654;
+    save.world.stage = 96;
+    save.world.highestStage = 152;
+    save.world.clears = 140;
+    save.player.karma.points = 31;
+    save.player.karma.rebirths = 2;
+    save.player.karma.claimedStage = 152;
+    save.player.karma.spent = { karmaPower: 9, karmaGold: 4, karmaGate: 6, karmaTier: 3 };
+    save.player.sectClears = { sword: 88, body: 12 };
+    save.player.dungeons = { library: 11, pagoda: 3 };
+    save.player.talismans = ['sword', 'frost', 'pyre', 'soul'];
+    for (const key of Object.keys(save.player.upgrades)) save.player.upgrades[key] = 42;
+    return JSON.parse(JSON.stringify(save)) as Record<string, unknown>;
+  }
+
+  /** 進度的指紋。遷移前後必須一模一樣。 */
+  function progress(save: SaveData): string {
+    return JSON.stringify({
+      gold: save.player.wallet.gold,
+      stage: save.world.stage,
+      highest: save.world.highestStage,
+      clears: save.world.clears,
+      karma: save.player.karma,
+      sectClears: save.player.sectClears,
+      dungeons: save.player.dungeons,
+      talismans: save.player.talismans,
+      upgrades: save.player.upgrades,
+    });
+  }
+
+  function loadFrom(raw: Record<string, unknown>): SaveData {
+    const storage = createMemoryStorage();
+    storage.write(SAVE_KEY, JSON.stringify(raw));
+    return loadSave(storage, 1);
+  }
+
+  it('v21（還沒有帳號欄位）升上來：進度不動，帳號是 null', () => {
+    const old = veteran();
+    const player = old['player'] as Record<string, unknown>;
+    delete player['account'];
+    old['version'] = 21;
+
+    const loaded = loadFrom(old);
+    expect(loaded.version).toBe(SAVE_VERSION);
+    expect(loaded.player.account).toBeNull();
+    expect(progress(loaded)).toBe(progress(createFrom(veteran())));
+  });
+
+  it('v20（還沒有門派秘傳）升上來：秘傳從 0 開始，其餘不動', () => {
+    const old = veteran();
+    const player = old['player'] as Record<string, unknown>;
+    delete player['account'];
+    delete player['sectDepth'];
+    old['version'] = 20;
+
+    const loaded = loadFrom(old);
+    expect(loaded.version).toBe(SAVE_VERSION);
+    expect(loaded.player.sectDepth).toEqual({});
+    expect(progress(loaded)).toBe(progress(createFrom(veteran())));
+  });
+
+  it('**v19（格位被 bug 灌大的那一版）升上來：多出來的格位消失，進度留著**', () => {
+    // 試劍台曾經因為兩個 bug 一直累加格位，製作人的存檔一度長到十八格。
+    // 那個欄位在 v20 被整條拿掉，多出來的格位也就跟著沒了。
+    const old = veteran();
+    const player = old['player'] as Record<string, unknown>;
+    delete player['account'];
+    delete player['sectDepth'];
+    player['dungeonFieldSlots'] = 9; // ← 被灌大的那一個
+    old['version'] = 19;
+
+    const loaded = loadFrom(old);
+    expect(loaded.version).toBe(SAVE_VERSION);
+    expect('dungeonFieldSlots' in loaded.player).toBe(false);
+    expect(progress(loaded)).toBe(progress(createFrom(veteran())));
+  });
+
+  it('遷移是冪等的：已經是最新版的存檔再讀一次不會有任何變化', () => {
+    const current = veteran();
+    const once = loadFrom(current);
+    const twice = loadFrom(JSON.parse(JSON.stringify(once)) as Record<string, unknown>);
+    expect(progress(twice)).toBe(progress(once));
+  });
+
+  it('未來版本（玩家降版）不會被硬套，也不會讓遊戲起不來', () => {
+    const future = veteran();
+    future['version'] = SAVE_VERSION + 5;
+    expect(() => loadFrom(future)).not.toThrow();
+  });
+});
+
+/** 把一份原始物件走一次完整的載入流程，當作比對的基準。 */
+function createFrom(raw: Record<string, unknown>): SaveData {
+  const storage = createMemoryStorage();
+  storage.write(SAVE_KEY, JSON.stringify(raw));
+  return loadSave(storage, 1);
+}
