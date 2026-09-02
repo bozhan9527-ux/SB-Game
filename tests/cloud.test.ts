@@ -174,6 +174,7 @@ describe('上報的關卡是種子那一半', () => {
       loadout: loadoutFor(save),
       arena: true,
       tutorial: false,
+      replay: false,
     });
 
     expect(submit).toHaveBeenCalledTimes(1);
@@ -205,6 +206,7 @@ describe('版本對不上就直說', () => {
       loadout: loadoutFor(save),
       arena: false,
       tutorial: false,
+      replay: false,
     });
     expect(submit.mock.calls[0]?.[0]).toMatchObject({ contract: REPLAY_CONTRACT_VERSION });
   });
@@ -247,6 +249,18 @@ describe('一場成績進哪幾個榜', () => {
     // 混進去的話，那個榜比的就從操作變成洞府等級。
     expect(boardsFor(120, false)).not.toContain('arena');
   });
+
+  it('重挑一個過掉的關卡只進速通榜，不進深度榜', () => {
+    // 一個打到第 152 關的人回頭重挑第 5 關，送一筆「深度 5」上去
+    // 是一筆永遠不會被採用的成績——而它要花伺服器 40 毫秒 CPU 才知道。
+    expect(boardsFor(5, false, true)).toEqual(['speed5']);
+    expect(boardsFor(5, false, true)).not.toContain('depth');
+  });
+
+  it('重挑不會改變競技場的去向', () => {
+    // 競技場永遠從第 1 關打起，本來就沒有「重挑」這件事。
+    expect(boardsFor(1, true, true)).toEqual(['arena']);
+  });
 });
 
 /**
@@ -267,6 +281,7 @@ describe('上榜開通', () => {
     loadout: loadoutFor(playing()),
     arena: false,
     tutorial: false,
+      replay: false,
   };
 
   /** 一份「可以上榜」的存檔：有門派、也註冊過。 */
@@ -520,7 +535,7 @@ describe('上報的是開打那一刻的配置', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6, elapsedMs: 1000 });
-    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false, tutorial: false });
+    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false, tutorial: false, replay: false });
 
     const sent = submit.mock.calls[0]?.[0];
     expect(sent?.loadout.sectClears).toBe(4);

@@ -56,12 +56,15 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
  * 全部的養成——把它的波數丟進競技榜，那個榜就從「誰操作得好」
  * 變成「誰洞府等級高」，而競技場存在的唯一理由正是不比那個。
  */
-export function boardsFor(stage: number, arena: boolean): BoardKind[] {
+export function boardsFor(stage: number, arena: boolean, replay = false): BoardKind[] {
   if (arena) return ['arena'];
   // 每一場**同時進兩個榜**：它既是一筆深度成績，也是那一關的一筆秒數成績。
   // 速通是一關一個榜，所以一場只會佔其中一個——同一個榜上大家打的
   // 必然是同一關，秒數才真的可以比。
   const track = speedTrackOf(stage);
+  // 重挑一個過掉的關卡只進速通榜。它的深度是舊聞（那一關早就過了），
+  // 送上去只是白花一次伺服器重播——而一次重播要 40 毫秒 CPU。
+  if (replay) return track === null ? [] : [speedBoard(track)];
   return track === null ? ['depth'] : ['depth', speedBoard(track)];
 }
 
@@ -195,8 +198,10 @@ export async function submitRun(
 
   // 第一個榜是主榜——它的名次就是要顯示給玩家看的那一個。其餘的
   // （打完主線最後一關那一場同時算速通）在背景送，失敗也不吵他。
-  const boards = boardsFor(stage, submission.arena);
-  const primary = boards[0] ?? 'depth';
+  const boards = boardsFor(stage, submission.arena, submission.replay);
+  // 沒有任何榜收這一場（重挑一個超出速通榜範圍的關卡）就別打伺服器。
+  const primary = boards[0];
+  if (primary === undefined) return { kind: 'skipped' };
   let result = await send(primary);
 
   if (!result.ok && result.error === 'unauthorized') {

@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { audio } from "../audio";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { CARDS } from "../data";
-import { recordClear, recordDefeat, recordDungeonRun } from "../save";
+import { recordClear, recordDefeat, recordDungeonRun, recordReplay } from "../save";
 import { dungeonById, grantFloor, nextOpenFloor } from "../systems/dungeons";
 import { detectAchievements } from "../systems/achievements";
 import { track } from "../telemetry";
@@ -73,11 +73,15 @@ export class ResultScene extends Phaser.Scene {
     stats.maxTier = Math.max(stats.maxTier, result.peakTier);
     stats.totalKills += result.kills;
     if (result.victory && result.leaks === 0) stats.perfectClears += 1;
-    const gold = result.goldCollected + result.goldReward;
+    // **重挑的一場不給金幣。** 見 recordReplay：不擋的話，回頭刷第 5 關
+    // 會變成全遊戲最好賺的金幣來源。這件事結算表上要寫出來，
+    // 不然玩家看到「金幣 0」只會以為壞掉了。
+    const gold = result.replay ? 0 : result.goldCollected + result.goldReward;
     const dungeon =
       result.dungeon === null ? null : dungeonById(result.dungeon.id);
     // 副本的一場走另一條記帳：給錢、算次數，但不動主線進度。
-    if (result.dungeon !== null) recordDungeonRun(save, gold);
+    if (result.replay) recordReplay(save);
+    else if (result.dungeon !== null) recordDungeonRun(save, gold);
     else if (result.victory) recordClear(save, gold);
     else recordDefeat(save, gold);
 
@@ -101,6 +105,7 @@ export class ResultScene extends Phaser.Scene {
     // 不是存檔已經推進到的下一關。
     track("stage_end", {
       stage: result.stage,
+      replay: result.replay,
       victory: result.victory,
       reason: result.defeatReason,
       duration_ms: Math.round(result.elapsedMs),
@@ -237,7 +242,9 @@ export class ResultScene extends Phaser.Scene {
       .text(
         cx,
         724,
-        dungeon === null
+        result.replay
+          ? `重挑第 ${result.stage} 關 · 只計速通榜，不動進度與金幣`
+          : dungeon === null
           ? `下一關：第 ${save.world.stage} 關 · ${realmTitle(save.world.stage)}`
           : dungeon.endless
             ? `${dungeon.name} · 無限波次`
@@ -251,8 +258,9 @@ export class ResultScene extends Phaser.Scene {
     createButton(this, cx, 784, {
       width: 340,
       height: 66,
-      label:
-        dungeon === null
+      label: result.replay
+        ? `再挑一次第 ${result.stage} 關`
+        : dungeon === null
           ? result.victory
             ? "繼續挑戰"
             : "再戰一次"
@@ -264,6 +272,10 @@ export class ResultScene extends Phaser.Scene {
       fontSize: 28,
       strokeColor: 0x6f8b7a,
       onClick: () => {
+        if (result.replay) {
+          fadeToScene(this, "Run", { replayStage: result.stage });
+          return;
+        }
         if (dungeon === null) {
           fadeToScene(this, "Run");
           return;
@@ -278,9 +290,11 @@ export class ResultScene extends Phaser.Scene {
     createButton(this, cx, 856, {
       width: 340,
       height: 62,
-      label: "洞府 · 提升屬性",
+      // 重挑的人是從榜單走過來的，他要看的是自己排到第幾——
+      // 把他丟回洞府等於要他自己再繞一次路。
+      label: result.replay ? "回榜單 · 看名次" : "洞府 · 提升屬性",
       fontSize: 24,
-      onClick: () => fadeToScene(this, "Upgrade"),
+      onClick: () => fadeToScene(this, result.replay ? "Leaderboard" : "Upgrade"),
     });
     createButton(this, cx - 92, 926, {
       width: 156,
@@ -477,13 +491,19 @@ export class ResultScene extends Phaser.Scene {
         result.bossKilled ? JADE : DANGER,
       ],
       ["最高法寶", `${result.peakTier} 階（合成 ${result.merges} 次）`, INK],
-      ["途中拾取", `${formatNumber(result.goldCollected)} 金`, GOLD],
-      [
+    ];
+    // **重挑不給金幣，這件事要寫在表上。** 只是把數字寫成 0 的話，
+    // 玩家看到的是「壞掉了」；寫出來他才知道那是規則。
+    if (result.replay) {
+      rows.push(["金　幣", "重挑不計", INK_DIM]);
+    } else {
+      rows.push(["途中拾取", `${formatNumber(result.goldCollected)} 金`, GOLD]);
+      rows.push([
         result.victory ? "通關獎勵" : "殘存所得",
         `${formatNumber(result.goldReward)} 金`,
         GOLD,
-      ],
-    ];
+      ]);
+    }
     // 無限模式的重點是深度，所以把它插在最上面——第一行就是這一趟的成績。
     if (result.endlessCleared !== null) {
       rows.unshift([

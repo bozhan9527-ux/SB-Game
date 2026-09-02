@@ -6,6 +6,7 @@ import {
   createDefaultSave,
   loadSave,
   recordClear,
+  recordReplay,
   recordDefeat,
   saveGame,
 } from '../src/save';
@@ -270,6 +271,26 @@ describe('關卡進度', () => {
     expect(save.world.clears).toBe(0);
     expect(save.world.runs).toBe(1);
     expect(save.player.wallet.gold).toBe(30);
+  });
+
+  it('重挑一個過掉的關卡：不推進度、不給金幣，但挑戰次數要加', () => {
+    const save = createDefaultSave();
+    save.world.stage = 153;
+    save.world.highestStage = 153;
+    save.player.wallet.gold = 500;
+    const clears = save.world.clears;
+
+    recordReplay(save);
+
+    // 進度不動：第 5 關早就過了，重挑它不該讓人變成第 154 關。
+    expect(save.world.stage).toBe(153);
+    expect(save.world.clears).toBe(clears);
+    // **金幣不動。** 不擋的話，回頭刷第 5 關會變成全遊戲最好賺的金幣來源，
+    // 而刷金幣本來是聚寶洞的工作——它的難度跟著你目前實力走，重挑第 5 關不是。
+    expect(save.player.wallet.gold).toBe(500);
+    // 挑戰次數要加：它是種子的另一半。不加的話同一關每次重挑都是同一批妖魔，
+    // 速通榜比的就變成「誰先把那一組背起來」。
+    expect(save.world.runs).toBe(1);
   });
 
   it('壞掉的速度設定夾回合法檔位', () => {
