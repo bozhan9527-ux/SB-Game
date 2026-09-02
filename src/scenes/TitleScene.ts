@@ -5,6 +5,7 @@ import type { IconName } from '../art';
 import { DISCIPLE_DISPLAY_HEIGHT, discipleTexture, glyphTexture, iconTexture } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
+import { storageUnavailable } from '../save/storage';
 import type { SaveData } from '../save/types';
 import { sectById } from '../systems/loadout';
 import { talismanDefs } from '../systems/talismans';
@@ -18,11 +19,13 @@ import { drawBackdrop } from '../ui/backdrop';
 import {
   BG_PANEL,
   BG_PANEL_ALT,
+  DANGER,
   GOLD,
   INK,
   INK_DIM,
   LINE,
   MIN_TOUCH_SIZE,
+  fitText,
   formatNumber,
   hexToNumber,
   textStyle,
@@ -95,10 +98,29 @@ export class TitleScene extends Phaser.Scene {
 
     this.buildMenu(y + 29 + 20 + 28, hasSect);
 
+    // **這個瀏覽器存不存得住東西，一定要講出來。**
+    //
+    // 私密模式與配額用盡的時候，存檔那一行寫入是安靜失敗的——遊戲照跑，
+    // 玩家一路推到第三十關，重新整理才發現全沒了，而且不知道為什麼。
+    // 吞掉例外是對的（存檔失敗不該把遊戲打斷），但不講就是把後果全推給他。
+    if (storageUnavailable()) {
+      const warn = this.add
+        .text(
+          cx,
+          GAME_HEIGHT - 56,
+          '這個瀏覽器不會保存進度，關掉分頁就沒了\n到「存檔」複製一份存檔碼，或註冊帳號存到雲端',
+          textStyle({ size: 15, color: DANGER }),
+        )
+        .setOrigin(0.5)
+        .setAlign('center')
+        .setLineSpacing(2);
+      fitText(warn, GAME_WIDTH - 32);
+    }
+
     this.add
       .text(
         cx,
-        GAME_HEIGHT - 26,
+        GAME_HEIGHT - 16,
         `最高境界 ${realmTitle(save.world.highestStage)} · 通關 ${save.world.clears} 次`,
         textStyle({ size: 17, color: INK_DIM }),
       )

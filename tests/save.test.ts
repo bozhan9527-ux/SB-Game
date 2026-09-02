@@ -212,6 +212,44 @@ describe('存檔（TECH_SPEC 第 4 節）', () => {
   });
 });
 
+/**
+ * 存不存得住。
+ *
+ * 私密模式與配額用盡的時候，localStorage 存在但 setItem 會丟例外。
+ * 吞掉例外是對的（存檔失敗不該把遊戲打斷），但**吞掉之後要有人知道**——
+ * 沒有這個旗標的話，玩家會一路推到第三十關，重新整理才發現全沒了。
+ */
+describe('儲存不可用時要說得出來', () => {
+  it('setItem 丟例外時退回記憶體儲存，而且旗標立起來', async () => {
+    const storage = await import('../src/save/storage');
+    const broken: globalThis.Storage = {
+      length: 0,
+      clear: () => undefined,
+      key: () => null,
+      getItem: () => null,
+      removeItem: () => undefined,
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    };
+    const previous = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', { value: broken, configurable: true });
+    try {
+      const picked = storage.defaultStorage();
+      // 退回記憶體：這一次遊玩要能正常進行，只是關掉分頁就沒了。
+      picked.write('k', 'v');
+      expect(picked.read('k')).toBe('v');
+      expect(storage.storageUnavailable()).toBe(true);
+    } finally {
+      if (previous === undefined) {
+        Reflect.deleteProperty(globalThis, 'localStorage');
+      } else {
+        Object.defineProperty(globalThis, 'localStorage', { value: previous, configurable: true });
+      }
+    }
+  });
+});
+
 describe('金幣升級', () => {
   it('金幣足夠時扣款並升級', () => {
     const save = createDefaultSave();
