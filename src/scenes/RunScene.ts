@@ -337,8 +337,14 @@ export class RunScene extends Phaser.Scene {
         ? { id, floor }
         : null;
     const replay = data?.replayStage;
+    // 副本與重挑互斥。同時帶進來的話，spec 會照副本組（因為副本的分支在前），
+    // 但結算頁會照重挑記帳——一場仗用兩套規則結算，那種錯不會當場出事，
+    // 會在存檔裡出事。目前的畫面不會同時傳兩個，但這一行的成本是零。
     this.replayStage =
-      typeof replay === "number" && Number.isInteger(replay) && replay >= 1
+      this.dungeonRun === null &&
+      typeof replay === "number" &&
+      Number.isInteger(replay) &&
+      replay >= 1
         ? replay
         : null;
     // Phaser 會重用 Scene 實例：上一場的文字物件早就被銷毀，

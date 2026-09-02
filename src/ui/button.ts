@@ -60,7 +60,11 @@ export function createButton(
   const fitLabel = (): void => {
     // 先還原縮放再量。不還原的話，換成短標籤時它會一直維持上一次縮小的比例。
     text.setScale(1);
-    fitText(text, width - 16 - (hasIcon ? iconSize + gap : 0));
+    // **下限一定要夾。** 一顆最小尺寸（44px）又帶圖示的按鈕，扣掉留白與圖示
+    // 之後剩下的寬度是負的，而 fitText 會照算——scale 變成負數，字會翻過去
+    // 或整個看不見。那種壞法在畫面上不像壞掉，只像「這顆按鈕沒有字」。
+    const room = Math.max(16, width - 16 - (hasIcon ? iconSize + gap : 0));
+    fitText(text, room);
   };
   fitLabel();
 
