@@ -13,10 +13,10 @@ import type {
   BoardKind,
   AccountSaltResult,
   ApiResponse,
-  DistributionResult,
   Identity,
   LeaderboardResult,
   RecoveryQuestionResult,
+  RecoveryRequestResult,
   SaveGetResult,
   SavePutResult,
   ScoreSubmitRequest,
@@ -88,8 +88,8 @@ export function accountRegister(body: {
 
 export function accountRecover(body: {
   email: string;
-}): Promise<ApiResponse<Record<string, never>>> {
-  return call('/account/recover', body);
+}): Promise<ApiResponse<RecoveryRequestResult>> {
+  return call<RecoveryRequestResult>('/account/recover', body);
 }
 
 export function accountReset(body: {
@@ -162,6 +162,3 @@ export function fetchLeaderboard(
   return call(`/leaderboard${query}`, null);
 }
 
-export function fetchDistribution(): Promise<ApiResponse<DistributionResult>> {
-  return call<DistributionResult>('/distribution', null);
-}

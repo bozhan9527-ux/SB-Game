@@ -534,6 +534,18 @@ export class LeaderboardScene extends Phaser.Scene {
       this.say(sent.reason, DANGER);
       return;
     }
+    // **這台伺服器根本寄不出信的話，就別開那張填驗證碼的表。**
+    // 開了等於請玩家坐在那裡等一封永遠不會到的信，而他會以為是自己
+    // 信箱打錯了、或是進了垃圾信匣，一直重試。
+    if (!sent.mail) {
+      await showNotice(
+        '這條路暫時走不通',
+        '伺服器還沒開通寄信，驗證碼寄不出去。\n\n' +
+          '如果你還登得進去，到榜單頁按「救援問題」設一組問題，\n' +
+          '下次忘記密碼就不必等信。',
+      );
+      return;
+    }
 
     const values = await showForm({
       title: '重設密碼',

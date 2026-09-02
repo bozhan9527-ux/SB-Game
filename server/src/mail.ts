@@ -28,6 +28,19 @@ export interface MailEnv {
  * **必須和「這個帳號不存在」長得一模一樣**，否則它就變成一個
  * 「查某個名字有沒有註冊」的工具。所以錯誤只能進記錄，不能進回應。
  */
+/**
+ * 這台伺服器寄不寄得出信。
+ *
+ * **要讓畫面問得到。** 沒設定金鑰時整包是 no-op，而玩家看到的是
+ * 「驗證碼已經在路上了」——然後坐在那裡等一封永遠不會到的信。
+ * 一句誠實的「這條路目前走不通」比一句好聽的謊話有用得多。
+ */
+export function mailConfigured(env: Env & MailEnv): boolean {
+  const key = env.RESEND_KEY;
+  const from = env.RESEND_FROM;
+  return key !== undefined && key.length > 0 && from !== undefined && from.length > 0;
+}
+
 export async function sendRecoveryMail(
   env: Env & MailEnv,
   to: string,
@@ -36,7 +49,7 @@ export async function sendRecoveryMail(
 ): Promise<boolean> {
   const key = env.RESEND_KEY;
   const from = env.RESEND_FROM;
-  if (key === undefined || key.length === 0 || from === undefined || from.length === 0) {
+  if (!mailConfigured(env)) {
     // 大聲說。安靜地失敗會讓玩家等一封永遠不會到的信。
     console.error('mail: RESEND_KEY / RESEND_FROM 沒有設定，驗證碼沒有寄出');
     return false;

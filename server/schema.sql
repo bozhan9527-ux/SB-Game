@@ -13,24 +13,10 @@ CREATE TABLE IF NOT EXISTS saves (
   updated_at  INTEGER NOT NULL
 );
 
--- 排行榜。一個玩家只留最好的一筆，不是每一場都留。
-CREATE TABLE IF NOT EXISTS scores (
-  player_id   TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  stage       INTEGER NOT NULL,
-  -- 重播用的原始資料，留著才有辦法事後複驗或申訴。
-  runs        INTEGER NOT NULL,
-  steps       INTEGER NOT NULL,
-  actions     TEXT NOT NULL,
-  -- 重播時用的配置，同樣留存。
-  loadout     TEXT NOT NULL,
-  verified_at INTEGER NOT NULL,
-  -- 被檢舉下架的不刪除，只標記——刪掉就查不出當初發生什麼事。
-  hidden      INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS scores_rank ON scores (hidden, stage DESC, verified_at ASC);
-
+-- （這裡曾經有一張 scores 表，那是匿名時代的排行榜：沒有帳號可以對應、
+-- 也沒有秒數。board_runs 取代它之後就沒有任何程式碼讀寫它了，所以停止建立。
+-- **刻意不 DROP**：已經部署的資料庫留著那張表不會怎麼樣，而一行 DROP 寫進
+-- 每次部署都會重跑的檔案裡，是這個專案已經犯過一次的錯。）
 -- 帳號。
 --
 -- 註冊才能上榜（製作人的決定），所以榜上每一筆都對得到這裡的一列——
@@ -129,4 +115,36 @@ CREATE TABLE IF NOT EXISTS account_recovery (
   -- 任何知道你信箱的人都能故意猜錯把你的救援管道關掉。
   locked_at   INTEGER,
   set_at      INTEGER NOT NULL
+);
+
+-- 速率限制的計數器。
+--
+-- **為什麼需要它。** 上榜的驗證是伺服器把整場戰鬥重跑一遍，實測一般通關
+-- 約 40 毫秒 CPU、跑滿上限的一場約 1.5 秒。沒有煞車的話，任何人只要上傳
+-- 一次雲端存檔拿到身分，就能無限次送出 1.5 秒 CPU 的請求——那不會讓資料
+-- 壞掉，它會讓帳單壞掉，而且是安靜地壞。
+--
+-- 固定視窗計數：key 是「做什麼事 + 對誰算」（playerId 或 IP），
+-- window_at 是這個視窗的起點。過期的列由 limits.ts 的 sweep 順手清掉——
+-- 不清的話，一個換 IP 的攻擊者可以用垃圾列把資料庫塞滿。
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key       TEXT PRIMARY KEY,
+  hits      INTEGER NOT NULL DEFAULT 0,
+  window_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS rate_limits_sweep ON rate_limits (window_at);
+
+-- 伺服器自己的秘密。目前只有一個用途，見下。
+--
+-- **給沒註冊過的信箱發一把「假鹽」用的胡椒。** /account/salt 對已註冊的信箱
+-- 回它真正的鹽，對沒註冊的回一把新的——而「新的」如果是隨機值，同一個信箱
+-- 問兩次會拿到兩把不同的鹽，那本身就洩漏了它沒註冊過。所以假鹽改成
+-- 從「胡椒 + 信箱」推導：對同一個信箱永遠一樣，而沒有這張表就算不出來。
+--
+-- 值在第一次需要時自己生出來（INSERT OR IGNORE），不必人工設定——
+-- 要人設定的秘密，忘了設就會安靜地退化成「沒有秘密」。
+CREATE TABLE IF NOT EXISTS server_secrets (
+  name  TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );

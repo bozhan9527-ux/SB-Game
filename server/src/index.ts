@@ -18,7 +18,7 @@ import {
   setRecoveryQuestion,
 } from './accounts';
 import { getSave, putSave } from './saves';
-import { distribution, leaderboard, submitScore } from './scores';
+import { leaderboard, submitScore } from './scores';
 import { API_VERSION } from '../../src/net/protocol';
 
 export default {
@@ -74,9 +74,6 @@ export default {
       }
       if (path === `/${API_VERSION}/leaderboard` && request.method === 'GET') {
         return await leaderboard(request, env, origin);
-      }
-      if (path === `/${API_VERSION}/distribution` && request.method === 'GET') {
-        return await distribution(env, origin);
       }
       return fail('notFound', env, origin);
     } catch (error) {

@@ -196,10 +196,28 @@ export type ApiError =
 
 export type ApiResponse<T> = ({ ok: true } & T) | { ok: false; error: ApiError; detail?: string };
 
-/** 註冊前先要一把鹽，順便問「這個名字有沒有人用了」。 */
+/**
+ * 這個信箱的鹽。
+ *
+ * **回應裡沒有「註冊過了沒有」。** 它原本回一個 taken 布林值，而那把
+ * 登入、忘記密碼、救援問題三支刻意做到不洩漏帳號存在與否的努力整個抵銷掉：
+ * 任何人都能拿一份信箱清單對著這一支跑一遍，問出誰註冊過這個遊戲。
+ *
+ * 客戶端也不需要它——註冊、登入、重設三條路的伺服器那一端本來就各自
+ * 回得出一模一樣的訊息，前端那個提前判斷只是省一次 PBKDF2（兩百毫秒）。
+ */
 export interface AccountSaltResult {
   salt: string;
-  taken: boolean;
+}
+
+/**
+ * 忘記密碼那一支的回應。
+ *
+ * **不說「這個信箱存不存在」**——那是刻意的，不然它就變成查詢工具。
+ * mail 講的是另一件事：這台伺服器有沒有開通寄信。所有人拿到的都一樣。
+ */
+export interface RecoveryRequestResult {
+  mail: boolean;
 }
 
 /**
@@ -391,17 +409,6 @@ export function isBoardKind(raw: unknown): raw is BoardKind {
   return trackOfBoard(raw as BoardKind) !== null;
 }
 
-/**
- * 關卡分布。索引就是關卡編號，值是「最深只到這一關的人數」。
- *
- * 回一份直方圖而不是「你贏過幾成」，是因為百分位要在客戶端算——
- * 這樣同一份回應可以在 CDN 上快取給所有人，不必為每個玩家算一次。
- */
-export interface DistributionResult {
-  /** buckets[i] = 最深停在第 i 關的人數。 */
-  buckets: number[];
-  total: number;
-}
 
 /** 從直方圖算出「你超過了幾成人」。0.92 = 超過 92%。 */
 export function percentileOf(buckets: readonly number[], stage: number): number {

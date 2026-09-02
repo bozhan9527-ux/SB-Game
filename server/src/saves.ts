@@ -10,6 +10,7 @@
  * 身分跟著回來。要到真的上架才需要正式的帳號系統。
  */
 import type { Env } from './http';
+import { LIMITS, ipKey, sweep, take, tooMany } from './limits';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
 import type { SaveGetResult, SavePutResult } from '../../src/net/protocol';
 import { MAX_BLOB_BYTES } from '../../src/net/protocol';
@@ -35,6 +36,12 @@ function identityOf(body: unknown): { playerId: string; secret: string } | null 
  * 而它換不到任何東西——第一次寫入時把雜湊記下來，效果完全一樣。
  */
 export async function putSave(request: Request, env: Env, origin: string | null): Promise<Response> {
+  // **上傳存檔是取得身分的唯一入口**，所以它決定了「偽造一個身分去洗榜」
+  // 有多便宜。擋在最前面：後面每一步都要打資料庫。
+  await sweep(env);
+  const blocked = await take(env, `save:${ipKey(request)}`, LIMITS.saveIp.limit, LIMITS.saveIp.windowMs);
+  if (blocked !== null) return tooMany(blocked, env, origin);
+
   const body = await readJson(request);
   if (body === 'tooLarge') return fail('tooLarge', env, origin);
   if (body === 'badRequest') return fail('badRequest', env, origin);
