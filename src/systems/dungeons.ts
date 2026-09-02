@@ -97,6 +97,21 @@ export function nextFloor(save: SaveData, dungeon: DungeonDef): number | null {
   return cleared + 1;
 }
 
+/**
+ * 下一層，而且**那一層真的開了**。沒開、或已經全部通完，回 null。
+ *
+ * 抽成一個函式是因為它有兩個呼叫端（副本列表、結算頁那顆「進第 N 層」），
+ * 而它們原本各判各的：列表擋著（會寫「推到第 45 關才開第 2 層」），
+ * 結算頁沒擋——於是打完問心崖第 1 層之後，那顆按鈕會把還在第 40 關的人
+ * 直接丟進門檻第 45 關的第 2 層。**同一件事給了兩種答案，而玩家會信
+ * 手邊的那一顆。**
+ */
+export function nextOpenFloor(save: SaveData, dungeon: DungeonDef): number | null {
+  const next = nextFloor(save, dungeon);
+  if (next === null) return null;
+  return floorOpen(save, dungeon, next) ? next : null;
+}
+
 /** 第 index 層（1 起算）的定義。超出範圍回 null。 */
 export function floorAt(dungeon: DungeonDef, index: number): DungeonFloor | null {
   return dungeon.floors[index - 1] ?? null;

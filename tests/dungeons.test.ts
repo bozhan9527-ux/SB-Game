@@ -26,6 +26,7 @@ import {
   floorStage,
   grantFloor,
   nextFloor,
+  nextOpenFloor,
 } from '../src/systems/dungeons';
 import type { LoadoutSpec } from '../src/systems/loadout';
 import { buildLoadoutFromSpec, loadoutSpecOf } from '../src/systems/loadout';
@@ -402,5 +403,61 @@ describe('試劍台', () => {
     // 一步都不操作當然很快就輸了，這裡驗的是它真的會結束、不是跑到上限被截斷。
     expect(result.outcome).toBe('defeated');
     expect(result.steps).toBeLessThan(MAX_REPLAY_STEPS);
+  });
+});
+
+/**
+ * 結算頁那顆「進第 N 層」。
+ *
+ * 這一組是為了一個兩頁互相矛盾的 bug 寫的：副本列表會擋住還沒開的層
+ * （寫「推到第 45 關才開第 2 層」），但結算頁那顆按鈕不擋——於是打完
+ * 問心崖第 1 層（第 8 關、門檻第 28 關）之後，它會把還在第 40 關的人
+ * 直接丟進門檻第 45 關的第 2 層。
+ *
+ * **同一件事給了兩種答案，而玩家會信手邊的那一顆。**
+ */
+describe('下一層開了沒', () => {
+  const cliff = dungeonById('cliff');
+  const library = dungeonById('library');
+
+  /** 一份乾淨的存檔：推到第 N 關，副本一層都還沒過。 */
+  function stagedSave(stage: number): SaveData {
+    const save = saveAt(stage);
+    save.player.dungeons = {};
+    return save;
+  }
+
+  it('通完一層就往下一層走', () => {
+    const save = stagedSave(30);
+    grantFloor(save, library!, 1);
+    expect(nextOpenFloor(save, library!)).toBe(2);
+  });
+
+  it('**下一層的門檻還沒到就回 null**——那顆按鈕會變成「回副本」', () => {
+    // 問心崖第 2 層的門檻是第 45 關。
+    const save = stagedSave(40);
+    grantFloor(save, cliff!, 1);
+    expect(nextFloor(save, cliff!)).toBe(2);
+    expect(floorOpen(save, cliff!, 2)).toBe(false);
+    expect(nextOpenFloor(save, cliff!)).toBeNull();
+  });
+
+  it('推到門檻之後就開了', () => {
+    const save = stagedSave(45);
+    grantFloor(save, cliff!, 1);
+    expect(nextOpenFloor(save, cliff!)).toBe(2);
+  });
+
+  it('全部通完回 null', () => {
+    const save = stagedSave(81);
+    for (let i = 1; i <= cliff!.floors.length; i += 1) grantFloor(save, cliff!, i);
+    expect(nextOpenFloor(save, cliff!)).toBeNull();
+  });
+
+  it('可重複的副本永遠回第一層——它只有那一層，不是「卡住」', () => {
+    // 聚寶洞與試劍台是無限波次、只有一層，所以「下一層」本來就還是第 1 層。
+    const save = stagedSave(40);
+    expect(nextOpenFloor(save, dungeonById('trove')!)).toBe(1);
+    expect(nextOpenFloor(save, dungeonById('arena')!)).toBe(1);
   });
 });

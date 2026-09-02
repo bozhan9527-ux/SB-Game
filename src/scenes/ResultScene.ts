@@ -3,7 +3,7 @@ import { audio } from "../audio";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { CARDS } from "../data";
 import { recordClear, recordDefeat, recordDungeonRun } from "../save";
-import { dungeonById, grantFloor, nextFloor } from "../systems/dungeons";
+import { dungeonById, grantFloor, nextOpenFloor } from "../systems/dungeons";
 import { detectAchievements } from "../systems/achievements";
 import { track } from "../telemetry";
 import { cloudEnabled } from "../net/client";
@@ -223,7 +223,16 @@ export class ResultScene extends Phaser.Scene {
 
     // 副本的一場不推進主線，所以這裡要講的是「這個副本接下來是第幾層」，
     // 而不是「下一關是第幾關」——後者在副本裡是一個和剛剛那一場無關的數字。
-    const upcoming = dungeon === null ? null : nextFloor(save, dungeon);
+    // **下一層開了沒也要看。**
+    //
+    // 副本列表那一頁擋著（「推到第 45 關才開第 2 層」），但結算頁這一顆
+    // 原本沒擋——於是打完問心崖第 1 層（第 8 關，門檻第 28 關）之後，
+    // 按鈕會直接把還在第 40 關的人丟進門檻第 45 關的第 2 層。
+    // 兩頁對同一件事給了兩種答案，而玩家會信在他手邊的那一顆。
+    //
+    // 沒開就當作「這個副本這一輪到此為止」：按鈕變成回副本列表，
+    // 而那一頁會把「還差幾關」講清楚。
+    const upcoming = dungeon === null ? null : nextOpenFloor(save, dungeon);
     this.add
       .text(
         cx,
