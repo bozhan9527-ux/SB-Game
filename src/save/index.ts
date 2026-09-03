@@ -358,6 +358,21 @@ export function recordDungeonRun(data: SaveData, gold: number): void {
   data.world.runs += 1;
 }
 
+/**
+ * 重挑一個已經過掉的關卡。
+ *
+ * **只算一次挑戰次數，其餘什麼都不動。** 不推進進度是定義問題——那一關早就
+ * 過了；**不給金幣是防守問題**——一個打到第 152 關的人回頭刷第 5 關，
+ * 那會立刻變成全遊戲最好賺的金幣來源，而刷金幣本來是聚寶洞的工作，
+ * 它的難度是跟著你目前實力走的，重挑第 5 關不是。
+ *
+ * 挑戰次數要加：它是種子的另一半，不加的話同一關每次重挑都是同一批妖魔，
+ * 而速通榜比的會變成「誰先把那一組背起來」。
+ */
+export function recordReplay(data: SaveData): void {
+  data.world.runs += 1;
+}
+
 /** 失敗：停在原關卡，只給安慰獎。 */
 export function recordDefeat(data: SaveData, gold: number): void {
   addGold(data, gold);

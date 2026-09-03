@@ -28,7 +28,7 @@ export const API_VERSION = 'v1';
  * 要 +1 的例子：戰鬥數值（balance.json）、tickCombat 的邏輯、抽符規則、
  * 無限模式的級距、上報欄位的意義。純畫面的改動不必動它。
  */
-export const REPLAY_CONTRACT_VERSION = 4;
+export const REPLAY_CONTRACT_VERSION = 5;
 
 /** 上傳的存檔最大幾個位元組。目前一份完整存檔約 1KB，64KB 是很寬鬆的上限。 */
 export const MAX_BLOB_BYTES = 64 * 1024;
@@ -105,6 +105,19 @@ export const RECOVERY_CODE_LENGTH = 6;
 
 /** 驗證碼多久過期。太長等於把信箱外洩的風險放大。 */
 export const RECOVERY_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * 兩封救援信之間至少要隔多久。
+ *
+ * **這是這支端點唯一的煞車。** 沒有它的話，任何人只要知道一個註冊過的信箱，
+ * 就能對著 /account/recover 連打，讓那個人的收件匣被灌爆——而受害者
+ * 完全不需要做錯任何事，也沒有任何辦法擋。順帶擋住的是寄信服務的帳單：
+ * 一個迴圈就能把免費額度打光，之後真的忘記密碼的人反而收不到信。
+ *
+ * 冷卻期間仍然回成功，和「這個信箱沒註冊過」一樣——回一句「太頻繁了」
+ * 等於告訴對方這個信箱存在，那正是這支端點一開始要避免的事。
+ */
+export const RECOVERY_RESEND_MS = 60 * 1000;
 
 /** 提示問題的長度上限。 */
 export const MAX_QUESTION_LENGTH = 40;
@@ -183,10 +196,28 @@ export type ApiError =
 
 export type ApiResponse<T> = ({ ok: true } & T) | { ok: false; error: ApiError; detail?: string };
 
-/** 註冊前先要一把鹽，順便問「這個名字有沒有人用了」。 */
+/**
+ * 這個信箱的鹽。
+ *
+ * **回應裡沒有「註冊過了沒有」。** 它原本回一個 taken 布林值，而那把
+ * 登入、忘記密碼、救援問題三支刻意做到不洩漏帳號存在與否的努力整個抵銷掉：
+ * 任何人都能拿一份信箱清單對著這一支跑一遍，問出誰註冊過這個遊戲。
+ *
+ * 客戶端也不需要它——註冊、登入、重設三條路的伺服器那一端本來就各自
+ * 回得出一模一樣的訊息，前端那個提前判斷只是省一次 PBKDF2（兩百毫秒）。
+ */
 export interface AccountSaltResult {
   salt: string;
-  taken: boolean;
+}
+
+/**
+ * 忘記密碼那一支的回應。
+ *
+ * **不說「這個信箱存不存在」**——那是刻意的，不然它就變成查詢工具。
+ * mail 講的是另一件事：這台伺服器有沒有開通寄信。所有人拿到的都一樣。
+ */
+export interface RecoveryRequestResult {
+  mail: boolean;
 }
 
 /**
@@ -378,17 +409,6 @@ export function isBoardKind(raw: unknown): raw is BoardKind {
   return trackOfBoard(raw as BoardKind) !== null;
 }
 
-/**
- * 關卡分布。索引就是關卡編號，值是「最深只到這一關的人數」。
- *
- * 回一份直方圖而不是「你贏過幾成」，是因為百分位要在客戶端算——
- * 這樣同一份回應可以在 CDN 上快取給所有人，不必為每個玩家算一次。
- */
-export interface DistributionResult {
-  /** buckets[i] = 最深停在第 i 關的人數。 */
-  buckets: number[];
-  total: number;
-}
 
 /** 從直方圖算出「你超過了幾成人」。0.92 = 超過 92%。 */
 export function percentileOf(buckets: readonly number[], stage: number): number {

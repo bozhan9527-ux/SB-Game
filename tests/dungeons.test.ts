@@ -10,7 +10,7 @@
  * 而且可重複的不得發放任何一次性的回報。
  */
 import { describe, expect, it } from 'vitest';
-import { CARDS, DUNGEONS } from '../src/data';
+import { BALANCE, CARDS, DUNGEONS, SECTS } from '../src/data';
 import { createDefaultSave } from '../src/save';
 import { rebirth } from '../src/systems/karma';
 import type { SaveData } from '../src/save/types';
@@ -374,6 +374,28 @@ describe('試劍台', () => {
     // 威脅度也一樣——轉世讓世界變硬那一條在這裡不生效。
     expect(b.threat).toBe(a.threat);
     expect(b.traitChance).toBe(a.traitChance);
+  });
+
+  it('**山門耐久是唯一往上調的東西**，而它調的其實是操作時間預算', () => {
+    const loadout = buildLoadoutFromSpec(dungeonSpecOf(fresh(), arena!, 1));
+    const sect = SECTS.find((item) => item.id === loadout.sect.id)!;
+    const bare = Math.round(BALANCE.power.baseDisciples * sect.discipleMultiplier);
+
+    // 競技場把所有養成歸零，所以能不能守住完全看你多快把符合起來——
+    // 而實測那是一道懸崖不是斜坡：每 2 秒動一次手的人穩穩打到 8 波，
+    // 每 3 秒的人有六成連第 1 波都過不了，每 4 秒的人是百分之百。
+    // 手機上拖一張符本來就要兩三秒。
+    //
+    // 而「連第 1 波都過不了」的下場不是分數低，是**什麼都沒有**：
+    // 伺服器會退回 0 波的紀錄，他連榜上一列都拿不到。
+    expect(BALANCE.power.arenaDiscipleMultiplier).toBeGreaterThan(1);
+    expect(loadout.disciples).toBe(
+      Math.round(bare * BALANCE.power.arenaDiscipleMultiplier),
+    );
+
+    // 但也不能放太寬。3 倍的時候所有速度都落在 6～8 波，技術不再分得出高下——
+    // 而那正是這個榜最初要避免的事。
+    expect(BALANCE.power.arenaDiscipleMultiplier).toBeLessThanOrEqual(2.5);
   });
 
   it('抽到的符一律是一階，但階數沒有上限', () => {

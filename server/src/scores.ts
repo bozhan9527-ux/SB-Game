@@ -16,9 +16,9 @@
  */
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
+import { LIMITS, ipKey, sweep, take, tooMany } from './limits';
 import { REPLAY_CONTRACT_VERSION, anonName, isBoardKind, trackOfBoard } from '../../src/net/protocol';
 import type {
-  DistributionResult,
   LeaderboardEntry,
   LeaderboardResult,
   ScoreLoadout,
@@ -227,6 +227,13 @@ async function rankOf(env: Env, board: BoardKind, score: number, elapsed: number
  * 而且一個人洗版一百筆會把別人全擠掉。
  */
 export async function submitScore(request: Request, env: Env, origin: string | null): Promise<Response> {
+  // **這是整個後端最貴的一支。** 驗證是把整場戰鬥重跑一遍：一般通關約
+  // 40 毫秒 CPU，跑滿上限的一場約 1.5 秒。IP 這一道擋在最前面，
+  // 身分那一道擋在驗過密鑰之後、真正開跑之前——見下面。
+  await sweep(env);
+  const byIp = await take(env, `score:${ipKey(request)}`, LIMITS.scoreIp.limit, LIMITS.scoreIp.windowMs);
+  if (byIp !== null) return tooMany(byIp, env, origin);
+
   const body = await readJson(request);
   if (body === 'tooLarge') return fail('tooLarge', env, origin);
   if (body === 'badRequest') return fail('badRequest', env, origin);
@@ -246,6 +253,12 @@ export async function submitScore(request: Request, env: Env, origin: string | n
     .first<{ secret_hash: string }>();
   if (owner === null) return fail('unauthorized', env, origin, '請先上傳一次雲端存檔');
   if (!timingSafeEqual(owner.secret_hash, hash)) return fail('unauthorized', env, origin);
+
+  // 身分這一道放在驗過密鑰之後：對不上密鑰的請求連額度都不該花掉，
+  // 否則任何人都能拿別人的 playerId 把他的額度耗光。而它必須在重播之前——
+  // 重播就是要擋的那一秒半。
+  const byPlayer = await take(env, `score:id:${playerId}`, LIMITS.score.limit, LIMITS.score.windowMs);
+  if (byPlayer !== null) return tooMany(byPlayer, env, origin);
 
   // **沒註冊也上得了榜。**
   //
@@ -484,28 +497,4 @@ export async function leaderboard(
     // 帶了 playerId 的那一份是個人化的，不能給 CDN 快取給所有人。
     playerId === null ? { 'cache-control': 'public, max-age=60' } : { 'cache-control': 'no-store' },
   );
-}
-
-/**
- * 關卡分布。
- *
- * 回直方圖而不是「你贏過幾成」，是因為百分位在客戶端算——
- * 這樣同一份回應可以在 CDN 上快取給所有人，不必為每個玩家算一次。
- */
-export async function distribution(env: Env, origin: string | null): Promise<Response> {
-  const rows = await env.DB.prepare(
-    `SELECT stage, COUNT(*) AS n FROM board_runs
-     WHERE board = 'depth' AND hidden = 0 GROUP BY stage ORDER BY stage ASC`,
-  ).all<{ stage: number; n: number }>();
-
-  const buckets: number[] = [];
-  let total = 0;
-  for (const row of rows.results ?? []) {
-    while (buckets.length <= row.stage) buckets.push(0);
-    buckets[row.stage] = row.n;
-    total += row.n;
-  }
-  return json<DistributionResult>({ ok: true, buckets, total }, env, origin, 200, {
-    'cache-control': 'public, max-age=300',
-  });
 }

@@ -18,18 +18,20 @@
  */
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
+import { LIMITS, ipKey, sweep, take, tooMany } from './limits';
 import {
   ANSWER_LOCK_MS,
   looksAnon,
   MAX_ANSWER_ATTEMPTS,
   RECOVERY_CODE_LENGTH,
+  RECOVERY_RESEND_MS,
   RECOVERY_TTL_MS,
   cleanEmail,
   cleanName,
   cleanQuestion,
   nameKey,
 } from '../../src/net/protocol';
-import { sendRecoveryMail } from './mail';
+import { mailConfigured, sendRecoveryMail } from './mail';
 
 interface AccountRow {
   email: string;
@@ -40,12 +42,55 @@ interface AccountRow {
 }
 
 /**
- * 註冊要用的鹽，順便回答「這個信箱註冊過了沒」。
+ * 這個帳號的胡椒，第一次需要時自己生出來。
+ *
+ * 快取在模組層：同一個 isolate 內只查一次。Worker 的 isolate 會被回收，
+ * 所以這不是永久快取，只是省掉同一批請求裡的重複查詢。
+ */
+let pepperCache: string | null = null;
+
+async function saltPepper(env: Env): Promise<string> {
+  if (pepperCache !== null) return pepperCache;
+  const read = async (): Promise<string | null> => {
+    const row = await env.DB.prepare("SELECT value FROM server_secrets WHERE name = 'salt_pepper'")
+      .first<{ value: string }>();
+    return row?.value ?? null;
+  };
+  const existing = await read();
+  if (existing !== null) {
+    pepperCache = existing;
+    return existing;
+  }
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO server_secrets (name, value) VALUES ('salt_pepper', ?)",
+  )
+    .bind(crypto.randomUUID().replace(/-/g, ''))
+    .run();
+  // 再讀一次而不是用剛剛那個值：同時進來的兩個請求只有一個會寫進去，
+  // 用自己那一份的話兩邊會對同一個信箱算出不同的假鹽。
+  const settled = await read();
+  pepperCache = settled;
+  return settled ?? '';
+}
+
+/**
+ * 註冊與登入都要先拿到的那把鹽。
  *
  * 鹽必須由伺服器決定：讓客戶端自己挑的話，兩個人可以挑同一個，
  * 而鹽的唯一工作就是讓「同樣的密碼在不同帳號上推出不同的 secret」。
  *
- * 登入也走這一支——它要先拿到鹽才算得出密鑰。
+ * **這一支不再回答「註冊過了沒」。** 它原本回一個 taken 布林值，而那把
+ * 登入、忘記密碼、救援問題三支刻意做到不洩漏帳號存在與否的努力整個抵銷掉：
+ * 任何人都能拿一份信箱清單對著它跑一遍，問出誰註冊過這個遊戲。
+ *
+ * 光是拿掉那個欄位還不夠：沒註冊的信箱如果每次拿到一把**隨機**的鹽，
+ * 問兩次比一比就知道它沒註冊。所以假鹽改成從「胡椒 + 信箱」推導——
+ * 對同一個信箱永遠一樣，形狀也和真鹽一模一樣（32 個十六進位字元），
+ * 而沒有資料庫就算不出來。
+ *
+ * 剩下的那個洩漏點是註冊本身（「這個信箱已經註冊過了」），而那對一個
+ * 「信箱必須唯一」的系統來說躲不掉。它需要一次完整的註冊請求，
+ * 而註冊已經被限流成每個 IP 每小時五次。
  */
 export async function accountSalt(
   request: Request,
@@ -64,13 +109,14 @@ export async function accountSalt(
     .first<{ salt: string }>();
 
   if (existing !== null) {
-    return json({ ok: true, salt: existing.salt, taken: true }, env, origin);
+    return json({ ok: true, salt: existing.salt }, env, origin);
   }
 
-  // 還沒註冊：發一把新的鹽。**不寫進資料庫**——寫了就等於任何人都能用一個
-  // 請求佔住任意信箱。真正的佔用發生在 register。
-  const salt = crypto.randomUUID().replace(/-/g, '');
-  return json({ ok: true, salt, taken: false }, env, origin);
+  // 還沒註冊：發一把從胡椒推出來的假鹽。**不寫進資料庫**——寫了就等於
+  // 任何人都能用一個請求佔住任意信箱。真正的佔用發生在 register，
+  // 而那時候客戶端會把這把鹽原封不動送回來，於是它就變成真的了。
+  const salt = (await sha256(`${await saltPepper(env)}:${email}`)).slice(0, 32);
+  return json({ ok: true, salt }, env, origin);
 }
 
 /**
@@ -86,6 +132,11 @@ export async function registerAccount(
   env: Env,
   origin: string | null,
 ): Promise<Response> {
+  // 註冊真人一輩子做一次。擋的是「一個迴圈把道號全部佔走」。
+  await sweep(env);
+  const throttled = await take(env, `reg:${ipKey(request)}`, LIMITS.registerIp.limit, LIMITS.registerIp.windowMs);
+  if (throttled !== null) return tooMany(throttled, env, origin);
+
   const body = await readJson(request);
   if (body === 'tooLarge') return fail('tooLarge', env, origin);
   if (typeof body !== 'object' || body === null) return fail('badRequest', env, origin);
@@ -169,6 +220,11 @@ export async function loginAccount(
   env: Env,
   origin: string | null,
 ): Promise<Response> {
+  // **線上猜密碼唯一的煞車。** 離線猜要先拿到雜湊，不走這一支。
+  await sweep(env);
+  const throttled = await take(env, `login:${ipKey(request)}`, LIMITS.loginIp.limit, LIMITS.loginIp.windowMs);
+  if (throttled !== null) return tooMany(throttled, env, origin);
+
   const body = await readJson(request);
   if (typeof body !== 'object' || body === null) return fail('badRequest', env, origin);
   const record = body as Record<string, unknown>;
@@ -264,11 +320,16 @@ export async function requestRecovery(
   const email = cleanEmail(record['email']);
   if (email === null) return fail('badRequest', env, origin, '電子信箱不合法');
 
-  const row = await env.DB.prepare('SELECT name FROM accounts WHERE email = ?')
+  const row = await env.DB.prepare('SELECT name, reset_at FROM accounts WHERE email = ?')
     .bind(email)
-    .first<{ name: string }>();
+    .first<{ name: string; reset_at: number | null }>();
 
-  if (row !== null) {
+  // 剛剛才寄過就不再寄。**冷卻期間一樣回成功**——回一句「太頻繁了」
+  // 等於承認這個信箱存在，見 RECOVERY_RESEND_MS。
+  const recent = row?.reset_at !== null && row?.reset_at !== undefined
+    && Date.now() - row.reset_at < RECOVERY_RESEND_MS;
+
+  if (row !== null && !recent) {
     const digits = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
     const code = String(digits).padStart(RECOVERY_CODE_LENGTH, '0').slice(-RECOVERY_CODE_LENGTH);
     await env.DB.prepare('UPDATE accounts SET reset_hash = ?, reset_at = ? WHERE email = ?')
@@ -277,7 +338,10 @@ export async function requestRecovery(
     await sendRecoveryMail(env, email, row.name, code);
   }
 
-  return json({ ok: true }, env, origin);
+  // **這一個布林值和信箱存不存在無關**，講的是「這台伺服器有沒有開通寄信」——
+  // 所有人拿到的都一樣，所以它不是查詢工具。不回的話，沒開通寄信的部署會
+  // 對每個人說「驗證碼已經在路上了」，然後讓他等一封永遠不會到的信。
+  return json({ ok: true, mail: mailConfigured(env) }, env, origin);
 }
 
 /**
@@ -444,6 +508,11 @@ export async function resetByAnswer(
   env: Env,
   origin: string | null,
 ): Promise<Response> {
+  // 這一支自己有猜錯次數上限（照信箱算），這裡擋的是「換一個信箱再猜一次」的掃描。
+  await sweep(env);
+  const throttled = await take(env, `answer:${ipKey(request)}`, LIMITS.answerIp.limit, LIMITS.answerIp.windowMs);
+  if (throttled !== null) return tooMany(throttled, env, origin);
+
   const body = await readJson(request);
   if (typeof body !== 'object' || body === null) return fail('badRequest', env, origin);
   const record = body as Record<string, unknown>;

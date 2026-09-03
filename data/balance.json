@@ -78,7 +78,8 @@
   },
   "power": {
     "baseDisciples": 20,
-    "maxDisciples": 999
+    "maxDisciples": 999,
+    "arenaDiscipleMultiplier": 2
   },
   "boss": {
     "hpBase": 5000,

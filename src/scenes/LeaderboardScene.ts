@@ -134,9 +134,12 @@ export class LeaderboardScene extends Phaser.Scene {
     // 是必要的——一關一關點過去，推到第 152 關的人要點一百多下。
     // 賽道那一列多佔一行，所以底下整塊往下推，榜少放一列——
     // 不推的話它會直接壓在「你最深到第幾關」上面。
-    const shift = track === null ? 0 : 40;
+    // 速通那一頁多兩列：選關卡的一列，加上「挑戰這一關」的一列。
+    // 底下整塊跟著往下推，榜少放兩列——不推的話它會直接壓在
+    // 「你最深到第幾關」上面。
+    const shift = track === null ? 0 : 84;
     this.listTop = LIST_TOP + shift;
-    this.visibleRows = VISIBLE_ROWS - (track === null ? 0 : 1);
+    this.visibleRows = VISIBLE_ROWS - (track === null ? 0 : 2);
 
     if (track !== null) {
       const go = (stage: number): void => {
@@ -165,6 +168,29 @@ export class LeaderboardScene extends Phaser.Scene {
       this.add
         .text(cx, 122, `第 ${track} 關`, textStyle({ size: 17, color: JADE, bold: true }))
         .setOrigin(0.5);
+
+      // **速通榜要能成立就需要這一顆。**
+      //
+      // 主線關卡過了進度就往前走，沒有重挑的話，「第 5 關速通榜」上你的成績
+      // 永遠是你這輩子第一次打第 5 關的時間——不管你後來練得多熟、洞府升多高
+      // 都改不了。那個榜比的就不是誰最快，是誰第一次剛好手順，而玩家看得出來。
+      //
+      // 門檻是「這一關這一世已經過了」（world.stage 是下一關，所以要小於它）。
+      // 用 highestStage 的話，輪迴之後的人會拿到一顆點下去必輸的按鈕——
+      // 他的養成已經歸零了。
+      const cleared = track < save.world.stage;
+      const canRun = cleared && save.player.sectId !== null;
+      const challenge = createButton(this, cx, 164, {
+        width: 240,
+        height: 40,
+        label: canRun ? `挑戰第 ${track} 關` : `第 ${track} 關還沒過`,
+        fontSize: 18,
+        fillColor: canRun ? hexToNumber(JADE) : BG_PANEL,
+        strokeColor: canRun ? hexToNumber(JADE) : LINE,
+        textColor: canRun ? '#12181f' : INK_DIM,
+        onClick: () => fadeToScene(this, 'Run', { replayStage: track }),
+      });
+      if (!canRun) challenge.setEnabled(false);
     }
 
     // **最上面那一行寫自己的進度，不寫百分位。**
@@ -506,6 +532,18 @@ export class LeaderboardScene extends Phaser.Scene {
     const sent = await requestRecovery(email);
     if (sent.kind === 'failed') {
       this.say(sent.reason, DANGER);
+      return;
+    }
+    // **這台伺服器根本寄不出信的話，就別開那張填驗證碼的表。**
+    // 開了等於請玩家坐在那裡等一封永遠不會到的信，而他會以為是自己
+    // 信箱打錯了、或是進了垃圾信匣，一直重試。
+    if (!sent.mail) {
+      await showNotice(
+        '這條路暫時走不通',
+        '伺服器還沒開通寄信，驗證碼寄不出去。\n\n' +
+          '如果你還登得進去，到榜單頁按「救援問題」設一組問題，\n' +
+          '下次忘記密碼就不必等信。',
+      );
       return;
     }
 

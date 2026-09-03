@@ -298,6 +298,14 @@ export class RunScene extends Phaser.Scene {
 
   /** 這一場是哪個副本的第幾層。一般關卡是 null。 */
   private dungeonRun: { id: string; floor: number } | null = null;
+  /**
+   * 重挑第幾關。不是重挑就是 null。
+   *
+   * 和 dungeonRun 同一種待遇：Phaser 重用 Scene 實例，不在 init 裡清成 null 的話，
+   * 重挑過一次之後的每一場正常關卡都會被當成重挑——那會安靜地停掉主線進度，
+   * 而畫面上完全看不出原因。
+   */
+  private replayStage: number | null = null;
   /** 副本那一行 HUD。無限模式會隨波數改寫，其餘副本寫一次就不動。 */
   private dungeonBanner: Phaser.GameObjects.Text | null = null;
   /** 無限模式的那一行怎麼寫。不是無限模式就是 null。 */
@@ -328,6 +336,17 @@ export class RunScene extends Phaser.Scene {
       typeof id === "string" && typeof floor === "number"
         ? { id, floor }
         : null;
+    const replay = data?.replayStage;
+    // 副本與重挑互斥。同時帶進來的話，spec 會照副本組（因為副本的分支在前），
+    // 但結算頁會照重挑記帳——一場仗用兩套規則結算，那種錯不會當場出事，
+    // 會在存檔裡出事。目前的畫面不會同時傳兩個，但這一行的成本是零。
+    this.replayStage =
+      this.dungeonRun === null &&
+      typeof replay === "number" &&
+      Number.isInteger(replay) &&
+      replay >= 1
+        ? replay
+        : null;
     // Phaser 會重用 Scene 實例：上一場的文字物件早就被銷毀，
     // 不清成 null 的話下一場會拿著空殼去 setText。
     this.dungeonBanner = null;
@@ -347,7 +366,7 @@ export class RunScene extends Phaser.Scene {
     // 副本走同一個組裝函式，只是規則、倍率與深度由副本填。
     const spec =
       dungeon === null || entry === null
-        ? loadoutSpecOf(save, save.world.stage)
+        ? loadoutSpecOf(save, this.replayStage ?? save.world.stage)
         : dungeonSpecOf(save, dungeon, entry.floor);
     const stage = spec.stage;
     const loadout = buildLoadoutFromSpec(spec);
@@ -384,7 +403,9 @@ export class RunScene extends Phaser.Scene {
     // 副本裡不跑教學：教學會改寫起手牌，而副本的規則（例如獨門一符）
     // 本來就已經改過一次牌了，兩者疊在一起誰都說不清這一場的牌是怎麼來的。
     this.step =
-      this.dungeonRun === null && shouldRunTutorial(save) ? "deploy" : "done";
+      this.dungeonRun === null && this.replayStage === null && shouldRunTutorial(save)
+        ? "deploy"
+        : "done";
     this.tutorialRun = this.step !== "done";
     // 起點也要報，否則分母不存在——只有「走到第二步」的人數是算不出完成率的。
     if (this.step === "deploy") track("tutorial_step", { step: "deploy" });
@@ -429,6 +450,9 @@ export class RunScene extends Phaser.Scene {
       // 不然副本的難度會混進主線的流失曲線裡。
       dungeon: this.dungeonRun?.id ?? null,
       dungeon_floor: this.dungeonRun?.floor ?? 0,
+      // 重挑的一場不能混進主線的難度曲線裡：那是一個已經過關的人
+      // 帶著現在的養成回頭打，難度和第一次完全不是同一回事。
+      replay: this.replayStage !== null,
       speed: this.speed,
       field_slots: this.run.field.length,
     });
@@ -2528,8 +2552,10 @@ export class RunScene extends Phaser.Scene {
               loadout: this.runLoadout,
               arena: this.run.loadout.arena,
               tutorial: this.tutorialRun,
+              replay: this.replayStage !== null,
             },
       dungeon: this.dungeonRun,
+      replay: this.replayStage !== null,
     };
 
     fadeToScene(this, "Result", result);

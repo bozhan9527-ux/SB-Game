@@ -38,6 +38,13 @@ export interface TelemetryEvents {
     /** 這一場是哪個副本（一般關卡為 null），以及第幾層。 */
     dungeon: string | null;
     dungeon_floor: number;
+    /**
+     * 這一場是不是重挑一個已經過掉的關卡。
+     *
+     * 一定要分得開：重挑是一個已經過關的人帶著現在的養成回頭打，
+     * 難度和第一次完全不是同一回事，混進去會把主線的難度曲線洗平。
+     */
+    replay: boolean;
     speed: number;
     field_slots: number;
   };
@@ -45,6 +52,8 @@ export interface TelemetryEvents {
   /** 一關結束。流失漏斗與難度曲線都靠這一個。 */
   stage_end: {
     stage: number;
+    /** 和 stage_start 同一個理由：重挑的一場不能混進主線的難度曲線裡。 */
+    replay: boolean;
     victory: boolean;
     /** breached／timeout／abandon，勝利時為 null。 */
     reason: string | null;

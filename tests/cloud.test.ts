@@ -174,6 +174,7 @@ describe('上報的關卡是種子那一半', () => {
       loadout: loadoutFor(save),
       arena: true,
       tutorial: false,
+      replay: false,
     });
 
     expect(submit).toHaveBeenCalledTimes(1);
@@ -205,6 +206,7 @@ describe('版本對不上就直說', () => {
       loadout: loadoutFor(save),
       arena: false,
       tutorial: false,
+      replay: false,
     });
     expect(submit.mock.calls[0]?.[0]).toMatchObject({ contract: REPLAY_CONTRACT_VERSION });
   });
@@ -212,6 +214,55 @@ describe('版本對不上就直說', () => {
   it('版本是整數而且大於零——0 是「沒帶」的意思，不能和合法值撞在一起', () => {
     expect(Number.isInteger(REPLAY_CONTRACT_VERSION)).toBe(true);
     expect(REPLAY_CONTRACT_VERSION).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * 伺服器沒回 JSON 的那一種故障。
+ *
+ * 最可能的成因是 Worker 在跑完之前被平台砍掉（CPU 逾時），而那時候
+ * Cloudflare 回的是一頁 HTML 錯誤頁。重播驗證是整個後端最貴的一支，
+ * 所以真的發生的話，被擋下來的剛好是打得最深的那幾個人——
+ * 而他們最不能接受的就是一句看不出所以然的話。
+ */
+describe('伺服器沒回 JSON 的時候要講得出話', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('HTML 錯誤頁不會被說成「連不上伺服器」', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://example.invalid');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<!DOCTYPE html><title>Error 1102</title>', {
+        status: 500,
+        headers: { 'content-type': 'text/html' },
+      }),
+    );
+
+    const result = await client.fetchLeaderboard('depth', null);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // 講得出「伺服器沒處理完」和狀態碼，而不是叫玩家去看網路——
+    // 他的網路是通的，重開 Wi-Fi 一百次也不會好。
+    expect(result.detail).toContain('500');
+    expect(result.detail).not.toContain('看一下網路');
+  });
+
+  it('伺服器回的錯誤 JSON 照樣讀得出來，不會被這條路蓋掉', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://example.invalid');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: false, error: 'rejected', detail: '你的遊戲是舊版本' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const result = await client.fetchLeaderboard('depth', null);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // 這一句是版本檢查唯一到得了玩家眼前的路徑，被蓋掉的話整套機制等於不存在。
+    expect(result.detail).toBe('你的遊戲是舊版本');
   });
 });
 
@@ -247,6 +298,18 @@ describe('一場成績進哪幾個榜', () => {
     // 混進去的話，那個榜比的就從操作變成洞府等級。
     expect(boardsFor(120, false)).not.toContain('arena');
   });
+
+  it('重挑一個過掉的關卡只進速通榜，不進深度榜', () => {
+    // 一個打到第 152 關的人回頭重挑第 5 關，送一筆「深度 5」上去
+    // 是一筆永遠不會被採用的成績——而它要花伺服器 40 毫秒 CPU 才知道。
+    expect(boardsFor(5, false, true)).toEqual(['speed5']);
+    expect(boardsFor(5, false, true)).not.toContain('depth');
+  });
+
+  it('重挑不會改變競技場的去向', () => {
+    // 競技場永遠從第 1 關打起，本來就沒有「重挑」這件事。
+    expect(boardsFor(1, true, true)).toEqual(['arena']);
+  });
 });
 
 /**
@@ -267,6 +330,7 @@ describe('上榜開通', () => {
     loadout: loadoutFor(playing()),
     arena: false,
     tutorial: false,
+      replay: false,
   };
 
   /** 一份「可以上榜」的存檔：有門派、也註冊過。 */
@@ -520,7 +584,7 @@ describe('上報的是開打那一刻的配置', () => {
     const submit = vi
       .spyOn(client, 'submitScore')
       .mockResolvedValue({ ok: true, rank: 1, best: true, stage: 6, elapsedMs: 1000 });
-    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false, tutorial: false });
+    await submitRun(save, { stage: 6, runs: 0, steps: 10, actions: [], loadout: captured, arena: false, tutorial: false, replay: false });
 
     const sent = submit.mock.calls[0]?.[0];
     expect(sent?.loadout.sectClears).toBe(4);

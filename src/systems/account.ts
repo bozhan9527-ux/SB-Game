@@ -108,7 +108,10 @@ export async function register(
 
   const salted = await accountSalt({ email: cleaned });
   if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  if (salted.taken) return { kind: 'failed', reason: '這個信箱已經註冊過了' };
+  // 這裡原本先問一次「這個信箱註冊過了沒」再決定要不要往下走。拿掉了：
+  // 那個問題本身就是一支任何人都能打的帳號查詢工具（見 AccountSaltResult）。
+  // 伺服器的 register 本來就會回一模一樣的那句話，前端這一步只省了一次
+  // PBKDF2——兩百毫秒，換一份全體玩家的信箱名單，不划算。
 
   const secret = await deriveSecret(password, salted.salt);
   const result = await accountRegister({
@@ -148,9 +151,10 @@ export async function login(
 
   const salted = await accountSalt({ email: cleaned });
   if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  // 沒註冊過就一定不是這個帳號的鹽，密碼再對也算不出同一把密鑰。
-  // 回和密碼錯誤同一句話：分開回等於送人一份「哪些信箱註冊過」的查詢工具。
-  if (!salted.taken) return { kind: 'failed', reason: '信箱或密碼不對' };
+  // 沒註冊過的信箱拿到的是一把假鹽，密碼再對也算不出伺服器存的那把密鑰，
+  // 所以下面的 login 一定會失敗，而且失敗的那句話和密碼錯誤完全一樣。
+  // **這正是不在這裡提前判斷的原因**——提前判斷要先問伺服器
+  // 「這個信箱註冊過了沒」，而那句話就是洩漏本身。
 
   const secret = await deriveSecret(password, salted.salt);
   const result = await accountLogin({ email: cleaned, secretHash: await sha256(secret) });
@@ -170,15 +174,23 @@ export async function login(
 /**
  * 忘記密碼：請伺服器寄一組驗證碼。
  *
- * **回傳永遠是成功**，即使那個帳號不存在——伺服器那邊也是同一個規則。
- * 分開回等於送人一份「哪些名字有註冊、綁哪個信箱」的查詢工具。
+ * **成功與否和帳號存不存在無關**，即使那個帳號不存在也回成功——伺服器那邊
+ * 也是同一個規則。分開回等於送人一份「哪些信箱有註冊」的查詢工具。
+ *
+ * mail 是另一回事：**這台伺服器有沒有開通寄信**。沒開通的話，
+ * 呼叫端要說一句誠實的「這條路目前走不通」，而不是「驗證碼已經在路上了」
+ * 然後讓玩家等一封永遠不會到的信。
  */
-export async function requestRecovery(email: string): Promise<AccountOutcome> {
+export async function requestRecovery(
+  email: string,
+): Promise<{ kind: 'ok'; mail: boolean } | { kind: 'failed'; reason: string }> {
   const cleaned = cleanEmail(email);
   if (cleaned === null) return { kind: 'failed', reason: '電子信箱看起來不對' };
   const result = await accountRecover({ email: cleaned });
-  if (!result.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  return { kind: 'ok', name: cleaned };
+  if (!result.ok) return { kind: 'failed', reason: result.detail ?? '連不上伺服器' };
+  // 舊版伺服器沒有這個欄位。把 undefined 當成「有開通」——多問一次總比
+  // 對著一個其實正常的部署說「走不通」好。
+  return { kind: 'ok', mail: result.mail !== false };
 }
 
 /**
@@ -201,7 +213,8 @@ export async function resetPassword(
 
   const salted = await accountSalt({ email: cleaned });
   if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  if (!salted.taken) return { kind: 'failed', reason: '驗證碼不對或已經過期' };
+  // 不提前判斷「這個信箱註冊過了沒」——見 login 那一段。沒註冊的信箱
+  // 走到底會拿到「驗證碼不對或已經過期」，和真的打錯驗證碼一模一樣。
 
   // 鹽不變，所以新密碼推出來的密鑰和伺服器接下來要存的是同一把。
   const secret = await deriveSecret(password, salted.salt);
@@ -321,9 +334,8 @@ export async function resetByQuestion(
 
   const salted = await accountSalt({ email: cleaned });
   if (!salted.ok) return { kind: 'failed', reason: '連不上伺服器' };
-  // 沒註冊過就一定算不出對的答案雜湊。回和答錯同一句話：分開回等於
-  // 送人一份「哪些信箱註冊過」的查詢工具。
-  if (!salted.taken) return { kind: 'failed', reason: '答案不對' };
+  // 同樣不提前判斷。沒註冊的信箱拿到假鹽，算出來的答案雜湊一定對不上，
+  // 伺服器回的是「答案不對」——和真的答錯一模一樣。
 
   // 鹽不變，所以新密碼推出來的密鑰和伺服器接下來要存的是同一把。
   const secret = await deriveSecret(password, salted.salt);
