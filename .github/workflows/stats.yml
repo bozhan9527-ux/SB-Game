@@ -17,6 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # **這一步不能省。** 沒有它的話 wrangler-action 會自己去裝一份 wrangler，
+      # 而那會撞上 peer 依賴衝突（repo 用 @cloudflare/workers-types@5，
+      # wrangler 3.90 的 peerOptional 寫的是 ^4）。npm ci 走鎖檔，不理 peer，
+      # 裝完之後 wrangler-action 就直接用 node_modules 裡那一份。
+      # deploy-api.yml 沒踩到這個坑，正是因為它前面本來就有 npm ci。
+      - run: npm ci
+
       - name: 玩過的人
         uses: cloudflare/wrangler-action@v3
         with:
