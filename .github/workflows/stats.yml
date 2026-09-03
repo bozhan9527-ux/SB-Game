@@ -5,8 +5,9 @@ name: Stats
 # 這個問題本來只能自己開終端機打 wrangler，而那表示它不會有人常常去問。
 # 做成 Actions 頁面上的一顆按鈕，數字直接印在 log 裡。
 #
-# 查詢寫在 server/stats.sql，只有 COUNT、沒有任何一列原始資料——
-# accounts 裡的信箱是這個專案唯一存下來的個人資料，而這裡的 log 是公開的。
+# **只有 COUNT，沒有任何一列原始資料。** accounts 裡的信箱是這個專案唯一
+# 存下來的個人資料，而這裡的 log 是公開的——所以一個信箱、一個 player_id
+# 都不會出現。
 on:
   workflow_dispatch:
 
@@ -21,14 +22,41 @@ jobs:
           node-version: '22'
           cache: npm
 
-      # **這一步不能省。** 沒有它的話 wrangler-action 會自己去裝一份 wrangler，
-      # 而那會撞上 peer 依賴衝突（repo 用 @cloudflare/workers-types@5，
-      # wrangler 3.90 的 peerOptional 寫的是 ^4）。npm ci 走鎖檔、不理 peer。
+      # 這一步不能省：沒有現成的 wrangler 時，後面那些指令會去 npm install
+      # 一份，而那會撞上 peer 依賴衝突（repo 用 @cloudflare/workers-types@5，
+      # wrangler 的 peerOptional 寫的是 ^4）。npm ci 走鎖檔、不理 peer。
       - run: npm ci
 
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: server
-          command: d1 execute sb-game --remote --file=stats.sql --yes
+      # **不用 wrangler-action，直接跑 wrangler。** 兩個都試過了：
+      #   - wrangler-action 的 command 會照空白拆開，引號包起來的 SQL 被切碎，
+      #     實際傳過去的只有 SELECT 這個字（D1 回 incomplete input）。
+      #   - 改成 --file 之後 SQL 完整了，但那條路走的是「匯入」，
+      #     只印摘要（Executed 3 queries, 921 rows read），不印查詢結果。
+      # 直接跑的話引號完全由這裡控制，而 --command 本來就會把結果印出來。
+      # wrangler 自己讀這兩個環境變數，不需要另外登入。
+      - name: 查
+        working-directory: server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          d1() { npx wrangler d1 execute sb-game --remote --yes --command "$1"; }
+
+          echo "::group::玩過的人"
+          # 三個數字的意思不一樣：
+          #   玩過   ＝ 雲端身分是「第一次成功送出成績」時自動建立的，所以它是
+          #            「至少通關過一關、而且當時網路是通的人」。最接近「玩過」，
+          #            但少算了打開遊戲就放棄、以及完全離線玩的人。
+          #   上過榜 ＝ 成績通過伺服器重播驗證的人。和上面的差就是驗證失敗的。
+          #   註冊   ＝ 填過信箱的人。一定最少，因為不註冊也能上榜。
+          d1 "SELECT (SELECT COUNT(*) FROM saves) AS 玩過, (SELECT COUNT(DISTINCT player_id) FROM board_runs) AS 上過榜, (SELECT COUNT(*) FROM accounts) AS 註冊, (SELECT COUNT(*) FROM saves WHERE updated_at > (strftime('%s','now') - 7*86400)*1000) AS 近七天, (SELECT COUNT(*) FROM saves WHERE updated_at > (strftime('%s','now') - 86400)*1000) AS 近一天"
+          echo "::endgroup::"
+
+          echo "::group::各榜有幾個人"
+          d1 "SELECT board AS 榜, COUNT(*) AS 人數, MAX(score) AS 最佳 FROM board_runs WHERE hidden = 0 GROUP BY board ORDER BY 人數 DESC, board LIMIT 30"
+          echo "::endgroup::"
+
+          echo "::group::大家推到第幾關"
+          # 卡關的位置就在這張表上：某一關特別多人停著，那一關就是門檻太高。
+          d1 "SELECT stage AS 關卡, COUNT(*) AS 人數 FROM board_runs WHERE board = 'depth' AND hidden = 0 GROUP BY stage ORDER BY stage"
+          echo "::endgroup::"
