@@ -3,11 +3,10 @@ name: Stats
 # 「目前有多少人玩過？」
 #
 # 這個問題本來只能自己開終端機打 wrangler，而那表示它不會有人常常去問。
-# 做成一顆按鈕：Actions 頁面手動觸發，數字直接印在 log 裡。
+# 做成 Actions 頁面上的一顆按鈕，數字直接印在 log 裡。
 #
-# **只印總數，不印任何一列原始資料。** accounts 表裡的信箱是這個專案唯一
-# 存下來的個人資料，而 workflow 的 log 對所有能看到這個 repo 的人都是公開的
-# ——所以這裡每一個查詢都只 SELECT COUNT，一個信箱、一個 player_id 都不出來。
+# 查詢寫在 server/stats.sql，只有 COUNT、沒有任何一列原始資料——
+# accounts 裡的信箱是這個專案唯一存下來的個人資料，而這裡的 log 是公開的。
 on:
   workflow_dispatch:
 
@@ -24,52 +23,12 @@ jobs:
 
       # **這一步不能省。** 沒有它的話 wrangler-action 會自己去裝一份 wrangler，
       # 而那會撞上 peer 依賴衝突（repo 用 @cloudflare/workers-types@5，
-      # wrangler 3.90 的 peerOptional 寫的是 ^4）。npm ci 走鎖檔，不理 peer，
-      # 裝完之後 wrangler-action 就直接用 node_modules 裡那一份。
-      # deploy-api.yml 沒踩到這個坑，正是因為它前面本來就有 npm ci。
+      # wrangler 3.90 的 peerOptional 寫的是 ^4）。npm ci 走鎖檔、不理 peer。
       - run: npm ci
 
-      - name: 玩過的人
-        uses: cloudflare/wrangler-action@v3
+      - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: server
-          # 三個數字的意思不一樣：
-          # - 雲端身分是第一次成功送出成績時自動建立的，所以它等於
-          #   「至少通關過一關、而且當時網路是通的人」——最接近「玩過的人數」。
-          # - 上過榜是成績通過重播驗證的人，和上面的差就是驗證失敗的人。
-          # - 註冊帳號一定最少：現在不註冊也能上榜。
-          command: >-
-            d1 execute sb-game --remote --yes --command
-            "SELECT
-               (SELECT COUNT(*) FROM saves) AS 玩過_有雲端身分,
-               (SELECT COUNT(DISTINCT player_id) FROM board_runs) AS 上過榜,
-               (SELECT COUNT(*) FROM accounts) AS 註冊帳號,
-               (SELECT COUNT(*) FROM saves WHERE updated_at > (strftime('%s','now') - 7*86400)*1000) AS 近七天有動,
-               (SELECT COUNT(*) FROM saves WHERE updated_at > (strftime('%s','now') - 86400)*1000) AS 近一天有動"
-
-      - name: 各榜有幾個人
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: server
-          command: >-
-            d1 execute sb-game --remote --yes --command
-            "SELECT board, COUNT(*) AS 人數, MAX(score) AS 最佳
-             FROM board_runs WHERE hidden = 0
-             GROUP BY board ORDER BY 人數 DESC, board LIMIT 30"
-
-      - name: 大家推到第幾關
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: server
-          # 卡關的位置就在這張表上：某一關特別多人停著，那一關就是門檻太高。
-          command: >-
-            d1 execute sb-game --remote --yes --command
-            "SELECT stage AS 關卡, COUNT(*) AS 人數
-             FROM board_runs WHERE board = 'depth' AND hidden = 0
-             GROUP BY stage ORDER BY stage"
+          command: d1 execute sb-game --remote --file=stats.sql --yes
