@@ -217,6 +217,55 @@ describe('版本對不上就直說', () => {
   });
 });
 
+/**
+ * 伺服器沒回 JSON 的那一種故障。
+ *
+ * 最可能的成因是 Worker 在跑完之前被平台砍掉（CPU 逾時），而那時候
+ * Cloudflare 回的是一頁 HTML 錯誤頁。重播驗證是整個後端最貴的一支，
+ * 所以真的發生的話，被擋下來的剛好是打得最深的那幾個人——
+ * 而他們最不能接受的就是一句看不出所以然的話。
+ */
+describe('伺服器沒回 JSON 的時候要講得出話', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('HTML 錯誤頁不會被說成「連不上伺服器」', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://example.invalid');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('<!DOCTYPE html><title>Error 1102</title>', {
+        status: 500,
+        headers: { 'content-type': 'text/html' },
+      }),
+    );
+
+    const result = await client.fetchLeaderboard('depth', null);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // 講得出「伺服器沒處理完」和狀態碼，而不是叫玩家去看網路——
+    // 他的網路是通的，重開 Wi-Fi 一百次也不會好。
+    expect(result.detail).toContain('500');
+    expect(result.detail).not.toContain('看一下網路');
+  });
+
+  it('伺服器回的錯誤 JSON 照樣讀得出來，不會被這條路蓋掉', async () => {
+    vi.stubEnv('VITE_API_BASE', 'https://example.invalid');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: false, error: 'rejected', detail: '你的遊戲是舊版本' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const result = await client.fetchLeaderboard('depth', null);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    // 這一句是版本檢查唯一到得了玩家眼前的路徑，被蓋掉的話整套機制等於不存在。
+    expect(result.detail).toBe('你的遊戲是舊版本');
+  });
+});
+
 describe('一場成績進哪幾個榜', () => {
   it('主線最後一關同時進深度與速通——同一場既是深度也是秒數', () => {
     expect(boardsFor(SPEED_STAGE, false)).toEqual(['depth', 'speed81']);

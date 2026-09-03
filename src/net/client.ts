@@ -55,6 +55,28 @@ async function call<T>(path: string, body: unknown | null): Promise<ApiResponse<
       body: body === null ? null : JSON.stringify(body),
       signal: controller.signal,
     });
+    // **伺服器沒回 JSON 是一種獨立的故障，不能和「連不上」混在一起。**
+    //
+    // 它最可能的成因是 Worker 在跑完之前就被平台砍掉——CPU 逾時的時候，
+    // Cloudflare 回的是一頁 HTML 錯誤頁，不是這個 API 的 JSON。而重播驗證
+    // 正是整個後端最貴的一支（一般通關 40 毫秒，最深的一場競技場 420 毫秒），
+    // 所以真的發生的話，**被擋下來的會剛好是打得最深的那幾個人**。
+    //
+    // 直接 await json() 的話，這個故障會掉進下面的 catch，然後被說成
+    // 「連不上伺服器，看一下網路」——玩家跑去重開 Wi-Fi，而問題不在那裡。
+    // 這個專案已經被同一種「catch-all 蓋掉真正原因」咬過三次了。
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      try {
+        return JSON.parse(text) as ApiResponse<T>;
+      } catch {
+        return {
+          ok: false,
+          error: 'serverError',
+          detail: `伺服器沒能處理完這個請求（${response.status}），這一場沒有上榜`,
+        };
+      }
+    }
     const parsed = (await response.json()) as ApiResponse<T>;
     return parsed;
   } catch {
