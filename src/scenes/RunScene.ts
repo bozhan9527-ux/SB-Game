@@ -2738,10 +2738,15 @@ export class RunScene extends Phaser.Scene {
       this.dungeonBanner.setText(this.endlessBanner(run.clearedStages + 1)).setScale(1);
       fitText(this.dungeonBanner, GAME_WIDTH - 40);
     }
+    // 無限副本的「第 N 波」是橫幅與榜單上的那個數（打過幾關）。右上角再寫「第 3 / 5 波」
+    // 就變成同一個字指兩件事，所以那裡改寫「本波 3/5」——這一波打到哪。
+    const sub = `${wave} / ${BALANCE.wave.wavesPerStage}`;
     this.hudWave.setText(
-      run.bossSpawnedAtMs === null
-        ? `第 ${wave} / ${BALANCE.wave.wavesPerStage} 波`
-        : "首領",
+      run.bossSpawnedAtMs !== null
+        ? "首領"
+        : this.endlessBanner !== null
+          ? `本波 ${sub}`
+          : `第 ${sub} 波`,
     );
     this.waveBar.setDisplaySize(GAME_WIDTH * progress, 4);
   }
