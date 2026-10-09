@@ -60,6 +60,8 @@ export interface ActiveEnemy {
   spawnedBySplit: boolean;
   /** 首領招式的狀態。一般妖魔（含首領叫出來的護衛）為 null。 */
   skill: BossSkillState | null;
+  /** 盾：還能整發擋掉幾下。沒有這個習性的一律是 0。 */
+  wardHits: number;
 }
 
 /** 首領身上那一招的即時狀態。 */
@@ -381,7 +383,14 @@ export function buildSpawnQueue(
 }
 
 /** 額外習性的候選。首領不在此列，牠本來就不帶習性。 */
-const EXTRA_TRAITS: readonly MobTrait[] = ["armor", "swift", "split"];
+const EXTRA_TRAITS: readonly MobTrait[] = [
+  "armor",
+  "swift",
+  "split",
+  "regen",
+  "phase",
+  "ward",
+];
 
 /**
  * 這一波要不要被塞一種額外習性。
@@ -408,6 +417,9 @@ function traitHpRatio(trait: MobTrait): number {
   if (trait === "armor") return cfg.armorHpRatio;
   if (trait === "swift") return cfg.swiftHpRatio;
   if (trait === "split") return cfg.splitParentHpRatio;
+  if (trait === "regen") return cfg.regenHpRatio;
+  if (trait === "phase") return cfg.phaseHpRatio;
+  if (trait === "ward") return cfg.wardHpRatio;
   return 1;
 }
 
@@ -669,7 +681,22 @@ function maxTier(state: DefenseState): number {
 
 /** 依「離山門最近」排序，法寶永遠先打最急的那一隻。 */
 function frontMost(state: DefenseState, count: number): ActiveEnemy[] {
-  return [...state.enemies].sort((a, b) => b.y - a.y).slice(0, count);
+  return state.enemies
+    .filter((enemy) => !isHidden(state, enemy))
+    .sort((a, b) => b.y - a.y)
+    .slice(0, count);
+}
+
+/**
+ * 隱：這一刻是不是隱身（打不到）。
+ *
+ * 每一隻的循環用自己的 id 錯開，不是整波一起閃——一起閃的話，
+ * 那一秒全場的符都會同時停手，看起來像當機。純粹看時間與 id，不擲骰，重播照樣對得上。
+ */
+export function isHidden(state: DefenseState, enemy: ActiveEnemy): boolean {
+  if (enemy.trait !== "phase") return false;
+  const { phaseCycleMs, phaseHiddenMs } = BALANCE.trait;
+  return (state.elapsedMs + enemy.id * 397) % phaseCycleMs < phaseHiddenMs;
 }
 
 /**
@@ -721,6 +748,15 @@ function fireOnce(
     if (beyondTargets && carried <= 0) break;
 
     const ratio = target.maxHp > 0 ? target.hp / target.maxHp : 1;
+
+    // 盾：前幾下整發擋掉，連溢傷也一起吞。出手快、道數多的符磨得快，
+    // 一發重擊的符則是整發浪費——這正是這個習性要逼玩家想的事。
+    if (target.wardHits > 0) {
+      target.wardHits -= 1;
+      carried = 0;
+      report.shots.push({ slot, enemyId: target.id, damage: 0, killed: false });
+      continue;
+    }
 
     let damage = beyondTargets ? 0 : base * ramp;
     if (!beyondTargets) {
@@ -937,6 +973,7 @@ export function tickCombat(
       trait: next.trait,
       spawnedBySplit: false,
       skill: next.boss ? newSkillState(state.bossDef) : null,
+      wardHits: next.trait === "ward" ? BALANCE.trait.wardHits : 0,
     };
     state.nextId += 1;
     state.enemies.push(enemy);
@@ -956,12 +993,20 @@ export function tickCombat(
     if (enemy.burnSource !== null) creditDamage(state, enemy.burnSource, tick);
   }
 
+  // 3a. 癒：活著就一直長回來，最多長回滿血。
+  const { regenPerSecond } = BALANCE.trait;
+  for (const enemy of state.enemies) {
+    if (enemy.trait !== "regen" || enemy.hp <= 0) continue;
+    enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenPerSecond * (deltaMs / 1000));
+  }
+
   // 3b. 首領招式。放在開火之前：這一拍罩上的護盾、封住的格位，這一拍就生效。
   tickBossSkill(state, deltaMs, rng, report);
 
   // 4. 法寶開火。陣法與光環每一拍重算一次——玩家隨時可能把符搬到別格。
   const bonuses = boardBonuses(state.field);
   recordFormation(state, bonuses, deltaMs);
+  const targetable = state.enemies.some((enemy) => !isHidden(state, enemy));
   for (let slot = 0; slot < state.field.length; slot += 1) {
     const card = state.field[slot];
     if (card === undefined || card === null) continue;
@@ -978,6 +1023,11 @@ export function tickCombat(
         remaining = 0;
         // 場上一空，連射累積就歸零：太乙符換來的是「持續有得打」的獎勵。
         state.ramps[slot] = 0;
+        break;
+      }
+      // 場上的全都隱身了：按住不發，等牠們現形。連射累積保留——牠們還在場上。
+      if (!targetable) {
+        remaining = 0;
         break;
       }
       fireOnce(state, slot, card, bonus.damage, rng, report);
@@ -1033,6 +1083,7 @@ export function tickCombat(
           trait: "split",
           spawnedBySplit: true,
           skill: null,
+          wardHits: 0,
         };
         state.nextId += 1;
         survivors.push(child);
@@ -1356,6 +1407,7 @@ function spawnMinions(
       trait: "none",
       spawnedBySplit: true,
       skill: null,
+      wardHits: 0,
     };
     state.nextId += 1;
     state.enemies.push(minion);

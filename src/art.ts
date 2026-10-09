@@ -70,6 +70,9 @@ export const ENEMY_ART_TOP: Readonly<Record<MobArt, number>> = {
   undead: 0,
   wolf: 14,
   yeti: 8,
+  treant: 12,
+  wisp: 12,
+  golem: 12,
 };
 
 export function bossTexture(art: BossArt, frame = 0): string {
@@ -127,6 +130,7 @@ const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial',
+  'treant', 'wisp', 'golem',
 ];
 
 const ASSETS: readonly ArtSpec[] = [

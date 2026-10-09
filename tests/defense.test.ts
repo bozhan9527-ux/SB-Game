@@ -76,7 +76,7 @@ function mob(over: Partial<ActiveEnemy> = {}): ActiveEnemy {
     burnPerMs: 0,
     burnSource: null,
     trait: 'none',
-    spawnedBySplit: false, skill: null,
+    spawnedBySplit: false, skill: null, wardHits: 0,
     ...over,
   };
 }

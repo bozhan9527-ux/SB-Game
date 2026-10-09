@@ -47,6 +47,7 @@ import {
   discardHand,
   dropOn,
   tickCombat,
+  isHidden,
 } from "../systems/defense";
 import type { FormationLine } from "../systems/formation";
 import {
@@ -246,6 +247,9 @@ const TRAIT_MARK: Record<
   armor: { text: "甲", color: "#b8c4d0" },
   swift: { text: "疾", color: "#7fd8ff" },
   split: { text: "裂", color: "#c79cf0" },
+  regen: { text: "癒", color: "#8fe07a" },
+  phase: { text: "隱", color: "#9fb4d8" },
+  ward: { text: "盾", color: "#f0c95a" },
 };
 
 /**
@@ -2138,17 +2142,17 @@ export class RunScene extends Phaser.Scene {
       const mark = TRAIT_MARK[enemy.trait];
       // 貼在血條右端，不是頭頂上：頭頂在剛出場時會落在 HUD 底下被蓋掉，
       // 而妖魔剛出場正是玩家最需要知道「這一波是什麼」的時候。
-      container.add(
-        this.add
-          .text(
-            26,
-            barY,
-            mark.text,
-            textStyle({ size: 15, color: mark.color, bold: true }),
-          )
-          .setOrigin(0, 0.5)
-          .setStroke("#0b0f14", 5),
-      );
+      const label = this.add
+        .text(
+          26,
+          barY,
+          enemy.trait === "ward" ? `${mark.text}${enemy.wardHits}` : mark.text,
+          textStyle({ size: 15, color: mark.color, bold: true }),
+        )
+        .setOrigin(0, 0.5)
+        .setStroke("#0b0f14", 5);
+      container.add(label);
+      container.setData("mark", label);
     }
 
     // 減速與灼燒的標記。特效若看不見，玩家就沒有理由相信寒冰符真的有用——
@@ -2174,6 +2178,14 @@ export class RunScene extends Phaser.Scene {
       const frost = view.getData("frost") as Phaser.GameObjects.Arc | undefined;
       const ember = view.getData("ember") as Phaser.GameObjects.Arc | undefined;
       frost?.setVisible(enemy.slowUntilMs > this.run.elapsedMs);
+      // 隱：隱身時整隻淡掉——打不到的東西要看起來就打不到。
+      if (enemy.trait === "phase") view.setAlpha(isHidden(this.run, enemy) ? 0.3 : 1);
+      // 盾：剩幾下寫在標記上，擋完就收掉，讓玩家看得到「再兩下就破」。
+      if (enemy.trait === "ward") {
+        const mark = view.getData("mark") as Phaser.GameObjects.Text | undefined;
+        if (enemy.wardHits > 0) mark?.setText(`盾${enemy.wardHits}`);
+        else mark?.setVisible(false);
+      }
       ember?.setVisible(enemy.burnRemaining > 0);
       const tintUntil = view.getData("tintUntil") as number | undefined;
       if (tintUntil !== undefined && this.time.now >= tintUntil) {

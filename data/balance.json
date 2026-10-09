@@ -68,7 +68,14 @@
     "splitParentHpRatio": 0.6,
     "splitCount": 2,
     "splitHpRatio": 0.24,
-    "splitSpeedMultiplier": 1.15
+    "splitSpeedMultiplier": 1.15,
+    "regenHpRatio": 0.8,
+    "regenPerSecond": 0.06,
+    "phaseHpRatio": 0.8,
+    "phaseCycleMs": 3000,
+    "phaseHiddenMs": 1000,
+    "wardHpRatio": 0.75,
+    "wardHits": 3
   },
   "sect": {
     "clearsPerMastery": 5,

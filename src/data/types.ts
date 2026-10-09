@@ -237,6 +237,16 @@ export interface TraitBalance {
   /** 分裂出來的小妖血量，佔母體最大血量的比例。 */
   splitHpRatio: number;
   splitSpeedMultiplier: number;
+  /** 癒：帶這個習性的妖魔血量打幾折、每秒回復最大血量的幾成。 */
+  regenHpRatio: number;
+  regenPerSecond: number;
+  /** 隱：血量折扣、一個循環多長、其中隱身（打不到）多久。 */
+  phaseHpRatio: number;
+  phaseCycleMs: number;
+  phaseHiddenMs: number;
+  /** 盾：血量折扣、前幾下攻擊整發擋掉。 */
+  wardHpRatio: number;
+  wardHits: number;
 }
 
 /**
@@ -572,7 +582,10 @@ export type MobArt =
   | 'bandit'
   | 'undead'
   | 'demon'
-  | 'celestial';
+  | 'celestial'
+  | 'treant'
+  | 'wisp'
+  | 'golem';
 
 /**
  * 妖魔的習性。
@@ -588,7 +601,7 @@ export type MobArt =
  *
  * 護甲與分裂互為反面：同一套牌組不可能同時最擅長兩者，這才逼出「帶哪四張」的取捨。
  */
-export type MobTrait = 'none' | 'armor' | 'swift' | 'split';
+export type MobTrait = 'none' | 'armor' | 'swift' | 'split' | 'regen' | 'phase' | 'ward';
 
 export interface MobDef {
   id: string;

@@ -50,7 +50,7 @@ function enemy(trait: MobTrait, hp: number, maxHp = hp): ActiveEnemy {
     burnPerMs: 0,
     burnSource: null,
     trait,
-    spawnedBySplit: false, skill: null,
+    spawnedBySplit: false, skill: null, wardHits: 0,
   };
 }
 
@@ -198,6 +198,49 @@ describe('轉世加成的習性', () => {
     if (trait === 'armor') return BALANCE.trait.armorHpRatio;
     if (trait === 'swift') return BALANCE.trait.swiftHpRatio;
     if (trait === 'split') return BALANCE.trait.splitParentHpRatio;
+    if (trait === 'regen') return BALANCE.trait.regenHpRatio;
+    if (trait === 'phase') return BALANCE.trait.phaseHpRatio;
+    if (trait === 'ward') return BALANCE.trait.wardHpRatio;
     return 1;
   }
+});
+
+describe('三種新習性', () => {
+  it('盾：快而多發的符破得掉，慢速重擊的符整發被吞——兩者在盾上的差距比在素面上大', () => {
+    const shielded = (type: string): number => {
+      const state = lab(type, 3, 'ward', 1e6);
+      const target = state.enemies[0];
+      if (target !== undefined) target.wardHits = BALANCE.trait.wardHits;
+      return damageOver(state, 3000);
+    };
+    const plain = (type: string): number => damageOver(lab(type, 3, 'none', 1e6), 3000);
+    // 劍陣符 0.52 秒一發，天雷符 1.5 秒一發：三秒內天雷只打得出兩發，全被盾吃掉。
+    expect(shielded('bolt')).toBe(0);
+    expect(shielded('sword')).toBeGreaterThan(0);
+    expect(shielded('sword') / plain('sword')).toBeGreaterThan(shielded('bolt') / plain('bolt'));
+  });
+
+  it('癒：沒人打就慢慢長回來，但不會超過滿血', () => {
+    const state = lab('sword', 1, 'regen', 50, 100);
+    state.field.fill(null);
+    for (let t = 0; t < 1000; t += 50) tickCombat(state, 50, createRng(1));
+    expect(state.enemies[0]?.hp).toBeCloseTo(50 + 100 * BALANCE.trait.regenPerSecond, 3);
+    for (let t = 0; t < 60_000; t += 50) tickCombat(state, 50, createRng(1));
+    expect(state.enemies[0]?.hp).toBe(100);
+  });
+
+  it('隱：同樣的符打隱身的妖魔，輸出大約少掉隱身的那一段', () => {
+    const phased = damageOver(lab('sword', 3, 'phase', 1e6), 9000);
+    const plain = damageOver(lab('sword', 3, 'none', 1e6), 9000);
+    const { phaseCycleMs, phaseHiddenMs } = BALANCE.trait;
+    const visible = 1 - phaseHiddenMs / phaseCycleMs;
+    expect(phased / plain).toBeGreaterThan(visible - 0.12);
+    expect(phased / plain).toBeLessThan(visible + 0.12);
+  });
+
+  it('六個新妖魔都掛在境界上，而且每個新習性至少有一種妖魔天生就帶', () => {
+    for (const trait of ['regen', 'phase', 'ward'] as const) {
+      expect(ENEMIES.mobs.some((mob) => mob.trait === trait), trait).toBe(true);
+    }
+  });
 });

@@ -33,6 +33,7 @@ function arena(kind: BossSkillKind, hp = 1e9): { state: DefenseState; boss: Acti
     trait: 'none',
     spawnedBySplit: false,
     skill: skillStateFor(kind),
+    wardHits: 0,
   };
   state.enemies = [boss];
   state.bossSpawnedAtMs = 0;

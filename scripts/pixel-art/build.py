@@ -1183,10 +1183,120 @@ def gate_post():
     return c
 
 
+
+def treant_frames():
+    """千年樹妖：樹幹身體、綠葉冠、黃眼、樹根當腳。習性「癒」——會自己長回來。"""
+    top = [
+        ".....gGGg..gGGg........",
+        "...gGGGGGggGGGGGg......",
+        "..gGGGLGGGGGGLGGGg.....",
+        ".gGGLGGGGGGGGGGLGGg....",
+        ".gGGGGGGGLGGGGGGGGg....",
+        "..gGGGGGGGGGGGGGGg.....",
+        "...ggGbbbbbbbbbGgg.....",
+        ".....bBBBBBBBBBb.......",
+        ".....BBeeBBBeeBB.......",
+        ".....BByyBBByyBB.......",
+        ".....BBBBBBBBBBB.......",
+        "...bbBBBdddddBBBbb.....",
+        "..bBBbBBBBBBBBBbBBb....",
+        ".bBb.BBBBkBBBBBB.bBb...",
+        ".gb..BBBBBBBkBBB..bg...",
+        ".g...BBkBBBBBBBB...g...",
+        ".....BBBBBBBBkBB.......",
+        ".....bBBBBBBBBBb.......",
+    ]
+    legs0 = [".....bBb.bBBb.bBb......", "....bBb...bb...bBb.....", "...bbb....bb....bbb...."]
+    legs1 = ["......bBbBBBbBb........", "......bBb.bb.bBb.......", ".....bbb..bb..bbb......"]
+    pal = dict(g="#2f7a3c", G="#4fae55", L="#9be07a", b="#4a2e1c", B="#7a5232", k="#5e3e26",
+               e="#2a1408", y="#ffe066", d="#3a2214")
+    return [sprite(bottom(top + legs, 23), pal, 23, 46, under_fn=shadow_fn(23, 28, 2, 20, 46))
+            for legs in (legs0, legs1)]
+
+
+def wisp_frames():
+    """游魂鬼火：浮在半空的青焰，沒有腳。習性「隱」——一陣一陣地淡掉。"""
+    flame0 = [
+        "..........c............",
+        ".........cC............",
+        "........cCCc...c.......",
+        ".......cCCCCc.cC.......",
+        "......cCCWWCCcCC.......",
+        "......CCWWWWCCCc.......",
+        ".....cCWWWWWWCCc.......",
+        ".....CCWWWWWWWCC.......",
+        ".....CWWeWWWeWWC.......",
+        ".....CWWeWWWeWWC.......",
+        ".....CWWWWWWWWWC.......",
+        ".....CCWWWmmWWCC.......",
+        ".....cCCWWWWWCCc.......",
+        "......cCCCCCCCc........",
+        ".......cCCCCCc.........",
+        "........cCcCc..........",
+        ".......cC.c.Cc.........",
+        "......c...c...c........",
+    ]
+    flame1 = [
+        "...........c...........",
+        "...c.......Cc..........",
+        "...Cc.....cCCc.........",
+        "...cCc...cCCCCc........",
+        "....CCc.cCCWWCCc.......",
+        "....cCCCCWWWWCCC.......",
+        ".....cCWWWWWWCCc.......",
+        ".....CCWWWWWWWCC.......",
+        ".....CWWeWWWeWWC.......",
+        ".....CWWeWWWeWWC.......",
+        ".....CWWWWWWWWWC.......",
+        ".....CCWWmmmWWCC.......",
+        ".....cCCWWWWWCCc.......",
+        "......cCCCCCCCc........",
+        ".......cCCCCCc.........",
+        "........cCcCc..........",
+        ".........cCc...........",
+        "........c.c.c..........",
+    ]
+    # 底下空三列：它是浮著的，不踩地。
+    pad = ["." * 23] * 3
+    # 芯不用接近白的顏色：會和受擊閃白混在一起（雪怪踩過同一個坑）。
+    pal = dict(c="#1a5f6a", C="#2fa8b0", W="#6fdcd2", e="#0e2a3a", m="#0e2a3a")
+    return [sprite(bottom(f + pad, 23), pal, 23, 46, under_fn=shadow_fn(23, 28, 7, 15, 46))
+            for f in (flame0, flame1)]
+
+
+def golem_frames():
+    """鎮山石傀：方塊石身、青色符文。習性「盾」——前幾下整發擋掉。"""
+    top = [
+        "......sSSSSSSSs........",
+        ".....sSSSSSSSSSs.......",
+        ".....SSrrSSSrrSS.......",
+        ".....SSrrSSSrrSS.......",
+        ".....sSSSSSSSSSs.......",
+        "......sSSdddSSs........",
+        "..ssssSSSSSSSSSssss....",
+        ".sSSSSSSSSSSSSSSSSSs...",
+        ".SSSSsSSSSrSSSSsSSSS...",
+        ".SSSSsSSSrrrSSSsSSSS...",
+        ".SSSSsSSSSrSSSSsSSSS...",
+        ".sSSssSSSSSSSSSssSSs...",
+        ".sSS.sSSSSSSSSSs.SSs...",
+        ".SSS.sSSSSSSSSSs.SSS...",
+        ".sss.sSSSdSSSSSs.sss...",
+        ".....sSSSSSSdSSs.......",
+        ".....sSSSSSSSSSs.......",
+        ".....ssSSSSSSSss.......",
+    ]
+    legs0 = [".....sSSS...SSSs.......", ".....sSSS...SSSs.......", "....sssss...sssss......"]
+    legs1 = ["......sSSS.SSSs........", "......sSSS.SSSs........", ".....sssss.sssss.......", ]
+    pal = dict(s="#5a6170", S="#8e97a6", d="#454b57", r="#5ff0e6")
+    return [sprite(bottom(top + legs, 23), pal, 23, 46, under_fn=shadow_fn(23, 28, 2, 20, 46))
+            for legs in (legs0, legs1)]
+
 MOBS = {
     "wolf": wolf_frames, "bear": bear_frames, "yeti": yeti_frames, "centipede": centipede_frames,
     "scorpion": scorpion_frames, "serpent": serpent_frames, "bandit": bandit_frames, "undead": undead_frames,
     "demon": demon_frames, "celestial": celestial_frames,
+    "treant": treant_frames, "wisp": wisp_frames, "golem": golem_frames,
 }
 BOSSES = {"beast": boss_beast_frames, "demon": boss_demon_frames, "storm": boss_storm_frames, "celestial": boss_celestial_frames}
 

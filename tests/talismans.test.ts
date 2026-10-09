@@ -51,7 +51,7 @@ function mob(over: Partial<ActiveEnemy> = {}): ActiveEnemy {
     id: 1, name: 'x', art: 'bandit', bossArt: null, boss: false,
     hp: 1e9, maxHp: 1e9, y: 0, lane: 0, speed: 0,
     slowUntilMs: 0, slowPercent: 0, burnRemaining: 0, burnPerMs: 0,
-    burnSource: null, trait: 'none', spawnedBySplit: false, skill: null,
+    burnSource: null, trait: 'none', spawnedBySplit: false, skill: null, wardHits: 0,
     ...over,
   };
 }

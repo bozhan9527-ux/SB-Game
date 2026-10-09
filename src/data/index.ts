@@ -92,9 +92,9 @@ const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
 ];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
-  'bandit', 'undead', 'demon', 'celestial',
+  'bandit', 'undead', 'demon', 'celestial', 'treant', 'wisp', 'golem',
 ];
-const MOB_TRAITS: readonly MobTrait[] = ['none', 'armor', 'swift', 'split'];
+const MOB_TRAITS: readonly MobTrait[] = ['none', 'armor', 'swift', 'split', 'regen', 'phase', 'ward'];
 
 function parseFormationTier(raw: unknown, path: string): FormationTierBalance {
   return {
@@ -173,6 +173,13 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       splitCount: p(trait, 'splitCount', 'trait'),
       splitHpRatio: p(trait, 'splitHpRatio', 'trait'),
       splitSpeedMultiplier: p(trait, 'splitSpeedMultiplier', 'trait'),
+      regenHpRatio: p(trait, 'regenHpRatio', 'trait'),
+      regenPerSecond: p(trait, 'regenPerSecond', 'trait'),
+      phaseHpRatio: p(trait, 'phaseHpRatio', 'trait'),
+      phaseCycleMs: p(trait, 'phaseCycleMs', 'trait'),
+      phaseHiddenMs: p(trait, 'phaseHiddenMs', 'trait'),
+      wardHpRatio: p(trait, 'wardHpRatio', 'trait'),
+      wardHits: p(trait, 'wardHits', 'trait'),
     },
     rebirth: {
       minStage: p(rebirth, 'minStage', 'rebirth'),
