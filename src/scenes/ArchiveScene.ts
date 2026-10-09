@@ -27,8 +27,8 @@ import { fadeIn, fadeToScene } from '../ui/transition';
 /** 版面。每一段的高度都是算過的，加東西就要重算——這是 PROGRESS 的 L-08。 */
 const RECORDS_TOP = 92;
 const RECORDS_ROW = 34;
-const CODE_TOP = 378;
-const CLOUD_TOP = 560;
+const CODE_TOP = 396;
+const CLOUD_TOP = 578;
 const PRIVACY_Y = 758;
 
 export class ArchiveScene extends Phaser.Scene {
@@ -68,7 +68,8 @@ export class ArchiveScene extends Phaser.Scene {
   private buildRecords(cx: number, top: number): void {
     const lines = recordLines(state());
     const width = GAME_WIDTH - 44;
-    const height = lines.length * RECORDS_ROW + 56;
+    // 上方 56 點給標題，下方留 20 點：點陣字的行高大，最後一列貼著框線會壓到底邊。
+    const height = lines.length * RECORDS_ROW + 76;
 
     pixelPanel(this, cx, top + height / 2, width, height);
     this.add
@@ -282,9 +283,9 @@ export class ArchiveScene extends Phaser.Scene {
     });
     this.add
       .text(
-        cx - 92,
+        cx - 110,
         top,
-        wrapText('送出關卡進度等匿名統計，幫助調整難度。不含個人資料。', 168, 13),
+        wrapText('送出關卡進度等匿名統計，幫助調整難度。不含個人資料。', 200, 13),
         textStyle({ size: 13, color: INK_DIM }),
       )
       .setOrigin(0.5)

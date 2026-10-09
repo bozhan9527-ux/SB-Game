@@ -49,9 +49,19 @@ export function textStyle(options: TextStyleOptions): Phaser.Types.GameObjects.T
   };
 }
 
-/** 全形字約佔一個字級寬，半形約 0.55。 */
+/**
+ * 點陣字「俐方體 11 號」的字寬（字級的倍數），在瀏覽器裡實測：全形字與全形標點是 13/12，
+ * 半形約 0.52（取 0.55 留一點餘裕）。原本以全形 = 1 估算，每 12 個字就多出近一字寬，
+ * 長句會超出面板右框。
+ */
+export const FULL_WIDTH_EM = 13 / 12;
+
+/** 不放在行首的標點（中文排版的「避頭」）。 */
+const NO_LINE_START = /[，。、：；！？）」』》〉,.!?:;)]/;
+const HALF_WIDTH_EM = 0.55;
+
 function charWidth(char: string): number {
-  return /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/.test(char) ? 1 : 0.55;
+  return /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/.test(char) ? FULL_WIDTH_EM : HALF_WIDTH_EM;
 }
 
 function textWidthInEm(text: string): number {
@@ -88,12 +98,30 @@ export function wrapText(text: string, widthPx: number, fontSize: number): strin
       flush();
       // 單一詞塊就超過一行（整句中文）時逐字硬斷。
       let chunk = '';
+      let broke = false;
       for (const char of token) {
         if (textWidthInEm(chunk + char) > limit) {
-          lines.push(chunk);
-          chunk = '';
+          // 避頭：標點不放行首，把上一行最後一個字一起帶下來。
+          if (NO_LINE_START.test(char) && [...chunk].length > 4) {
+            const chars = [...chunk];
+            lines.push(chars.slice(0, -1).join(''));
+            chunk = chars[chars.length - 1] ?? '';
+          } else {
+            lines.push(chunk);
+            chunk = '';
+          }
+          broke = true;
         }
         chunk += char;
+      }
+      // 孤行：段落最後一行只掛兩三個字很難看，從上一行借字，補到一行可容納字數的四分之一（至少四個）。
+      const tail = [...chunk];
+      const prev = [...(lines[lines.length - 1] ?? '')];
+      const minTail = Math.max(4, Math.floor(limit / FULL_WIDTH_EM / 4));
+      const need = minTail - tail.length;
+      if (broke && need > 0 && prev.length - need >= minTail) {
+        lines[lines.length - 1] = prev.slice(0, -need).join('');
+        chunk = prev.slice(-need).join('') + chunk;
       }
       line = chunk;
     }

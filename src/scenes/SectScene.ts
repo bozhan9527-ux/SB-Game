@@ -20,6 +20,7 @@ import {
   LINE,
   hexToNumber,
   textStyle,
+  fitText,
   wrapText,
 } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
@@ -129,20 +130,23 @@ export class SectScene extends Phaser.Scene {
     this.add
       .text(cx + width / 2 - 20, top + 13, `「${sect.motto}」`, textStyle({ size: 14, color: INK_DIM }))
       .setOrigin(1, 0);
-    this.add
+    // 說明、被動、數值依序往下接，每一段都從上一段的實際高度後面開始：
+    // 寫死位置的話，被動說明一換成兩行就會撞上數值那一行。
+    const desc = this.add
       .text(left, top + 34, wrapText(sect.desc, textWidth, 15), textStyle({ size: 15, color: INK }))
       .setLineSpacing(2);
-    this.add
+    const passive = this.add
       .text(
         left,
-        top + 78,
+        desc.y + desc.height + 3,
         wrapText(`【被動】${sect.passive}`, textWidth, 14),
         textStyle({ size: 14, color: GOLD }),
       )
       .setLineSpacing(2);
-    this.add
-      .text(left, top + 118, wrapText(this.statLine(sect), textWidth, 13), textStyle({ size: 13, color: INK_DIM }))
-      .setLineSpacing(2);
+    const stats = this.add
+      .text(left, passive.y + passive.height + 3, this.statLine(sect), textStyle({ size: 13, color: INK_DIM }));
+    // 數值那一行不換行，太長就縮：卡片高度是固定的，多一行就會壓到最底下的修為。
+    fitText(stats, textWidth);
 
     // 修為：這一派已經累積了多少、下一階還差幾場。沒有這一行，「換派要付錢」就只是懲罰。
     this.add.text(left, top + 146, masteryLine(state(), sect.id), textStyle({ size: 13, color: JADE }));

@@ -57,7 +57,8 @@ export class AchievementScene extends Phaser.Scene {
     const viewTop = 122;
     const viewHeight = GAME_HEIGHT - viewTop - 176;
     const list = this.add.container(0, viewTop);
-    const rowHeight = 76;
+    // 點陣字的行高比一般字體大，三行字要 84 點才不會壓到框線。
+    const rowHeight = 84;
 
     ACHIEVEMENTS.forEach((item, index) => {
       const y = index * rowHeight + rowHeight / 2;
@@ -68,10 +69,10 @@ export class AchievementScene extends Phaser.Scene {
       list.add(frame);
       const left = cx - width / 2 + 18;
       list.add(
-        this.add.text(left, y - 26, item.name, textStyle({ size: 21, color: INK, bold: true })),
+        this.add.text(left, y - 32, item.name, textStyle({ size: 21, color: INK, bold: true })),
       );
-      list.add(this.add.text(left, y - 2, item.desc, textStyle({ size: 14, color: INK_DIM })));
-      const status = this.add.text(left, y + 18, '', textStyle({ size: 14, color: INK_DIM }));
+      list.add(this.add.text(left, y - 6, item.desc, textStyle({ size: 14, color: INK_DIM })));
+      const status = this.add.text(left, y + 13, '', textStyle({ size: 14, color: INK_DIM }));
       list.add(status);
 
       const reward = this.add

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MIN_TOUCH_SIZE, formatNumber, hexToNumber, wrapText } from '../src/ui/theme';
+import { FULL_WIDTH_EM, MIN_TOUCH_SIZE, formatNumber, hexToNumber, wrapText } from '../src/ui/theme';
 
 describe('文字排版', () => {
   it('中文沒有空白也會斷行（Phaser 的 word wrap 不會處理）', () => {
@@ -16,6 +16,24 @@ describe('文字排版', () => {
     for (const line of wrapped.split('\n')) {
       expect(line).not.toMatch(/[×+]$/);
       expect(line).not.toMatch(/^\d/);
+    }
+  });
+
+  it('以點陣字的實際字寬換行：全形字一個佔 13/12 字級，每行不超過指定寬度', () => {
+    const text = '按住一張符拖到別的格位放開，或是點一下選起來、再點目標格，兩種都行。';
+    const width = 464;
+    const size = 16;
+    for (const line of wrapText(text, width, size).split('\n')) {
+      expect([...line].length * FULL_WIDTH_EM * size).toBeLessThanOrEqual(width);
+    }
+  });
+
+  it('段落最後一行至少四個字，標點不放行首', () => {
+    const text = '按住一張符拖到別的格位放開，或是點一下選起來、再點目標格，兩種都行。';
+    for (const width of [200, 260, 320, 464]) {
+      const lines = wrapText(text, width, 16).split('\n');
+      expect([...(lines[lines.length - 1] ?? '')].length).toBeGreaterThanOrEqual(4);
+      for (const line of lines.slice(1)) expect(line).not.toMatch(/^[，。、：]/);
     }
   });
 
