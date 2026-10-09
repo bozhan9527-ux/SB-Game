@@ -304,7 +304,8 @@ export class TalismanScene extends Phaser.Scene {
       // 原本這裡還有一行「N 道 / 第 N 關」。拿掉是為了把空間讓給圖騰——
       // 那一行的資訊在下面的說明面板裡本來就有，而格子的工作是「認出是哪一張」，
       // 不是「說完它的規格」。是否解鎖靠圖騰的明暗與名字的顏色就分得出來。
-      const note = this.add.text(x, y + 23, '', textStyle({ size: 12, color: INK_DIM })).setVisible(false);
+      // 依數值排序時，那個數字掛在左上角（右上角是門派專精的「專」）。
+      const note = this.add.text(x, y, '', textStyle({ size: 12, color: INK })).setOrigin(0, 0);
       // 門派專精的那一張在格子上直接掛個記號，不必回選門派畫面對照。
       const mark =
         def.id === favoredId
@@ -380,9 +381,9 @@ export class TalismanScene extends Phaser.Scene {
       const x = left + col * (TILE_W + TILE_GAP);
       const y = GRID_TOP + TILE_H / 2 + row * (TILE_H + TILE_GAP);
       tile.background.setPosition(x, y);
-      tile.glyph.setPosition(x, y - 16);
-      tile.name.setPosition(x, y + 8);
-      tile.note.setPosition(x, y + 26);
+      tile.glyph.setPosition(x, y - 10);
+      tile.name.setPosition(x, y + 23);
+      tile.note.setPosition(x - TILE_W / 2 + 6, y - TILE_H / 2 + 4);
       tile.mark?.setPosition(x + TILE_W / 2 - 4, y - TILE_H / 2 + 2);
     });
   }
@@ -568,11 +569,15 @@ export class TalismanScene extends Phaser.Scene {
   }
 
   private noteFor(tile: Tile): string {
-    if (!tile.unlocked) return `第 ${tile.def.unlockStage} 關`;
-    if (this.sortMode === 'dps') return `每秒 ${Math.round(this.dpsOf(tile.def))}`;
-    if (this.sortMode === 'rate') return `${(tile.def.intervalMs / 1000).toFixed(2)} 秒`;
-    return `${tile.def.targets} 道`;
+    // 解鎖順序不是數字，不必寫；其餘三種排序，鎖著的符也照寫——
+    // 「還沒拿到的那張值不值得去拿」正是要靠這個數字判斷。
+    // 只寫數字不寫「每秒」：角落只有 40px 寬，排序按鈕上已經寫了排的是什麼。
+    if (this.sortMode === 'unlock') return '';
+    if (this.sortMode === 'dps') return `${Math.round(this.dpsOf(tile.def))}`;
+    if (this.sortMode === 'rate') return `${(tile.def.intervalMs / 1000).toFixed(2)}秒`;
+    return `${tile.def.targets}道`;
   }
+
 
   /**
    * 比較欄。
