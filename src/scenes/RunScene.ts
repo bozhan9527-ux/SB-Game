@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import {
   ART,
@@ -93,6 +94,7 @@ import {
   LINE,
   fitText,
   formatNumber,
+  wrapText,
   hexToNumber,
   textStyle,
 } from "../ui/theme";
@@ -196,6 +198,22 @@ type DragSource = CardSlot;
 /** 妖魔的身體本體。受擊白閃與倒下都動它，不動外層容器（容器的位置由模擬決定）。 */
 type EnemyBody = Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
 
+interface BannerBox {
+  container: Phaser.GameObjects.Container;
+  bg: Phaser.GameObjects.Rectangle;
+  bar: Phaser.GameObjects.Rectangle;
+  text: Phaser.GameObjects.Text;
+}
+
+/**
+ * 妖物身上的字（傷害、掉落金幣）的深度：在妖物（20）之上、符牌（26）之下。
+ * 妖物走過陣位時本來就被符擋在後面，牠的數字也該跟著被擋，而不是蓋在符的階數上。
+ */
+const ENEMY_TEXT_DEPTH = 24;
+
+/** 首領登場演出的中心線：放在妖物出場的那一段，黑帶與字都碰不到陣位。 */
+const BOSS_INTRO_Y = ARENA_TOP + 174;
+
 /**
  * 習性的標記：一個字加一個顏色。
  *
@@ -291,6 +309,9 @@ export class RunScene extends Phaser.Scene {
   private gateBase?: Phaser.GameObjects.Rectangle;
   private gateCracks?: Phaser.GameObjects.Graphics;
   private gateLabel?: Phaser.GameObjects.Text;
+  /** 陣位上方的兩條訊息帶：notice 報陣法與合成，hint 放一次性提示。見 banner()。 */
+  private noticeBox?: BannerBox;
+  private hintBox?: BannerBox;
   private gateStage = -1;
   /** 每隻妖魔累積中的傷害，湊夠一段時間才吐一個數字。 */
   private pendingDamage = new Map<number, { total: number; since: number }>();
@@ -595,7 +616,7 @@ export class RunScene extends Phaser.Scene {
     this.drawWarning = this.add
       .text(
         GAME_WIDTH / 2,
-        812,
+        791,
         "手牌已滿，符流失了",
         textStyle({ size: 17, color: DANGER, bold: true }),
       )
@@ -839,16 +860,18 @@ export class RunScene extends Phaser.Scene {
       // 每一格自己吃到多少，寫在那一格上。陣法的加成是逐格不同的
       // （四角與正中吃三條線、邊中點只吃兩條），只報「成陣了」看不出這件事。
       this.fieldBonusLabels.push(
+        // 跨在牌框上緣的小徽章，一半在框外：放在框內會蓋到圖騰頂端。
         this.add
           .text(
-            x + 32,
-            y - 40,
+            x + 34,
+            y - 41,
             "",
-            textStyle({ size: 14, color: GOLD, bold: true }),
+            textStyle({ size: 13, color: GOLD }),
           )
-          .setOrigin(1, 0)
+          .setOrigin(1, 0.5)
           .setDepth(30)
-          .setStroke("#0b0f14", 4)
+          .setBackgroundColor("#12141c")
+          .setPadding(4, 1, 4, 1)
           .setVisible(false),
       );
 
@@ -898,11 +921,13 @@ export class RunScene extends Phaser.Scene {
 
     // 拖曳中會不會落在哪一格、落上去會發生什麼，都要在放手**之前**看得到。
     // 玩家回報「合成常常變成取代到別的卡片」有一半是這個：他到放開的那一刻才知道結果。
+    // 深色實心底的小徽章：它會直接疊在目標格上，要和底下的符分得開。
     this.dropLabel = this.add
       .text(0, 0, "", textStyle({ size: 17, color: INK, bold: true }))
       .setOrigin(0.5)
       .setDepth(92)
-      .setStroke("#0b0f14", 5)
+      .setBackgroundColor("#12141c")
+      .setPadding(6, 2, 6, 2)
       .setVisible(false);
 
     // 落點框畫在最上層：它要蓋過符本身，否則被拖過去的那張符會擋住它。
@@ -980,12 +1005,17 @@ export class RunScene extends Phaser.Scene {
         ? this.fieldHighlights[source.index]
         : this.handHighlights[source.index];
     this.paintGlow(glow, GOLD, 6, 1, 0.22);
+    // 手牌的上方是空的，提示放那裡；陣位的上方是另一排符，改放到山門下方、
+    // 兩位門人中間那塊空地，不壓到任何一張符。
     const pos = this.slotPosition(source);
     this.dropLabel
       ?.setVisible(true)
       .setText("再點一格放置")
       .setColor(GOLD)
-      .setPosition(pos.x, pos.y - CARD_HEIGHT / 2 - 16);
+      .setPosition(
+        source.where === "hand" ? pos.x : GAME_WIDTH / 2,
+        source.where === "hand" ? pos.y - CARD_HEIGHT / 2 - 16 : GATE_Y + 36,
+      );
     this.refreshCards();
   }
 
@@ -1130,11 +1160,12 @@ export class RunScene extends Phaser.Scene {
       ?.setVisible(!same)
       .setPosition(pos.x, pos.y)
       .setStrokeStyle(3, hexToNumber(color), 0.9);
+    // 疊在目標格正中央：這幾個字說的就是那一格。放在格子上方會壓到上一排的符。
     label
       .setVisible(text.length > 0)
       .setText(text)
       .setColor(color);
-    label.setPosition(pos.x, pos.y - CARD_HEIGHT / 2 - 16);
+    label.setPosition(pos.x, pos.y);
   }
 
   private endDrag(pointer: Phaser.Input.Pointer): void {
@@ -1195,7 +1226,6 @@ export class RunScene extends Phaser.Scene {
     this.record({ kind: "drop", from: source, to: target });
     if (result === "none" || card === null) return;
 
-    const pos = this.slotPosition(target);
     if (result === "merged") this.advanceTutorial("merge");
     else if (
       result === "moved" &&
@@ -1208,12 +1238,11 @@ export class RunScene extends Phaser.Scene {
       const merged = cardAt(this.run, target);
       audio.play("gold");
       this.playMerge(source, target, card);
-      this.floatText(
-        pos.x,
-        pos.y - 46,
-        `${cardDef(card.type).name} ${merged?.tier ?? ""} 階`,
+      this.banner(
+        "notice",
+        `${cardDef(card.type).name} 升至 ${merged?.tier ?? ""} 階`,
         GOLD,
-        24,
+        700,
       );
     } else {
       audio.play("gateGood");
@@ -1563,20 +1592,17 @@ export class RunScene extends Phaser.Scene {
   private announceFormations(fresh: FormationLine[]): void {
     const first = fresh[0];
     if (first === undefined) return;
-    const slot = first.slots[Math.floor(first.slots.length / 2)] ?? 0;
-    const pos = this.slotPosition({ where: "field", index: slot });
     const color = first.pattern === "distinct" ? JADE : GOLD;
     const text =
       fresh.length === 1
         ? `${formationName(first)}成　${formationEffect(first)}`
         : `一口氣成 ${fresh.length} 條陣`;
     // 停住 1.1 秒再淡出，中文讀得完。
-    this.floatText(pos.x, pos.y - 58, text, color, 22, 1100);
+    this.banner("notice", text, color, 1100);
     audio.play("gold");
     this.showHintOnce(
       HINT_FORMATION,
       "一整條線全同種（金色虛線）或全不同種（綠色實線）都會成陣：橫排加傷害、直排加出手速度",
-      260,
     );
   }
 
@@ -1733,6 +1759,8 @@ export class RunScene extends Phaser.Scene {
           `+${Math.max(1, Math.round(kill.gold))}`,
           GOLD,
           20,
+          0,
+          ENEMY_TEXT_DEPTH,
         );
         this.enemySprites.delete(kill.enemyId);
         this.killEnemyView(view, kill.boss);
@@ -1761,9 +1789,10 @@ export class RunScene extends Phaser.Scene {
       audio.play("bossAttack");
       this.gateBar.setAlpha(1);
       this.tweens.add({ targets: this.gateBar, alpha: 0, duration: 420 });
+      // 放在山門橫梁下方、往上飄進梁裡：放在上方會壓到最下排的符。
       this.floatText(
         x,
-        GATE_Y - 24,
+        GATE_Y + 52,
         leak.immune ? "銅皮鐵骨" : `-${leak.loss}`,
         leak.immune ? JADE : DANGER,
         leak.immune ? 22 : leak.boss ? 40 : 34,
@@ -1779,7 +1808,6 @@ export class RunScene extends Phaser.Scene {
       this.showHintOnce(
         HINT_BOSS,
         "首領血厚，別讓它走到山門——它一撞就是六倍耐久",
-        300,
       );
     }
     if (report.drawnSlot !== null) {
@@ -1793,7 +1821,6 @@ export class RunScene extends Phaser.Scene {
       this.showHintOnce(
         HINT_HAND_FULL,
         "手牌滿了會抽不到新符。用不到的符往畫面最下緣拖可以棄掉",
-        706,
       );
       this.tweens.killTweensOf(this.drawWarning);
       this.drawWarning.setAlpha(1);
@@ -1826,7 +1853,6 @@ export class RunScene extends Phaser.Scene {
     this.showHintOnce(
       HINT_GATE_SIEGE,
       "首領不會自己離開——不斬掉牠，山門會一直掉耐久",
-      300,
     );
   }
 
@@ -2058,7 +2084,7 @@ export class RunScene extends Phaser.Scene {
       this.add
         .rectangle(
           cx,
-          (ARENA_TOP + GATE_Y) / 2 + side * 150,
+          BOSS_INTRO_Y + side * 120,
           GAME_WIDTH,
           0,
           0x0b0f14,
@@ -2079,7 +2105,7 @@ export class RunScene extends Phaser.Scene {
     const title = this.add
       .text(
         cx,
-        (ARENA_TOP + GATE_Y) / 2 - 26,
+        BOSS_INTRO_Y - 26,
         boss.name,
         textStyle({ size: 44, color: DANGER, bold: true }),
       )
@@ -2105,7 +2131,7 @@ export class RunScene extends Phaser.Scene {
 
     this.floatText(
       cx,
-      (ARENA_TOP + GATE_Y) / 2 + 30,
+      BOSS_INTRO_Y + 34,
       `「${boss.taunt}」`,
       INK,
       22,
@@ -2307,6 +2333,8 @@ export class RunScene extends Phaser.Scene {
         formatNumber(Math.round(entry.total)),
         heavy ? GOLD : INK,
         heavy ? 24 : 18,
+        0,
+        ENEMY_TEXT_DEPTH,
       );
     }
   }
@@ -2361,12 +2389,13 @@ export class RunScene extends Phaser.Scene {
     color: string,
     size: number,
     holdMs = 0,
+    depth = 70,
   ): void {
     const label = this.add
       .text(x, y, text, textStyle({ size, color, bold: true }))
       .setOrigin(0.5)
       .setStroke("#0b0f14", 6)
-      .setDepth(70);
+      .setDepth(depth);
     this.tweens.add({
       targets: label,
       y: y - 46,
@@ -2454,97 +2483,129 @@ export class RunScene extends Phaser.Scene {
   }
 
   /** 一次性提示：看過就不再出現，免得老玩家每一關都被同一句話打斷。 */
-  private showHintOnce(id: string, text: string, y: number): void {
+  private showHintOnce(id: string, text: string): void {
     // 教學進行中不插話：兩段說明疊在一起，新手一段都讀不進去。
     // 這裡直接跳過而不是記成看過，之後再遇到同樣情況還是會提示。
     if (this.step !== "done") return;
     const save = state();
     if (!markHintSeen(save, id)) return;
     persist();
-    const label = this.add
-      .text(
-        GAME_WIDTH / 2,
-        y,
-        text,
-        textStyle({ size: 19, color: GOLD, bold: true }),
-      )
-      .setOrigin(0.5)
-      .setStroke("#0b0f14", 6)
-      .setDepth(92);
-    fitText(label, GAME_WIDTH - 40);
+    this.banner("hint", text, GOLD, 2600);
+  }
+
+  /**
+   * 陣位正上方的訊息帶，深色實心底、上緣一條訊息色。
+   *
+   * 陣法成立、合成、一次性提示原本都是在符牌附近飄字，滿盤時一定壓在別張符上——
+   * 字讀不清楚，底下的符也看不到。改成固定兩條帶子，永遠在最上排符的上方：
+   * notice 是戰況（短、常出現、新的蓋掉舊的），hint 是說明（長、一次性），各佔一條不互搶。
+   */
+  /** 陣位最上排符的上緣。陣位會隨陣法擴充往上長，所有要避開符的文字都以它為準。 */
+  private fieldTopEdge(): number {
+    return Math.min(...this.fieldSlotY) - (CARD_HEIGHT * 0.82) / 2;
+  }
+
+  private banner(kind: "notice" | "hint", text: string, color: string, holdMs: number): void {
+    const topEdge = this.fieldTopEdge();
+    let box = kind === "notice" ? this.noticeBox : this.hintBox;
+    if (box === undefined || !box.text.active) {
+      const bg = this.add.rectangle(0, 0, 10, 36, BG_PANEL, 0.95).setStrokeStyle(3, EDGE);
+      const bar = this.add.rectangle(0, -15, 10, 3, 0xffffff, 1);
+      const label = this.add
+        .text(0, 1, "", textStyle({ size: kind === "notice" ? 20 : 17 }))
+        .setOrigin(0.5);
+      box = {
+        container: this.add.container(GAME_WIDTH / 2, 0, [bg, bar, label]).setDepth(92),
+        bg,
+        bar,
+        text: label,
+      };
+      if (kind === "notice") this.noticeBox = box;
+      else this.hintBox = box;
+    }
+    // 提示是整句說明，換行成兩三行、維持字級；戰況公告一定是短句，一行放得下就不換。
+    const size = kind === "notice" ? 20 : 17;
+    box.text
+      .setText(kind === "hint" ? wrapText(text, GAME_WIDTH - 80, size) : text)
+      .setColor(color)
+      .setScale(1)
+      .setLineSpacing(6)
+      .setAlign("center");
+    fitText(box.text, GAME_WIDTH - 60);
+    const width = Math.min(GAME_WIDTH - 24, Math.ceil(box.text.displayWidth) + 36);
+    const height = Math.ceil(box.text.displayHeight) + 16;
+    box.bg.setSize(width, height);
+    box.bar.setSize(width - 6, 3).setY(-height / 2 + 3).setFillStyle(hexToNumber(color), 1);
+    // notice 貼在最上排符的正上方；hint 再疊在 notice 上面，兩條不會互相蓋到。
+    const noticeY = topEdge - 30;
+    const y = Math.max(
+      ARENA_TOP + height / 2 + 6,
+      kind === "notice" ? noticeY : noticeY - 18 - 6 - height / 2,
+    );
+    this.tweens.killTweensOf(box.container);
+    box.container.setY(y).setAlpha(1).setVisible(true);
     this.tweens.add({
-      targets: label,
+      targets: box.container,
       alpha: 0,
-      delay: 2600,
-      duration: 600,
-      onComplete: () => label.destroy(),
+      delay: holdMs,
+      duration: 300,
+      ease: "Stepped",
+      easeParams: [3],
     });
   }
 
   private showIntro(accentHex: string): void {
     const realm = realmForStage(this.run.stage);
-    const title = this.add
-      .text(
-        GAME_WIDTH / 2,
-        380,
-        realmTitle(this.run.stage),
-        textStyle({ size: 48, color: accentHex, bold: true }),
-      )
-      .setOrigin(0.5)
-      .setDepth(80);
-    const sub = this.add
-      .text(
-        GAME_WIDTH / 2,
-        434,
-        realm.subtitle,
-        textStyle({ size: 20, color: INK_DIM }),
-      )
-      .setOrigin(0.5)
-      .setDepth(80);
-    // 開場這一格本來就會停一下讓玩家看境界名，把「這一關該學的那一條」掛在同一個位置：
-    // 規則在它第一次派上用場的當下講，比塞在一頁說明裡有效得多。
+    // 這一關該學的那一條掛在境界名底下：規則在它第一次派上用場的當下講，
+    // 比塞在一頁說明裡有效得多。
     const lesson =
       this.step === "done" ? lessonForStage(state(), this.run.stage) : null;
+
+    // 整組由下往上排，底緣停在最上排符的上方：開場時玩家可能已經在擺符，
+    // 境界名與說明框不能蓋住陣位。
+    const bottom = this.fieldTopEdge() - 10;
+    const panelH = 132;
+    const bodyTop = lesson === null ? bottom - 24 : bottom - panelH;
+    const subY = Math.max(ARENA_TOP + 92, bodyTop - 24);
+    const titleY = subY - 52;
+
+    const title = this.add
+      .text(GAME_WIDTH / 2, titleY, realmTitle(this.run.stage), textStyle({ size: 48, color: accentHex, bold: true }))
+      .setOrigin(0.5)
+      .setStroke("#0b0f14", 8)
+      .setDepth(80);
+    const sub = this.add
+      .text(GAME_WIDTH / 2, subY, realm.subtitle, textStyle({ size: 20, color: INK_DIM }))
+      .setOrigin(0.5)
+      .setStroke("#0b0f14", 6)
+      .setDepth(80);
     const parts: Phaser.GameObjects.GameObject[] = [title, sub];
     let hold = 1100;
 
     if (lesson === null) {
       parts.push(
         this.add
-          .text(
-            GAME_WIDTH / 2,
-            492,
-            "把符拖到陣位；同種同階疊起來可以合成",
-            textStyle({ size: 20, color: INK }),
-          )
+          .text(GAME_WIDTH / 2, bottom - 12, "把符拖到陣位；同種同階疊起來可以合成", textStyle({ size: 20, color: INK }))
           .setOrigin(0.5)
+          .setStroke("#0b0f14", 6)
           .setDepth(80),
       );
     } else {
-      const panel = this.add
-        .rectangle(GAME_WIDTH / 2, 528, GAME_WIDTH - 60, 132, BG_PANEL, 0.95)
-        .setStrokeStyle(3, hexToNumber(GOLD))
-        .setDepth(80);
+      const center = bottom - panelH / 2;
+      const panel = pixelPanel(this, GAME_WIDTH / 2, center, GAME_WIDTH - 60, panelH, {
+        accent: hexToNumber(GOLD),
+      }).setDepth(80);
       const heading = this.add
-        .text(
-          GAME_WIDTH / 2,
-          486,
-          lesson.title,
-          textStyle({ size: 24, color: GOLD, bold: true }),
-        )
+        .text(GAME_WIDTH / 2, center - 42, lesson.title, textStyle({ size: 24, color: GOLD, bold: true }))
         .setOrigin(0.5)
         .setDepth(81);
       const body = this.add
-        .text(
-          GAME_WIDTH / 2,
-          546,
-          lesson.body,
-          textStyle({ size: 18, color: INK }),
-        )
+        .text(GAME_WIDTH / 2, center + 18, lesson.body, textStyle({ size: 18, color: INK }))
         .setOrigin(0.5)
         .setLineSpacing(8)
         .setAlign("center")
         .setDepth(81);
+      fitText(body, GAME_WIDTH - 90);
       parts.push(panel, heading, body);
       // 一課只上一次，開場就記起來——玩家中途退出也不該再被教一遍。
       const save = state();
