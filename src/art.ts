@@ -60,8 +60,11 @@ export function bossIdleKey(art: BossArt): string {
   return `idle-boss-${art}`;
 }
 
-/** 走路循環的兩幀。以兩張獨立貼圖組成動畫，不需要 spritesheet。 */
-export const WALK_FRAMES = [0, 1] as const;
+/**
+ * 走路循環四幀：姿勢 A、A 上抬、姿勢 B、B 上抬。以獨立貼圖組成動畫，不需要 spritesheet。
+ * 只有兩幀的話是左右腳硬切，四幀多了「彈起來」那一下，走起來才有重量。
+ */
+export const WALK_FRAMES = [0, 1, 2, 3] as const;
 
 /** 門人造型分三階，隨境界提升換裝。 */
 export const DISCIPLE_TIERS = [0, 1, 2] as const;
@@ -128,7 +131,7 @@ const ASSETS: readonly ArtSpec[] = [
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
 export function createWalkAnimations(scene: Phaser.Scene): void {
-  const define = (key: string, frames: string[], frameRate = 7): void => {
+  const define = (key: string, frames: string[], frameRate = 11): void => {
     if (scene.anims.exists(key)) return;
     scene.anims.create({
       key,
@@ -147,7 +150,7 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
   }
   // 首領比小妖慢一拍：牠是在呼吸，不是在跑。
   for (const art of BOSS_ARTS) {
-    define(bossIdleKey(art), WALK_FRAMES.map((f) => bossTexture(art, f)), 3);
+    define(bossIdleKey(art), WALK_FRAMES.map((f) => bossTexture(art, f)), 5);
   }
 }
 

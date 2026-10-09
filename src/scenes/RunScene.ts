@@ -177,6 +177,11 @@ const CHARGE_DIP = 7;
  */
 const FLASH_MS = 45;
 const FLASH_GAP_MS = 160;
+/**
+ * 首領的閃白間隔要長得多：首領整場都在挨打，用小妖的間隔它有三成的時間是一團白，
+ * 加上外圈的光暈，玩家幾乎看不到首領長什麼樣子。
+ */
+const BOSS_FLASH_GAP_MS = 450;
 
 /** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
 const FREEZE_BOSS_HIT_MS = 28;
@@ -1247,20 +1252,22 @@ export class RunScene extends Phaser.Scene {
     });
   }
 
-  /** 合成撞擊點的一圈金光。只是一個會擴散淡出的圓環，沒有貼圖成本。 */
+  /** 合成撞擊點：一圈往外一格一格擴散的金框，加一把金色方塊迸開。 */
   private mergeRing(x: number, y: number): void {
     const ring = this.add
-      .circle(x, y, 14)
-      .setStrokeStyle(4, hexToNumber(GOLD), 0.95)
+      .rectangle(x, y, 30, 30, 0x000000, 0)
+      .setStrokeStyle(3, hexToNumber(GOLD), 1)
       .setDepth(79);
     this.tweens.add({
       targets: ring,
       scale: 3.4,
       alpha: 0,
       duration: 320,
-      ease: "Quad.easeOut",
+      ease: "Stepped",
+      easeParams: [5],
       onComplete: () => ring.destroy(),
     });
+    this.burst(x, y, GOLD, 14, 1.2);
   }
 
   private slotPosition(slot: CardSlot): { x: number; y: number } {
@@ -1719,12 +1726,7 @@ export class RunScene extends Phaser.Scene {
     for (const kill of report.kills) {
       const view = this.enemySprites.get(kill.enemyId);
       if (view !== undefined) {
-        this.burst(
-          view.x,
-          view.y,
-          kill.boss ? GOLD : DANGER,
-          kill.boss ? 40 : 10,
-        );
+        this.crumble(view.x, view.y, kill.boss ? 36 : 12, kill.boss);
         this.floatText(
           view.x,
           view.y - 20,
@@ -1770,6 +1772,9 @@ export class RunScene extends Phaser.Scene {
     }
 
     if (report.bossSpawned) {
+      // 登場：紫光一閃加一下震動，讓「首領來了」不只是多一條血條。
+      this.cameras.main.flash(240, 110, 60, 190);
+      this.cameras.main.shake(320, 0.008);
       this.buildBossPanel();
       this.showHintOnce(
         HINT_BOSS,
@@ -1879,6 +1884,16 @@ export class RunScene extends Phaser.Scene {
       // 浮動要是也掛在 body 上，被打一下就不動了。
       const hover = this.add.container(0, 0, [body]);
       container.add([aura, embers, hover]);
+      // 由大縮小、一格一格現身，像從陣法裡壓下來。
+      hover.setScale(1.6).setAlpha(0);
+      this.tweens.add({
+        targets: hover,
+        scale: 1,
+        alpha: 1,
+        duration: 420,
+        ease: "Stepped",
+        easeParams: [6],
+      });
       container.setData("body", body);
       container.setData("boss", true);
       this.tweens.add({
@@ -2187,7 +2202,10 @@ export class RunScene extends Phaser.Scene {
     const now = this.time.now;
     const nextAt = view.getData("flashAt") as number | undefined;
     if (nextAt !== undefined && now < nextAt) return;
-    view.setData("flashAt", now + FLASH_GAP_MS);
+    view.setData(
+      "flashAt",
+      now + (view.getData("boss") === true ? BOSS_FLASH_GAP_MS : FLASH_GAP_MS),
+    );
 
     this.tweens.killTweensOf(view);
     view.setScale(1.14);
@@ -2239,7 +2257,8 @@ export class RunScene extends Phaser.Scene {
       angle: boss ? 0 : 20,
       alpha: 0,
       duration: boss ? 460 : 230,
-      ease: "Quad.easeIn",
+      ease: "Stepped",
+      easeParams: [boss ? 6 : 3],
       onComplete: () => view.destroy(),
     });
   }
@@ -2290,6 +2309,28 @@ export class RunScene extends Phaser.Scene {
         heavy ? 24 : 18,
       );
     }
+  }
+
+  /**
+   * 倒下時碎成一把方塊：往上噴開、再被重力拉下來。
+   * 原本是一團往外飛的光點，看起來像被打散的煙；方塊有重量，才像「碎了」。
+   */
+  private crumble(x: number, y: number, count: number, boss: boolean): void {
+    const emitter = this.add.particles(x, y - 20, "spark", {
+      speed: { min: 70, max: boss ? 260 : 170 },
+      angle: { min: 200, max: 340 },
+      gravityY: 520,
+      lifespan: { min: 420, max: 760 },
+      scale: { start: boss ? 2.2 : 1.6, end: 1 },
+      alpha: { start: 1, end: 0 },
+      tint: boss
+        ? [hexToNumber(GOLD), BOSS_GLOW, 0xffffff]
+        : [hexToNumber(DANGER), 0x9aa0c4, 0xece6d2],
+      emitting: false,
+    });
+    emitter.setDepth(45);
+    emitter.explode(count);
+    this.time.delayedCall(900, () => emitter.destroy());
   }
 
   private burst(x: number, y: number, color: string, count: number, size = 1): void {

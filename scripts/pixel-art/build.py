@@ -25,6 +25,18 @@ def save(name, text):
     write_png(grid, os.path.join(ART, name.replace(".svg", ".png")))
 
 
+def lift(grid):
+    """整張往上抬一格：插在兩個邁步姿勢之間，走起來才會一彈一彈。"""
+    return grid[1:] + [[None] * len(grid[0])]
+
+
+def save_cycle(prefix, frames):
+    """兩個關鍵姿勢 → 四幀循環：姿勢 A、A 上抬、姿勢 B、B 上抬。"""
+    a, b = (refine(t) for t in frames)
+    for i, grid in enumerate((a, lift(a), b, lift(b))):
+        write_png(grid, os.path.join(ART, f"{prefix}-{i}.png"))
+
+
 def inner(svg_text):
     return svg_text.split("\n", 1)[1].rsplit("</svg>", 1)[0]
 
@@ -1181,17 +1193,14 @@ if __name__ == "__main__":
     n = 0
     for sect in gen.SECTS:
         for tier in (0, 1, 2):
-            for frame in (0, 1):
-                save(f"disciple-{sect}-t{tier}-{frame}.svg", gen.disciple(sect, tier, frame))
-                n += 1
+            save_cycle(f"disciple-{sect}-t{tier}", [gen.disciple(sect, tier, f) for f in (0, 1)])
+            n += 4
     for name, fn in MOBS.items():
-        for f, svg in enumerate(fn()):
-            save(f"enemy-{name}-{f}.svg", svg)
-            n += 1
+        save_cycle(f"enemy-{name}", fn())
+        n += 4
     for name, fn in BOSSES.items():
-        for f, svg in enumerate(fn()):
-            save(f"boss-{name}-{f}.svg", svg)
-            n += 1
+        save_cycle(f"boss-{name}", fn())
+        n += 4
     for name in G:
         save(f"glyph-{name}.svg", glyph_svg(name))
         n += 1
