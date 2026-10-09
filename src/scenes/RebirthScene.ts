@@ -71,14 +71,17 @@ export class RebirthScene extends Phaser.Scene {
 
     // 轉世區。留下什麼、失去什麼要寫在同一個地方，玩家才不必自己猜。
     const panelTop = top + KARMA.length * (rowHeight + rowGap) + 8;
-    pixelPanel(this, cx, panelTop + 76, GAME_WIDTH - 40, 152, { accent: hexToNumber(GOLD) });
+    // 三行說明加一顆按鈕：說明從頂端往下排、按鈕貼底。原本 152 高、說明以中心定位，
+    // 換成點陣字後第一行會冒出面板上框。
+    const panelH = 184;
+    pixelPanel(this, cx, panelTop + panelH / 2, GAME_WIDTH - 40, panelH, { accent: hexToNumber(GOLD) });
     this.offerText = this.add
-      .text(cx, panelTop + 40, '', textStyle({ size: 17, color: INK }))
-      .setOrigin(0.5)
+      .text(cx, panelTop + 16, '', textStyle({ size: 17, color: INK }))
+      .setOrigin(0.5, 0)
       .setAlign('center')
       .setLineSpacing(6);
 
-    this.rebirthButton = createButton(this, cx, panelTop + 120, {
+    this.rebirthButton = createButton(this, cx, panelTop + panelH - 46, {
       width: 300,
       height: 60,
       label: '轉世重修',

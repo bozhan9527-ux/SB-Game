@@ -777,9 +777,10 @@ export class RunScene extends Phaser.Scene {
     const veil = this.add
       .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
       .setInteractive();
-    const panel = this.add
-      .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH - 96, 320, BG_PANEL, 0.98)
-      .setStrokeStyle(3, hexToNumber(GOLD));
+    const panel = pixelPanel(this, cx, GAME_HEIGHT / 2, GAME_WIDTH - 96, 320, {
+      accent: hexToNumber(GOLD),
+      alpha: 0.98,
+    });
     const title = this.add
       .text(
         cx,
@@ -1800,13 +1801,24 @@ export class RunScene extends Phaser.Scene {
       audio.play("bossAttack");
       this.gateBar.setAlpha(1);
       this.tweens.add({ targets: this.gateBar, alpha: 0, duration: 420 });
-      // 放在山門橫梁下方、往上飄進梁裡：放在上方會壓到最下排的符。
+      // 釘在被撞的那段橫梁上、原地淡出：往上飄會飄進最下排的符，
+      // 放在梁下又會和「手牌已滿」那行警告擠在一起。
+      // 中間那條路正對著「山門」匾額，數字讓到匾額旁邊，兩邊的字才都讀得到。
+      const plaqueHalf = 66;
+      const offset = x - GAME_WIDTH / 2;
+      const leakX =
+        Math.abs(offset) < plaqueHalf
+          ? GAME_WIDTH / 2 + (offset < 0 ? -1 : 1) * (plaqueHalf + 24)
+          : x;
       this.floatText(
-        x,
-        GATE_Y + 52,
+        leakX,
+        GATE_Y + 6,
         leak.immune ? "銅皮鐵骨" : `-${leak.loss}`,
         leak.immune ? JADE : DANGER,
         leak.immune ? 22 : leak.boss ? 40 : 34,
+        250,
+        70,
+        0,
       );
       if (leak.boss) this.warnGateSiege();
     }
@@ -2401,6 +2413,7 @@ export class RunScene extends Phaser.Scene {
     size: number,
     holdMs = 0,
     depth = 70,
+    rise = 46,
   ): void {
     const label = this.add
       .text(x, y, text, textStyle({ size, color, bold: true }))
@@ -2409,7 +2422,7 @@ export class RunScene extends Phaser.Scene {
       .setDepth(depth);
     this.tweens.add({
       targets: label,
-      y: y - 46,
+      y: y - rise,
       alpha: 0,
       delay: holdMs,
       duration: 700,
