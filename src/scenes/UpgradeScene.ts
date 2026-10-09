@@ -21,9 +21,14 @@ import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, hexToNumber, textStyle } from '../ui/theme';
 import { realmForStage } from '../systems/realms';
 import { fadeIn, fadeToScene } from '../ui/transition';
+import { burstPixels } from '../ui/effects';
+import { audio } from '../audio';
 
 interface Row {
   track: UpgradeTrack;
+  /** 買到時閃一下的那層光，和購買按鈕的位置（像素從那裡噴出來）。 */
+  flash: Phaser.GameObjects.Rectangle;
+  buttonX: number;
   level: Phaser.GameObjects.Text;
   effect: Phaser.GameObjects.Text;
   button: Button;
@@ -32,6 +37,8 @@ interface Row {
 /** 門派秘傳那一列。沒有門派時整列不畫，所以是 null。 */
 interface SectRow {
   track: SectUpgradeTrack;
+  flash: Phaser.GameObjects.Rectangle;
+  buttonX: number;
   level: Phaser.GameObjects.Text;
   effect: Phaser.GameObjects.Text;
   button: Button;
@@ -106,6 +113,7 @@ export class UpgradeScene extends Phaser.Scene {
     const textWidth = width - 176;
 
     this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(3, LINE);
+    const flash = this.add.rectangle(cx, cy, width - 6, height - 6, hexToNumber(GOLD), 1).setAlpha(0);
     this.add.text(left, top + 8, track.name, textStyle({ size: 25, color: INK, bold: true }));
     const level = this.add.text(left + 140, top + 14, '', textStyle({ size: 17, color: JADE }));
     // 說明固定一行：列高只有 96，換行會把下面的效果數字擠出面板。
@@ -122,7 +130,7 @@ export class UpgradeScene extends Phaser.Scene {
       onClick: () => this.purchase(track),
     });
 
-    this.rows.push({ track, level, effect, button });
+    this.rows.push({ track, flash, buttonX: cx + width / 2 - 76, level, effect, button });
   }
 
   /**
@@ -144,6 +152,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.add
       .rectangle(cx, cy, width, height, BG_PANEL, 0.9)
       .setStrokeStyle(3, hexToNumber(accent));
+    const flash = this.add.rectangle(cx, cy, width - 6, height - 6, hexToNumber(accent), 1).setAlpha(0);
 
     if (sect === null || track === null) {
       this.add
@@ -170,7 +179,7 @@ export class UpgradeScene extends Phaser.Scene {
       onClick: () => this.purchaseSect(),
     });
 
-    this.sectRow = { track, level, effect, button };
+    this.sectRow = { track, flash, buttonX: cx + width / 2 - 76, level, effect, button };
   }
 
   private purchaseSect(): void {
@@ -182,6 +191,7 @@ export class UpgradeScene extends Phaser.Scene {
     }
     persist();
     this.refresh();
+    if (this.sectRow !== null) this.celebrate(this.sectRow);
   }
 
   private purchase(track: UpgradeTrack): void {
@@ -195,6 +205,23 @@ export class UpgradeScene extends Phaser.Scene {
     }
     persist();
     this.refresh();
+    const row = this.rows.find((item) => item.track.id === track.id);
+    if (row !== undefined) this.celebrate(row);
+  }
+
+  /**
+   * 買到了。原本只有數字悄悄換掉——連點的時候根本分不出哪一下有買到、哪一下錢不夠。
+   * 整列閃一下、按鈕噴幾顆像素、等級跳一下，再加一聲金幣聲。
+   */
+  private celebrate(row: Row | SectRow): void {
+    audio.play('gold');
+    this.tweens.killTweensOf(row.flash);
+    row.flash.setAlpha(0.28);
+    this.tweens.add({ targets: row.flash, alpha: 0, duration: 420, ease: 'Stepped', easeParams: [4] });
+    burstPixels(this, row.buttonX, row.flash.y, GOLD, 8);
+    this.tweens.killTweensOf(row.level);
+    row.level.setScale(1.25);
+    this.tweens.add({ targets: row.level, scale: 1, duration: 180, ease: 'Stepped', easeParams: [3] });
   }
 
   private refresh(): void {

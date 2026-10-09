@@ -2091,6 +2091,9 @@ export class RunScene extends Phaser.Scene {
     });
 
     // 一道紅光壓過整個戰場。
+    //
+    // 填色的透明度要給 1、用物件的 alpha 來補間：兩者是相乘的，
+    // 原本填色寫 0，這道光從來沒有出現過。只閃一下——連閃對光敏感的人不友善。
     const flash = this.add
       .rectangle(
         cx,
@@ -2098,15 +2101,15 @@ export class RunScene extends Phaser.Scene {
         GAME_WIDTH,
         GATE_Y - ARENA_TOP,
         hexToNumber(DANGER),
-        0,
+        1,
       )
+      .setAlpha(0)
       .setDepth(46);
     this.tweens.add({
       targets: flash,
-      alpha: { from: 0, to: 0.34 },
-      duration: 170,
+      alpha: { from: 0, to: 0.3 },
+      duration: 200,
       yoyo: true,
-      repeat: 1,
       onComplete: () => flash.destroy(),
     });
 
