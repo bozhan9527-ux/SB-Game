@@ -274,6 +274,9 @@ export class RunScene extends Phaser.Scene {
   private gateBar!: Phaser.GameObjects.Rectangle;
   private bossPanel: Phaser.GameObjects.Container | null = null;
   private bossBar: Phaser.GameObjects.Rectangle | null = null;
+  /** 開場的境界名與說明框。它和公告條佔同一塊位置，公告要出來時得知道它還在不在。 */
+  private introParts: Phaser.GameObjects.GameObject[] = [];
+  private introEndsAt = 0;
   private bossText: Phaser.GameObjects.Text | null = null;
   private discardZone!: Phaser.GameObjects.Rectangle;
   /** 落點框：拖曳中跟著磁吸移動，停在符會落下的那一格。 */
@@ -626,10 +629,11 @@ export class RunScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(44)
       .setAlpha(0);
+    // 掛在首領血條正下方：首領停在山門時上半場是空的，放在門口會壓到最下排的符。
     this.siegeText = this.add
       .text(
         GAME_WIDTH / 2,
-        GATE_Y - 62,
+        196,
         "首領正在砸門！",
         textStyle({ size: 26, color: DANGER, bold: true }),
       )
@@ -1824,9 +1828,8 @@ export class RunScene extends Phaser.Scene {
     }
 
     if (report.bossSpawned) {
-      // 登場：紫光一閃加一下震動，讓「首領來了」不只是多一條血條。
-      this.cameras.main.flash(240, 110, 60, 190);
-      this.cameras.main.shake(320, 0.008);
+      // 登場的紅光與震動都在 buildBossPanel 裡。這裡原本還有一道相機閃光——
+      // 它從全不透明開始，整個畫面（連手牌與數字）會整片變紫，又和紅光疊成兩次閃。
       this.buildBossPanel();
       this.showHintOnce(
         HINT_BOSS,
@@ -2530,6 +2533,15 @@ export class RunScene extends Phaser.Scene {
   }
 
   private banner(kind: "notice" | "hint", text: string, color: string, holdMs: number): void {
+    // 開場說明還掛著時，兩者會疊在同一塊。陣法成形這種公告場上的連線已經看得到，先不出。
+    // 只講一次的提示也是教學，不能把另一段教學擠掉——排到開場說明收完再出。
+    if (this.introParts.some((part) => part.active)) {
+      if (kind === "notice") return;
+      this.time.delayedCall(Math.max(0, this.introEndsAt - this.time.now), () =>
+        this.banner(kind, text, color, holdMs),
+      );
+      return;
+    }
     const topEdge = this.fieldTopEdge();
     let box = kind === "notice" ? this.noticeBox : this.hintBox;
     if (box === undefined || !box.text.active) {
@@ -2646,6 +2658,8 @@ export class RunScene extends Phaser.Scene {
       audio.play("ui");
     }
 
+    this.introParts = parts;
+    this.introEndsAt = this.time.now + hold + 600;
     this.tweens.add({
       targets: parts,
       alpha: 0,
@@ -2656,6 +2670,7 @@ export class RunScene extends Phaser.Scene {
       },
     });
   }
+
 
   private updateHud(): void {
     const run = this.run;
