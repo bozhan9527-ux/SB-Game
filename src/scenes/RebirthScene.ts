@@ -6,6 +6,7 @@
  * 一個不可逆的操作，資訊必須全部在按下去之前就攤開。
  */
 import Phaser from 'phaser';
+import { confirmForm } from '../ui/form';
 import { pixelPanel } from '../ui/panel';
 import { GAME_WIDTH } from '../config';
 import { BALANCE, KARMA } from '../data';
@@ -87,7 +88,7 @@ export class RebirthScene extends Phaser.Scene {
       label: '轉世重修',
       fontSize: 24,
       textColor: GOLD,
-      onClick: () => this.doRebirth(),
+      onClick: () => void this.doRebirth(),
     });
 
     createButton(this, cx, 926, {
@@ -137,14 +138,16 @@ export class RebirthScene extends Phaser.Scene {
     this.refresh();
   }
 
-  private doRebirth(): void {
+  private async doRebirth(): Promise<void> {
     const save = state();
     if (!canRebirth(save)) return;
     const gained = pendingKarma(save);
-    const confirmed = window.confirm(
-      `轉世會把關卡進度退回第 1 關、金幣歸零、洞府六條線全部重來。\n` +
+    const confirmed = await confirmForm(
+      '轉世重修？',
+      `退回第 1 關，金幣與洞府六條線歸零。\n` +
         `門派修為、符籙解鎖、成就與仙緣都留著。\n\n` +
-        `這一次可換得仙緣 ${gained} 點。要轉世嗎？`,
+        `這一次可換得仙緣 ${gained} 點。`,
+      '轉世',
     );
     if (!confirmed) return;
     rebirth(save);

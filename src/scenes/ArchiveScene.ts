@@ -23,7 +23,7 @@ import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { DANGER, GOLD, INK, INK_DIM, JADE, textStyle, wrapText } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
-import { showForm } from '../ui/form';
+import { confirmForm, showForm } from '../ui/form';
 
 /** 版面。每一段的高度都是算過的，加東西就要重算——這是 PROGRESS 的 L-08。 */
 const RECORDS_TOP = 92;
@@ -186,9 +186,11 @@ export class ArchiveScene extends Phaser.Scene {
     // 先看雲端那份，才有辦法在覆蓋之前告訴玩家他要蓋掉的是什麼。
     const existing = await getSave({ playerId: identity.playerId, secret: identity.secret });
     if (existing.ok && compare(save.savedAt, existing.savedAt) === 'cloudNewer') {
-      const confirmed = window.confirm(
+      const confirmed = await confirmForm(
+        '蓋掉雲端那一份？',
         `雲端那一份比較新（${new Date(existing.savedAt).toLocaleString()}），\n` +
-          `本機這一份是 ${new Date(save.savedAt).toLocaleString()}。\n\n上傳會蓋掉雲端那一份，確定嗎？`,
+          `本機這一份是 ${new Date(save.savedAt).toLocaleString()}。`,
+        '上傳覆蓋',
       );
       if (!confirmed) {
         this.sayCloud('已取消，雲端那一份沒有動。', INK_DIM);
@@ -231,9 +233,11 @@ export class ArchiveScene extends Phaser.Scene {
       freshness === 'localNewer'
         ? '⚠ 本機這一份比雲端的新，下載會把較新的那份蓋掉。\n\n'
         : '';
-    const confirmed = window.confirm(
+    const confirmed = await confirmForm(
+      '覆蓋本機進度？',
       `${warning}雲端：${new Date(result.savedAt).toLocaleString()}\n` +
-        `本機：${new Date(save.savedAt).toLocaleString()}\n\n下載會覆蓋本機進度，確定嗎？`,
+        `本機：${new Date(save.savedAt).toLocaleString()}`,
+      '下載覆蓋',
     );
     if (!confirmed) {
       this.sayCloud('已取消，本機進度沒有動。', INK_DIM);
@@ -300,10 +304,14 @@ export class ArchiveScene extends Phaser.Scene {
       await navigator.clipboard.writeText(code);
       this.say(`已複製（${code.length} 字）。貼到記事本或傳給自己收好。`, JADE);
     } catch {
-      // 沒有剪貼簿權限（多半是非 https 或使用者拒絕）時退到 prompt：
-      // 那個對話框裡的文字是選得起來的，玩家仍然帶得走。
-      window.prompt('複製這一串存檔碼：', code);
-      this.say('剪貼簿不可用，已改用對話框顯示。', GOLD);
+      // 沒有剪貼簿權限（多半是非 https 或使用者拒絕）時，把碼放進唯讀欄位讓玩家自己複製。
+      await showForm({
+        title: '複製存檔碼',
+        note: '剪貼簿無法使用。點一下欄位會全選，再長按複製。',
+        fields: [{ key: 'code', label: '存檔碼', value: code, readonly: true }],
+        submit: '複製好了',
+      });
+      this.say('剪貼簿不可用，已改用欄位顯示。', GOLD);
     }
   }
 
@@ -335,6 +343,7 @@ export class ArchiveScene extends Phaser.Scene {
       note: `目前是第 ${current.world.stage} 關、金幣 ${Math.floor(current.player.wallet.gold)}。\n匯入後會換成存檔碼裡的進度，這一步不能復原。`,
       fields: [],
       submit: '覆蓋匯入',
+      danger: true,
     });
     if (confirmed === null) {
       this.say('已取消，目前的進度沒有動。', INK_DIM);

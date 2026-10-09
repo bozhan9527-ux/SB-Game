@@ -24,6 +24,10 @@ export interface FormField {
   numeric?: boolean;
   placeholder?: string;
   maxLength?: number;
+  /** 預先填好的值。 */
+  value?: string;
+  /** 唯讀：只給玩家複製用（例如剪貼簿不可用時顯示存檔碼），點一下就全選。 */
+  readonly?: boolean;
 }
 
 export interface FormOptions {
@@ -37,6 +41,8 @@ export interface FormOptions {
    * 打錯一個字就把整張表清掉重來，是這種畫面最讓人火大的地方。
    */
   validate?: (values: Record<string, string>) => string | null;
+  /** 送出會蓋掉或清掉東西時用紅色按鈕，和一般的「確定」分開。 */
+  danger?: boolean;
 }
 
 /** 送出時回傳每個欄位的值；取消回 null。 */
@@ -105,6 +111,14 @@ function ensureStyle(): void {
 .sb-form button.sb-primary:active:not(:disabled) {
   box-shadow: inset 3px 3px 0 #b8862a;
 }
+.sb-form button.sb-primary.sb-danger {
+  background: #e0616a;
+  color: #1c0a0c;
+  box-shadow: inset -3px -3px 0 #9a3540, inset 3px 3px 0 #ffc2c6;
+}
+.sb-form button.sb-primary.sb-danger:active:not(:disabled) {
+  box-shadow: inset 3px 3px 0 #9a3540;
+}
 .sb-form button:disabled { opacity: 0.5; cursor: default; }
 `;
   document.head.appendChild(style);
@@ -151,6 +165,11 @@ export function showForm(options: FormOptions): Promise<FormResult> {
       }
       if (field.placeholder !== undefined) input.placeholder = field.placeholder;
       if (field.maxLength !== undefined) input.maxLength = field.maxLength;
+      if (field.value !== undefined) input.value = field.value;
+      if (field.readonly === true) {
+        input.readOnly = true;
+        input.addEventListener('focus', () => input.select());
+      }
       label.appendChild(input);
       form.appendChild(label);
       inputs.set(field.key, input);
@@ -167,7 +186,7 @@ export function showForm(options: FormOptions): Promise<FormResult> {
     cancel.textContent = '取消';
     const submit = document.createElement('button');
     submit.type = 'submit';
-    submit.className = 'sb-primary';
+    submit.className = options.danger === true ? 'sb-primary sb-danger' : 'sb-primary';
     submit.textContent = options.submit;
     row.append(cancel, submit);
     form.appendChild(row);
@@ -212,4 +231,12 @@ export function showForm(options: FormOptions): Promise<FormResult> {
  */
 export function showNotice(title: string, note: string): Promise<void> {
   return showForm({ title, note, fields: [], submit: '知道了' }).then(() => undefined);
+}
+
+/**
+ * 確定／取消。取代 window.confirm，理由同上。按確定回 true，取消或點外面回 false。
+ * 會蓋掉進度的確認一律用紅色按鈕。
+ */
+export function confirmForm(title: string, note: string, submit: string): Promise<boolean> {
+  return showForm({ title, note, fields: [], submit, danger: true }).then((result) => result !== null);
 }
