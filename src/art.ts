@@ -52,6 +52,26 @@ export const DISCIPLE_DISPLAY_HEIGHT = 56;
 export const ENEMY_SOURCE_HEIGHT = 56;
 export const ENEMY_DISPLAY_HEIGHT = 84;
 
+/**
+ * 每種妖物貼圖裡實際有畫的最上一列（四幀取最高的那幀），單位是原圖像素。
+ *
+ * 貼圖一律 56 格高，但蜈蚣、熊這種矮胖的身體只畫在下半部——血條要是固定掛在
+ * 貼圖頂端，就會浮在身體上方四五十像素，看起來像沒人的血條。
+ * 數字是量 public/art/enemy-*.png 的不透明範圍得來的；重畫妖物時要跟著重量。
+ */
+export const ENEMY_ART_TOP: Readonly<Record<MobArt, number>> = {
+  bandit: 2,
+  bear: 22,
+  celestial: 0,
+  centipede: 24,
+  demon: 0,
+  scorpion: 12,
+  serpent: 12,
+  undead: 0,
+  wolf: 14,
+  yeti: 8,
+};
+
 export function bossTexture(art: BossArt, frame = 0): string {
   return `boss-${art}-${frame}`;
 }

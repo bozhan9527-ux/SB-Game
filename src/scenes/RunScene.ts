@@ -3,6 +3,7 @@ import { pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import {
   ART,
+  ENEMY_ART_TOP,
   ENEMY_DISPLAY_HEIGHT,
   ENEMY_SOURCE_HEIGHT,
   DISCIPLE_DISPLAY_HEIGHT,
@@ -1987,10 +1988,15 @@ export class RunScene extends Phaser.Scene {
 
     // 一般妖魔各有一條小血條：沒有它就看不出「打不動」和「快死了」的差別。
     // 首領不畫，它的血量已經在畫面頂端有一條大的，畫兩條只是干擾。
+    // 血條貼著身體實際的上緣，不貼貼圖的上緣（見 ENEMY_ART_TOP）。
+    const enemyScale = ENEMY_DISPLAY_HEIGHT / ENEMY_SOURCE_HEIGHT;
+    const barY = enemy.boss
+      ? -56
+      : Math.round(-0.6 * ENEMY_DISPLAY_HEIGHT + ENEMY_ART_TOP[enemy.art] * enemyScale - 8);
     if (!enemy.boss) {
-      const barBg = this.add.rectangle(0, -56, 46, 6, 0x000000, 0.7).setStrokeStyle(3, EDGE);
+      const barBg = this.add.rectangle(0, barY, 46, 6, 0x000000, 0.7).setStrokeStyle(3, EDGE);
       const bar = this.add
-        .rectangle(-23, -56, 46, 6, 0xd8434f, 1)
+        .rectangle(-23, barY, 46, 6, 0xd8434f, 1)
         .setOrigin(0, 0.5);
       container.add([barBg, bar]);
       container.setData("bar", bar);
@@ -2004,7 +2010,7 @@ export class RunScene extends Phaser.Scene {
         this.add
           .text(
             26,
-            -56,
+            barY,
             mark.text,
             textStyle({ size: 15, color: mark.color, bold: true }),
           )
