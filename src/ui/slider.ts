@@ -9,7 +9,7 @@
  * 一條 4px 的線在手機上是點不到的。
  */
 import Phaser from 'phaser';
-import { BG_PANEL_ALT, GOLD, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, hexToNumber, textStyle } from './theme';
+import { BG_PANEL_ALT, GOLD, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, hexToNumber, textStyle, ACCENT_GLOW } from './theme';
 
 export interface SliderOptions {
   width: number;
@@ -51,9 +51,19 @@ export function createSlider(
   const fill = scene.add
     .rectangle(trackLeft, 14, trackWidth * value, 4, hexToNumber(GOLD))
     .setOrigin(0, 0.5);
+
+  // 填充條光暈：在填充條後面添加一個發光效果
+  const fillGlow = scene.add
+    .rectangle(trackLeft, 14, trackWidth * value, 12, hexToNumber(ACCENT_GLOW), 0.15)
+    .setOrigin(0, 0.5);
+
   const knob = scene.add
     .circle(trackLeft + trackWidth * value, 14, 11, hexToNumber(GOLD))
     .setStrokeStyle(2, BG_PANEL_ALT);
+
+  // 把手光暈：圍繞把手的發光效果
+  const knobGlow = scene.add
+    .circle(trackLeft + trackWidth * value, 14, 16, hexToNumber(ACCENT_GLOW), 0.2);
 
   // 熱區蓋住整條，包含把手走得到的兩端——只讓把手可拖的話，
   // 玩家點軌道上的某一點不會有反應，而那是最自然的操作。
@@ -61,11 +71,13 @@ export function createSlider(
     .rectangle(0, 8, width, MIN_TOUCH_SIZE, 0x000000, 0)
     .setInteractive({ useHandCursor: true });
 
-  const container = scene.add.container(x, y, [label, readout, track, fill, knob, hit]);
+  const container = scene.add.container(x, y, [label, readout, track, fillGlow, fill, knobGlow, knob, hit]);
 
   const render = (): void => {
     fill.width = trackWidth * value;
+    fillGlow.width = trackWidth * value;
     knob.x = trackLeft + trackWidth * value;
+    knobGlow.x = trackLeft + trackWidth * value;
     readout.setText(`${Math.round(value * 100)}%`);
     readout.setColor(value <= 0 ? INK_DIM : GOLD);
   };

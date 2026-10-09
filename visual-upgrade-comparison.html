@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修仙視覺升級對比</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --gold: #e8c46a;
+            --bg: #0d1116;
+            --ink: #e9e2cf;
+            --dim: #9a917c;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0d1116 0%, #161d24 100%);
+            color: var(--ink);
+            font-family: "PingFang TC", sans-serif;
+            padding: 40px 20px;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; font-size: 2.5em; color: var(--gold); margin-bottom: 30px; text-shadow: 0 0 20px rgba(232,196,106,0.3); }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+        
+        .side {
+            padding: 30px;
+            border-radius: 10px;
+            background: rgba(22, 29, 36, 0.8);
+            border: 2px solid var(--dim);
+        }
+        
+        .side.after {
+            border: 2px solid var(--gold);
+            box-shadow: 0 0 20px rgba(232, 196, 106, 0.2);
+        }
+        
+        .side h2 { font-size: 1.8em; margin-bottom: 30px; text-align: center; }
+        .side.before h2 { color: var(--dim); }
+        .side.after h2 { color: var(--gold); text-shadow: 0 0 15px rgba(232, 196, 106, 0.3); }
+        
+        .comp { margin-bottom: 25px; padding: 15px; background: rgba(13, 17, 22, 0.6); border-radius: 6px; }
+        .label { font-size: 0.85em; color: var(--dim); margin-bottom: 12px; text-transform: uppercase; }
+        
+        .btn-old { width: 100%; padding: 10px; background: #1e2730; border: 2px solid #3a4652; color: var(--ink); border-radius: 4px; cursor: pointer; }
+        
+        .btn-new {
+            width: 100%;
+            padding: 10px;
+            background: #1e2730;
+            border: 2px solid var(--gold);
+            color: var(--ink);
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 0 12px rgba(232,196,106,0.2);
+            position: relative;
+        }
+        
+        .btn-new::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border: 1px solid rgba(245, 215, 110, 0.3);
+            border-radius: 6px;
+            pointer-events: none;
+        }
+        
+        .cards { display: flex; justify-content: center; gap: 15px; }
+        .card-old { width: 70px; height: 90px; background: #fff; border: 2px solid #3a4652; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.8em; color: var(--gold); }
+        .card-new { width: 70px; height: 90px; background: #fff; border: 2px solid var(--gold); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.8em; color: var(--gold); box-shadow: 0 0 15px rgba(232,196,106,0.4); }
+        
+        .panel-old { background: #161d24; border: 2px solid #3a4652; padding: 12px; border-radius: 6px; font-size: 0.9em; }
+        .panel-new { background: #161d24; border: 2px solid var(--gold); padding: 12px; border-radius: 6px; font-size: 0.9em; box-shadow: 0 0 20px rgba(232,196,106,0.15); }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(232, 196, 106, 0.2);
+        }
+        
+        .feature {
+            padding: 20px;
+            background: rgba(232, 196, 106, 0.05);
+            border-left: 3px solid var(--gold);
+            border-radius: 6px;
+        }
+        
+        .feature h3 { color: var(--gold); margin-bottom: 10px; }
+        .feature p { color: var(--dim); font-size: 0.95em; line-height: 1.5; }
+        
+        @media (max-width: 768px) {
+            .comparison { grid-template-columns: 1fr; }
+            h1 { font-size: 1.8em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ 修仙遊戲視覺升級對比</h1>
+        
+        <div class="comparison">
+            <!-- 升級前 -->
+            <div class="side before">
+                <h2>升級前</h2>
+                
+                <div class="comp">
+                    <div class="label">按鈕</div>
+                    <button class="btn-old">開始挑戰</button>
+                </div>
+                
+                <div class="comp">
+                    <div class="label">符牌</div>
+                    <div class="cards">
+                        <div class="card-old">劍</div>
+                        <div class="card-old">盾</div>
+                        <div class="card-old">火</div>
+                    </div>
+                </div>
+                
+                <div class="comp">
+                    <div class="label">信息面板</div>
+                    <div class="panel-old">
+                        <div>境界：煉氣初期</div>
+                        <div>經驗：2350/5000</div>
+                        <div>金幣：15,680</div>
+                    </div>
+                </div>
+                
+                <div class="comp">
+                    <div class="label">特點</div>
+                    <ul style="margin-left: 20px; color: var(--dim); font-size: 0.9em;">
+                        <li>簡單線條邊框</li>
+                        <li>最小視覺層次</li>
+                        <li>無光暈效果</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 升級後 -->
+            <div class="side after">
+                <h2>升級後 ✨</h2>
+                
+                <div class="comp">
+                    <div class="label">按鈕</div>
+                    <button class="btn-new">開始挑戰</button>
+                </div>
+                
+                <div class="comp">
+                    <div class="label">符牌</div>
+                    <div class="cards">
+                        <div class="card-new">劍</div>
+                        <div class="card-new">盾</div>
+                        <div class="card-new">火</div>
+                    </div>
+                </div>
+                
+                <div class="comp">
+                    <div class="label">信息面板</div>
+                    <div class="panel-new">
+                        <div>境界：煉氣初期</div>
+                        <div>經驗：2350/5000</div>
+                        <div>金幣：15,680</div>
+                    </div>
+                </div>
+                
+                <div class="comp">
+                    <div class="label">升級特點</div>
+                    <ul style="margin-left: 20px; color: var(--gold); font-size: 0.9em;">
+                        <li>✨ 光暈邊框效果</li>
+                        <li>💫 陰影與發光</li>
+                        <li>🌟 多層次深度</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>🎨 按鈕增強</h3>
+                <p>陰影增加深度感，光暈邊框提升修仙質感，點擊時觸發靈光粒子</p>
+            </div>
+            <div class="feature">
+                <h3>🃏 符牌提升</h3>
+                <p>邊框光暈與卡牌顏色相配，增強視覺識別度</p>
+            </div>
+            <div class="feature">
+                <h3>🖼️ 面板框架</h3>
+                <p>傳統中式邊框，光暈效果，營造修仙風格統一</p>
+            </div>
+            <div class="feature">
+                <h3>📋 表單美化</h3>
+                <p>聚焦發光，懸停動畫，整體框架光暈</p>
+            </div>
+            <div class="feature">
+                <h3>🎚️ 拉條優化</h3>
+                <p>填充條光暈，把手發光圈，視覺流暢</p>
+            </div>
+            <div class="feature">
+                <h3>✨ 粒子系統</h3>
+                <p>光影粒子、靈光上升、旋轉軌跡、粒子雨</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

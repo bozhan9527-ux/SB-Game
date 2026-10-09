@@ -39,3 +39,11 @@ export function fadeToScene(scene: Phaser.Scene, key: string, data?: object): vo
     scene.scene.start(key, data ?? {});
   });
 }
+
+/**
+ * 帶有光暈效果的淡入。用於重要場景的開場。
+ */
+export function fadeInWithGlow(scene: Phaser.Scene, glowColor: number = 0xffffff): void {
+  const camera = scene.cameras.main;
+  camera.fadeIn(FADE_MS, (glowColor >> 16) & 0xff, (glowColor >> 8) & 0xff, glowColor & 0xff);
+}

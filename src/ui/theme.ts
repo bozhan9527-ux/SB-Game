@@ -15,6 +15,11 @@ export const BG_PANEL = 0x161d24;
 export const BG_PANEL_ALT = 0x1e2730;
 export const LINE = 0x3a4652;
 
+// Xianxia visual enhancements
+export const ACCENT_GLOW = '#f5d76e';
+export const JADE_GLOW = '#9fffc8';
+export const DANGER_GLOW = '#ff8a8f';
+
 /** 觸控熱區下限（TECH_SPEC 第 6 節）。 */
 export const MIN_TOUCH_SIZE = 44;
 
@@ -118,4 +123,106 @@ export function formatTime(ms: number): string {
   const hours = Math.floor(total / 3600);
   const mm = hours > 0 ? String(minutes).padStart(2, '0') : String(minutes);
   return `${hours > 0 ? `${hours}:` : ''}${mm}:${String(seconds).padStart(2, '0')}`;
+}
+
+/**
+ * 繪製帶有修仙風格陰影與光暈的按鈕背景。
+ */
+export function drawButtonWithGlow(
+  scene: Phaser.Scene,
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  fillColor: number,
+  glowColor: string,
+): void {
+  // 外層光暈（暈染效果）
+  g.fillStyle(hexToNumber(glowColor), 0.15);
+  g.fillRect(x - width / 2 - 12, y - height / 2 - 12, width + 24, height + 24);
+
+  // 邊框內側陰影
+  g.lineStyle(1, 0x000000, 0.3);
+  g.strokeRect(x - width / 2 + 1, y - height / 2 + 1, width - 2, height - 2);
+
+  // 主體背景
+  g.fillStyle(fillColor, 1);
+  g.fillRect(x - width / 2, y - height / 2, width, height);
+
+  // 邊框
+  g.lineStyle(2, hexToNumber(glowColor), 0.8);
+  g.strokeRect(x - width / 2, y - height / 2, width, height);
+
+  // 邊框外側光暈
+  g.lineStyle(1, hexToNumber(glowColor), 0.3);
+  g.strokeRect(x - width / 2 - 2, y - height / 2 - 2, width + 4, height + 4);
+}
+
+/**
+ * 繪製帶有修仙風格裝飾的面板邊框。
+ */
+export function drawPanelFrame(
+  scene: Phaser.Scene,
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  accentColor: number,
+): void {
+  const cornerSize = 12;
+
+  // 背景陰影
+  g.fillStyle(0x000000, 0.4);
+  g.fillRect(x - width / 2 + 2, y - height / 2 + 2, width, height);
+
+  // 主邊框
+  g.lineStyle(2, accentColor, 0.8);
+  g.strokeRect(x - width / 2, y - height / 2, width, height);
+
+  // 四角裝飾
+  const corners = [
+    { x: x - width / 2, y: y - height / 2 }, // 左上
+    { x: x + width / 2, y: y - height / 2 }, // 右上
+    { x: x - width / 2, y: y + height / 2 }, // 左下
+    { x: x + width / 2, y: y + height / 2 }, // 右下
+  ];
+
+  for (const corner of corners) {
+    g.fillStyle(accentColor, 0.4);
+    g.fillCircle(corner.x, corner.y, 4);
+  }
+
+  // 邊框光暈
+  g.lineStyle(1, accentColor, 0.2);
+  g.strokeRect(x - width / 2 - 3, y - height / 2 - 3, width + 6, height + 6);
+}
+
+/**
+ * 添加浮動靈光粒子效果到目標物件。
+ */
+export function addGlowParticles(
+  scene: Phaser.Scene,
+  targetX: number,
+  targetY: number,
+  glowColor: string,
+  particleCount: number = 5,
+): void {
+  for (let i = 0; i < particleCount; i += 1) {
+    const angle = (i / particleCount) * Math.PI * 2;
+    const distance = 15 + Math.random() * 10;
+    const x = targetX + Math.cos(angle) * distance;
+    const y = targetY + Math.sin(angle) * distance;
+
+    const particle = scene.add.circle(x, y, 2, hexToNumber(glowColor), 0.6);
+    scene.tweens.add({
+      targets: particle,
+      x: x + Math.cos(angle) * 20,
+      y: y + Math.sin(angle) * 20,
+      alpha: 0,
+      duration: 1000 + Math.random() * 500,
+      onComplete: () => particle.destroy(),
+    });
+  }
 }
