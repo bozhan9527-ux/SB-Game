@@ -524,6 +524,16 @@ export class RunScene extends Phaser.Scene {
     if (this.omen !== null) {
       this.banner("hint", `奇遇「${this.omen.name}」：${omenSummary(this.omen)}`, GOLD, 3200);
     }
+    // 天劫同理：開場就講清楚這一關多了什麼條件。
+    const tribulations = this.run.loadout.tribulations;
+    if (tribulations.length > 0) {
+      this.banner(
+        "hint",
+        `天劫降臨——${tribulations.map((item) => `${item.name}：${item.desc}`).join("；")}`,
+        "#9fd8ff",
+        4200,
+      );
+    }
     else this.refreshCoach();
 
     // 與 stage_end 成對。兩者的差就是中離——沒有它，「第幾關流失」只看得到一半。
@@ -1585,7 +1595,7 @@ export class RunScene extends Phaser.Scene {
     }
 
     // 每一格吃到的總倍率，常駐寫在該格右上角。
-    const bonuses = boardBonuses(this.run.field);
+    const bonuses = boardBonuses(this.run.field, this.run.loadout.formationMultiplier);
     for (let i = 0; i < this.fieldBonusLabels.length; i += 1) {
       const label = this.fieldBonusLabels[i];
       const bonus = bonuses[i];
@@ -1914,6 +1924,7 @@ export class RunScene extends Phaser.Scene {
       );
     }
     if (report.bossSkill !== null) this.announceBossSkill(report);
+    if (report.tribulation !== null) this.announceTribulation(report);
     if (report.drawnSlot !== null) {
       this.refreshCards();
       this.pulseHand(report.drawnSlot);
@@ -1971,6 +1982,61 @@ export class RunScene extends Phaser.Scene {
       const glow = bossView?.getData("glow") as Phaser.FX.Glow | undefined;
       if (glow !== undefined) glow.color = 0xff3a3a;
     }
+  }
+
+  /**
+   * 天劫發作。雷劫從天上劈一道折線到被封的格位，天火在被燒的手牌上爆開。
+   * 公告帶寫出發生了什麼——天劫整場都在，玩家需要知道「剛剛那一下不是 bug」。
+   */
+  private announceTribulation(report: TickReport): void {
+    const item = this.run.loadout.tribulations.find((trib) => trib.id === report.tribulation);
+    if (item === undefined) return;
+    if (item.id === "thunder") {
+      this.banner("notice", "雷劫！一格陣位被劈封，把符搬開", "#9fd8ff", 1200);
+      audio.play("bossAttack");
+      this.cameras.main.shake(160, 0.006);
+      for (const slot of report.sealed) {
+        const view = this.sealViews[slot];
+        if (view === undefined) continue;
+        this.lightning(view.x, view.y);
+        this.burst(view.x, view.y, "#9fd8ff", 14, 1.1);
+      }
+    } else if (item.id === "heavenfire") {
+      this.banner("notice", "天火劫！燒掉一張手牌", "#ff9a5a", 1200);
+      audio.play("bossAttack");
+      for (const index of report.devoured) {
+        const view = this.handViews[index];
+        if (view === undefined) continue;
+        this.burst(view.container.x, view.container.y, "#ff9a5a", 16, 1.2);
+      }
+      this.refreshCards();
+    }
+  }
+
+  /** 一道從戰場頂端劈到 (x, y) 的折線閃電，三格寬、硬邊，一閃就收。 */
+  private lightning(x: number, y: number): void {
+    const g = this.add.graphics().setDepth(90);
+    const points: [number, number][] = [];
+    let px = x + Phaser.Math.Between(-30, 30);
+    for (let py = ARENA_TOP; py < y; py += 36) {
+      points.push([px, py]);
+      px = x + Phaser.Math.Between(-22, 22);
+    }
+    points.push([x, y]);
+    for (const [width, color] of [[9, 0x3a6fd8], [3, 0xffffff]] as const) {
+      g.lineStyle(width, color, 1);
+      g.beginPath();
+      points.forEach(([a, b], index) => (index === 0 ? g.moveTo(a, b) : g.lineTo(a, b)));
+      g.strokePath();
+    }
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 260,
+      ease: "Stepped",
+      easeParams: [3],
+      onComplete: () => g.destroy(),
+    });
   }
 
   /** 場上那一隻首領的畫面物件。 */

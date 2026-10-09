@@ -1,4 +1,5 @@
 import { omenById, omenSummary } from '../systems/omens';
+import { tribulationNames, tribulationsFor } from '../systems/tribulations';
 import Phaser from 'phaser';
 import { pixelPanel } from '../ui/panel';
 import { libraryFloor } from '../systems/dungeons';
@@ -227,6 +228,8 @@ export class TitleScene extends Phaser.Scene {
     // 距離突破還有幾關，是修仙題材最直接的推進動機。
     const toBreak = realm.stageTo - save.world.stage + 1;
     // 帶著奇遇時這一行讓給它：奇遇只管下一場，這時候它比「還差幾關突破」急。
+    // 飛升境的天劫也寫在這裡：進場前就知道這一關多了什麼，才有機會換符。
+    const tribulations = tribulationsFor(save.world.stage);
     const pending = save.player.omen;
     const omen =
       pending !== null && pending.stage === save.world.stage && pending.runs === save.world.runs
@@ -238,10 +241,12 @@ export class TitleScene extends Phaser.Scene {
         top + 116,
         omen !== null
           ? `奇遇「${omen.name}」　${omenSummary(omen)}`
-          : toBreak > 900
-            ? '已至無盡飛升境'
-            : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
-        textStyle({ size: 17, color: omen !== null ? JADE : GOLD }),
+          : tribulations.length > 0
+            ? `本關天劫：${tribulationNames(tribulations)}`
+            : toBreak > 900
+              ? '已至無盡飛升境'
+              : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
+        textStyle({ size: 17, color: omen !== null ? JADE : tribulations.length > 0 ? '#9fd8ff' : GOLD }),
       )
       .setOrigin(0.5);
     fitText(line, GAME_WIDTH - 80);

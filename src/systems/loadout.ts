@@ -10,13 +10,14 @@
  */
 import { sectTrackFor, sectUpgradeAmount, sectUpgradeLevel } from './sect-upgrades';
 import { BALANCE, SECTS } from '../data';
-import type { CardDef, Sect } from '../data/types';
+import type { CardDef, Sect, TribulationDef } from '../data/types';
 import type { SaveData } from '../save/types';
 import { karmaAmountOf } from './karma';
 import { masteryBonus, masteryTierFor } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
-import { omenOfRules } from './omens';
+import { OMEN_RULE_PREFIX, omenOfRules } from './omens';
+import { tribulationsFor } from './tribulations';
 import { amountOf } from './upgrades';
 
 /**
@@ -109,8 +110,33 @@ export interface Loadout {
    * 分開乘會讓後期的專精符變成一個獨立的指數。
    */
   favoredDamageBonus: number;
-  /** 妖魔（含首領）血量倍率。只有關間奇遇會動它，平常是 1。 */
+  /** 妖魔（含首領）血量倍率。關間奇遇與天劫會動它，平常是 1。 */
   mobHpMultiplier: number;
+  /** 妖魔推進速度倍率（天劫「罡風」）。 */
+  mobSpeedMultiplier: number;
+  /** 每波妖魔數量倍率（天劫「萬魔」）。 */
+  waveCountMultiplier: number;
+  /** 陣法加成的縮放（天劫「陣崩」）。只縮陣法，不動光環。 */
+  formationMultiplier: number;
+  /** 這一場的天劫。定時的那幾條由 tickCombat 結算。 */
+  tribulations: TribulationDef[];
+}
+
+/**
+ * 把第 stage 關的天劫套到配置上。單獨拿出來是為了讓平衡模擬也能吃到同一份——
+ * 模擬走的是 buildLoadoutFor，不經過 buildLoadoutFromSpec。
+ */
+export function applyTribulations(loadout: Loadout, stage: number): void {
+  const list = tribulationsFor(stage);
+  loadout.tribulations = list;
+  for (const item of list) {
+    loadout.mobHpMultiplier *= item.mobHp;
+    loadout.mobSpeedMultiplier *= item.mobSpeed;
+    loadout.waveCountMultiplier *= item.waveCount;
+    loadout.formationMultiplier *= item.formation;
+    loadout.drawSpeedMultiplier *= item.drawSpeed;
+    loadout.goldMultiplier *= item.gold;
+  }
 }
 
 export function sectById(id: string | null): Sect | null {
@@ -299,6 +325,11 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
     loadout.tierBonus += omen.tierBonus;
   }
 
+  // 飛升境的天劫：只給主線。副本有自己的規則、無限模式一場跨很多關，
+  // 再疊天劫會變成兩套條件打架。奇遇不算副本規則，帶著奇遇照樣吃天劫。
+  const mainline = !spec.endless && spec.rules.every((rule) => rule.startsWith(OMEN_RULE_PREFIX));
+  if (mainline && !loadout.arena) applyTribulations(loadout, spec.stage);
+
   applySectDepth(loadout, spec.sectDepth);
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
   // 習性的機率也是養成的一部分，所以競技場一樣要關掉——**而且它是反過來的**：
@@ -391,6 +422,10 @@ export function buildLoadoutFor(
     stage,
     favoredDamageBonus: 0,
     mobHpMultiplier: 1,
+    mobSpeedMultiplier: 1,
+    waveCountMultiplier: 1,
+    formationMultiplier: 1,
+    tribulations: [],
     arena: false,
     // 沒有轉世資訊時威脅度就是關卡本身、妖魔也不額外長習性。
     // 平衡模擬與測試大多走這條路。

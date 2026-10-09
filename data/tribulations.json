@@ -1,0 +1,93 @@
+[
+  {
+    "id": "thunder",
+    "name": "雷劫",
+    "desc": "每 10 秒劈下一道雷，封住一格陣位 3 秒",
+    "intervalMs": 10000,
+    "durationMs": 3000,
+    "mobHp": 1,
+    "mobSpeed": 1,
+    "formation": 1,
+    "drawSpeed": 1,
+    "waveCount": 1,
+    "gold": 1.3
+  },
+  {
+    "id": "heavenfire",
+    "name": "天火劫",
+    "desc": "每 12 秒降下天火，燒掉手牌裡最低階的一張",
+    "intervalMs": 12000,
+    "durationMs": 0,
+    "mobHp": 1,
+    "mobSpeed": 1,
+    "formation": 1,
+    "drawSpeed": 1,
+    "waveCount": 1,
+    "gold": 1.3
+  },
+  {
+    "id": "heartDemon",
+    "name": "心魔劫",
+    "desc": "妖魔血量 +25%",
+    "intervalMs": 0,
+    "durationMs": 0,
+    "mobHp": 1.25,
+    "mobSpeed": 1,
+    "formation": 1,
+    "drawSpeed": 1,
+    "waveCount": 1,
+    "gold": 1.3
+  },
+  {
+    "id": "gale",
+    "name": "罡風劫",
+    "desc": "妖魔走得快兩成",
+    "intervalMs": 0,
+    "durationMs": 0,
+    "mobHp": 1,
+    "mobSpeed": 1.2,
+    "formation": 1,
+    "drawSpeed": 1,
+    "waveCount": 1,
+    "gold": 1.3
+  },
+  {
+    "id": "collapse",
+    "name": "陣崩劫",
+    "desc": "陣法加成減半",
+    "intervalMs": 0,
+    "durationMs": 0,
+    "mobHp": 1,
+    "mobSpeed": 1,
+    "formation": 0.5,
+    "drawSpeed": 1,
+    "waveCount": 1,
+    "gold": 1.3
+  },
+  {
+    "id": "cloud",
+    "name": "劫雲",
+    "desc": "抽符慢兩成",
+    "intervalMs": 0,
+    "durationMs": 0,
+    "mobHp": 1,
+    "mobSpeed": 1,
+    "formation": 1,
+    "drawSpeed": 0.8,
+    "waveCount": 1,
+    "gold": 1.3
+  },
+  {
+    "id": "horde",
+    "name": "萬魔劫",
+    "desc": "每一波的妖魔多三成",
+    "intervalMs": 0,
+    "durationMs": 0,
+    "mobHp": 1,
+    "mobSpeed": 1,
+    "formation": 1,
+    "drawSpeed": 1,
+    "waveCount": 1.3,
+    "gold": 1.3
+  }
+]

@@ -125,6 +125,8 @@ export interface DefenseState {
    * 封的是**格位**不是符：把符搬到別格就脫困，這正是這一招的對策。
    */
   sealedUntil: number[];
+  /** 每一條天劫距離下一次發作還有多久（只有定時的那幾條會用到）。 */
+  tribulationTimers: number[];
   /**
    * 每個格位「連續出手」累積的傷害倍率（太乙符）。
    *
@@ -220,6 +222,8 @@ export interface TickReport {
   sealed: number[];
   /** 這一拍被吃掉的手牌格位。 */
   devoured: number[];
+  /** 這一拍發作的天劫 id。 */
+  tribulation: string | null;
 }
 
 const EMPTY_REPORT = (): TickReport => ({
@@ -233,6 +237,7 @@ const EMPTY_REPORT = (): TickReport => ({
   bossSkill: null,
   sealed: [],
   devoured: [],
+  tribulation: null,
 });
 
 // ---------------------------------------------------------------- 關卡編成
@@ -318,6 +323,8 @@ export function buildSpawnQueue(
   rng: Rng,
   traitChance = 0,
   hpMultiplier = 1,
+  speedMultiplier = 1,
+  countMultiplier = 1,
 ): { queue: SpawnEntry[]; boss: BossDef } {
   const { wave: cfg } = BALANCE;
   const realm = realmForStage(stage);
@@ -327,10 +334,10 @@ export function buildSpawnQueue(
   if (boss === undefined) throw new Error(`境界 ${realm.id} 沒有可用的首領`);
 
   const queue: SpawnEntry[] = [];
-  const speed = mobSpeed(stage);
+  const speed = mobSpeed(stage) * speedMultiplier;
 
   for (let wave = 1; wave <= cfg.wavesPerStage; wave += 1) {
-    const count = waveCount(stage, wave);
+    const count = Math.round(waveCount(stage, wave) * countMultiplier);
     const hp = waveHp(stage, wave);
     // 同一波用同一種妖魔，畫面上才看得出「這一波是狼群」而不是雜燴。
     const mob = mobs[rng.int(0, Math.max(0, mobs.length - 1))];
@@ -434,6 +441,8 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     rng,
     loadout.traitChance,
     loadout.mobHpMultiplier,
+    loadout.mobSpeedMultiplier,
+    loadout.waveCountMultiplier,
   );
 
   const hand: (Card | null)[] = new Array<Card | null>(field.handSlots).fill(
@@ -463,6 +472,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     field: slots,
     cooldowns: new Array<number>(loadout.fieldSlots).fill(0),
     sealedUntil: new Array<number>(loadout.fieldSlots).fill(0),
+    tribulationTimers: loadout.tribulations.map((item) => item.intervalMs),
     ramps: new Array<number>(loadout.fieldSlots).fill(0),
     enemies: [],
     queue,
@@ -1002,9 +1012,10 @@ export function tickCombat(
 
   // 3b. 首領招式。放在開火之前：這一拍罩上的護盾、封住的格位，這一拍就生效。
   tickBossSkill(state, deltaMs, rng, report);
+  tickTribulations(state, deltaMs, rng, report);
 
   // 4. 法寶開火。陣法與光環每一拍重算一次——玩家隨時可能把符搬到別格。
-  const bonuses = boardBonuses(state.field);
+  const bonuses = boardBonuses(state.field, state.loadout.formationMultiplier);
   recordFormation(state, bonuses, deltaMs);
   const targetable = state.enemies.some((enemy) => !isHidden(state, enemy));
   for (let slot = 0; slot < state.field.length; slot += 1) {
@@ -1231,6 +1242,8 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
     rng,
     state.loadout.traitChance,
     state.loadout.mobHpMultiplier,
+    state.loadout.mobSpeedMultiplier,
+    state.loadout.waveCountMultiplier,
   );
   const offset = state.elapsedMs + BALANCE.wave.waveIntervalMs * 0.5;
   state.queue = queue.map((entry) => ({ ...entry, atMs: entry.atMs + offset }));
@@ -1321,22 +1334,9 @@ function castSkill(
       // 不疊加：重新罩上就是補滿到這一層，免得放著不打越疊越厚。
       skill.shield = Math.max(skill.shield, boss.maxHp * def.amount);
       break;
-    case "seal": {
-      // 只封有符的格位——封一格空格等於這一招沒放。
-      const loaded: number[] = [];
-      for (let i = 0; i < state.field.length; i += 1) {
-        if (state.field[i] != null && (state.sealedUntil[i] ?? 0) <= state.elapsedMs) {
-          loaded.push(i);
-        }
-      }
-      for (let n = 0; n < def.count && loaded.length > 0; n += 1) {
-        const pick = loaded.splice(rng.int(0, loaded.length - 1), 1)[0];
-        if (pick === undefined) break;
-        state.sealedUntil[pick] = state.elapsedMs + def.durationMs;
-        report.sealed.push(pick);
-      }
+    case "seal":
+      sealSlots(state, def.count, def.durationMs, rng, report);
       break;
-    }
     case "charge":
       skill.chargeUntilMs = state.elapsedMs + def.durationMs;
       break;
@@ -1347,21 +1347,73 @@ function castSkill(
       // 狀態旗標已經在觸發時立起來，速度與砸門間隔各自去讀它。
       break;
     case "devour":
-      for (let n = 0; n < def.count; n += 1) {
-        let lowest = -1;
-        for (let i = 0; i < state.hand.length; i += 1) {
-          const card = state.hand[i];
-          if (card == null) continue;
-          const current = lowest < 0 ? null : state.hand[lowest];
-          if (current == null || card.tier < current.tier) lowest = i;
-        }
-        if (lowest < 0) break;
-        state.hand[lowest] = null;
-        report.devoured.push(lowest);
-      }
+      devourHand(state, def.count, report);
       break;
   }
   report.bossSkill = def.kind;
+}
+
+/** 封住 count 格有符、還沒被封的格位。封一格空格等於沒放，所以只挑有符的。 */
+function sealSlots(
+  state: DefenseState,
+  count: number,
+  durationMs: number,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const loaded: number[] = [];
+  for (let i = 0; i < state.field.length; i += 1) {
+    if (state.field[i] != null && (state.sealedUntil[i] ?? 0) <= state.elapsedMs) {
+      loaded.push(i);
+    }
+  }
+  for (let n = 0; n < count && loaded.length > 0; n += 1) {
+    const pick = loaded.splice(rng.int(0, loaded.length - 1), 1)[0];
+    if (pick === undefined) break;
+    state.sealedUntil[pick] = state.elapsedMs + durationMs;
+    report.sealed.push(pick);
+  }
+}
+
+/** 吃掉手牌裡最低階的 count 張。 */
+function devourHand(state: DefenseState, count: number, report: TickReport): void {
+  for (let n = 0; n < count; n += 1) {
+    let lowest = -1;
+    for (let i = 0; i < state.hand.length; i += 1) {
+      const card = state.hand[i];
+      if (card == null) continue;
+      const current = lowest < 0 ? null : state.hand[lowest];
+      if (current == null || card.tier < current.tier) lowest = i;
+    }
+    if (lowest < 0) break;
+    state.hand[lowest] = null;
+    report.devoured.push(lowest);
+  }
+}
+
+/**
+ * 定時發作的天劫：雷劫封格、天火燒牌。和首領招式共用同一套動作，
+ * 差別只在「誰放的」——天劫整場都在，不用等首領出場。
+ */
+function tickTribulations(
+  state: DefenseState,
+  deltaMs: number,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const list = state.loadout.tribulations;
+  for (let i = 0; i < list.length; i += 1) {
+    const item = list[i];
+    if (item === undefined || item.intervalMs <= 0) continue;
+    let timer = (state.tribulationTimers[i] ?? item.intervalMs) - deltaMs;
+    while (timer <= 0) {
+      timer += item.intervalMs;
+      if (item.id === "thunder") sealSlots(state, 1, item.durationMs, rng, report);
+      else if (item.id === "heavenfire") devourHand(state, 1, report);
+      report.tribulation = item.id;
+    }
+    state.tribulationTimers[i] = timer;
+  }
 }
 
 /**
@@ -1398,7 +1450,7 @@ function spawnMinions(
       maxHp: hp,
       y: boss.y,
       lane: Math.max(0, Math.min(LANES - 1, boss.lane + offset)),
-      speed: mobSpeed(state.threat) * def.speedMultiplier,
+      speed: mobSpeed(state.threat) * def.speedMultiplier * state.loadout.mobSpeedMultiplier,
       slowUntilMs: 0,
       slowPercent: 0,
       burnRemaining: 0,

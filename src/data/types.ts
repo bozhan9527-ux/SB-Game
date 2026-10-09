@@ -844,3 +844,25 @@ export interface OmenDef {
   bossTime: number;
   tierBonus: number;
 }
+
+/**
+ * 飛升境的天劫。
+ *
+ * 第 82 關以後境界不再變化，原本只剩數字往上長。天劫讓每一關都有自己的條件：
+ * 由關卡編號決定（不擲骰），越深疊越多條，每一條都另給金幣。
+ * 定時的兩種（雷劫、天火）用 intervalMs；其餘是倍率，1 表示不變。
+ */
+export interface TribulationDef {
+  id: string;
+  name: string;
+  desc: string;
+  intervalMs: number;
+  durationMs: number;
+  mobHp: number;
+  mobSpeed: number;
+  /** 陣法加成的倍率（只縮陣法，不動光環）。 */
+  formation: number;
+  drawSpeed: number;
+  waveCount: number;
+  gold: number;
+}

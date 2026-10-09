@@ -69,7 +69,10 @@ export function neighboursOf(slot: number, slotCount: number): number[] {
  * 每一格至多各吃一次橫、縱、斜。橫與縱本來就不會重複，但正中央那一格同時在兩條斜線上，
  * 不去重的話它會拿到雙倍斜陣加成——單一格位的上限必須是可預期的。
  */
-export function boardBonuses(field: readonly (Card | null)[]): SlotBonus[] {
+/**
+ * formationScale 縮放的只有陣法那一段（光環不受影響）：飛升境的「陣崩劫」用它把陣法減半。
+ */
+export function boardBonuses(field: readonly (Card | null)[], formationScale = 1): SlotBonus[] {
   const count = field.length;
   // 先把陣法的加成分開累積，因為它要整包乘上該格的 formationMultiplier。
   const formationDamage = new Array<number>(count).fill(0);
@@ -109,7 +112,7 @@ export function boardBonuses(field: readonly (Card | null)[]): SlotBonus[] {
     const card = field[slot];
     const multiplier = card === undefined || card === null
       ? 1
-      : cardDef(card.type).effect.formationMultiplier;
+      : cardDef(card.type).effect.formationMultiplier * formationScale;
     bonuses.push({
       damage: 1 + (formationDamage[slot] ?? 0) * multiplier + (auraDamage[slot] ?? 0),
       fireRate: 1 + (formationFireRate[slot] ?? 0) * multiplier + (auraFireRate[slot] ?? 0),

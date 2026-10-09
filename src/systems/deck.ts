@@ -148,7 +148,7 @@ export function cardDps(card: Card, loadout: Loadout): number {
  * 不然他不會知道剛剛那一下有沒有用。
  */
 export function fieldDps(field: readonly (Card | null)[], loadout: Loadout): number {
-  const bonuses = boardBonuses(field);
+  const bonuses = boardBonuses(field, loadout.formationMultiplier);
   let total = 0;
   for (let i = 0; i < field.length; i += 1) {
     const card = field[i];

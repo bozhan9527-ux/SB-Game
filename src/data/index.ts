@@ -18,6 +18,7 @@ import challengesJson from '../../data/challenges.json';
 import dungeonsJson from '../../data/dungeons.json';
 import bossSkillsJson from '../../data/boss-skills.json';
 import omensJson from '../../data/omens.json';
+import tribulationsJson from '../../data/tribulations.json';
 
 import { ICON_NAMES } from './types';
 import type {
@@ -30,6 +31,7 @@ import type {
   BossSkillDef,
   BossSkillKind,
   OmenDef,
+  TribulationDef,
   CardDef,
   CardEffect,
   ChallengeDef,
@@ -509,7 +511,34 @@ export function parseOmens(raw: unknown, path = 'omens.json'): OmenDef[] {
   return omens;
 }
 
+export function parseTribulations(raw: unknown, path = 'tribulations.json'): TribulationDef[] {
+  const items = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    name: str(item, 'name', p),
+    desc: str(item, 'desc', p),
+    intervalMs: num(item, 'intervalMs', p),
+    durationMs: num(item, 'durationMs', p),
+    mobHp: num(item, 'mobHp', p),
+    mobSpeed: num(item, 'mobSpeed', p),
+    formation: num(item, 'formation', p),
+    drawSpeed: num(item, 'drawSpeed', p),
+    waveCount: num(item, 'waveCount', p),
+    gold: num(item, 'gold', p),
+  }));
+  assertUniqueIds(items, path);
+  for (const item of items) {
+    for (const key of ['mobHp', 'mobSpeed', 'formation', 'drawSpeed', 'waveCount', 'gold'] as const) {
+      if (item[key] <= 0) throw new DataError(path, `天劫 ${item.id} 的 ${key} 必須大於 0`);
+    }
+    if (item.intervalMs < 0 || item.durationMs < 0) {
+      throw new DataError(path, `天劫 ${item.id} 的時間不得為負`);
+    }
+  }
+  return items;
+}
+
 export const BALANCE: Balance = parseBalance(balanceJson);
+export const TRIBULATIONS: readonly TribulationDef[] = parseTribulations(tribulationsJson);
 export const OMENS: readonly OmenDef[] = parseOmens(omensJson);
 export const BOSS_SKILLS: readonly BossSkillDef[] = parseBossSkills(bossSkillsJson);
 

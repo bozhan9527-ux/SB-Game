@@ -15,6 +15,7 @@ import {
   tickCombat,
 } from '../src/systems/defense';
 import {
+  applyTribulations,
   buildLoadoutFromSpec,
   buildLoadoutFor,
   dungeonThreatFactor,
@@ -22,6 +23,7 @@ import {
 import { karmaCost, karmaTrackById } from '../src/systems/karma';
 import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
+import { tribulationsFor } from '../src/systems/tribulations';
 import { trackById, upgradeCost } from '../src/systems/upgrades';
 
 /**
@@ -205,12 +207,15 @@ function runOnce(
   talismans?: readonly string[],
   decisionMs: number = DECISION_MS,
   arranging = false,
+  tribulations = false,
 ): RunOutcome {
   const sect = SECTS.find((item) => item.id === sectId);
   if (sect === undefined) throw new Error(`測試用門派不存在：${sectId}`);
   const rng = createRng(seed);
   const pool = talismans === undefined ? undefined : talismanDefs(talismans, 999);
-  const state = createDefenseState(buildLoadoutFor(sect, upgrades, stage, pool), rng);
+  const loadout = buildLoadoutFor(sect, upgrades, stage, pool);
+  if (tribulations) applyTribulations(loadout, stage);
+  const state = createDefenseState(loadout, rng);
 
   let sinceDecision = 0;
   let bossGateHits = 0;
@@ -419,6 +424,27 @@ describe('數值平衡', () => {
         wins / samples,
         `第 ${stage} 關，肯花時間排陣的玩家只有 ${Math.round((wins / samples) * 100)}% 勝率`,
       ).toBeGreaterThanOrEqual(0.6);
+    }
+  });
+
+  it('天劫疊上去之後，飛升境在真人操作速度下仍然守得住', () => {
+    // 天劫只會出現在主線，而上面那條測試組配置時沒有經過它——這一條補上。
+    // 門檻比無天劫時低一點：天劫本來就該讓這幾關比較難，但不能難到過不去。
+    const maxed: Record<string, number> = {};
+    for (const track of UPGRADES) maxed[track.id] = track.maxLevel;
+    for (const stage of [82, 90, 97, 105, 115]) {
+      let wins = 0;
+      const samples = 8;
+      for (let i = 0; i < samples; i += 1) {
+        const outcome = runOnce(
+          stage, maxed, 'body', stage * 7919 + i * 104729, undefined, HUMAN_DECISION_MS, true, true,
+        );
+        if (outcome.victory) wins += 1;
+      }
+      expect(
+        wins / samples,
+        `第 ${stage} 關（${tribulationsFor(stage).map((item) => item.name).join('、')}），真人勝率 ${Math.round((wins / samples) * 100)}%`,
+      ).toBeGreaterThanOrEqual(0.5);
     }
   });
 
