@@ -93,9 +93,11 @@ function drawScenery(g: G, scenery: Scenery, accent: number): void {
       // 受光面與岩漿流
       g.fillStyle(0x4a2420, 0.9);
       g.fillPoints([{ x: vx - 30, y: top }, { x: vx - 6, y: top }, { x: vx - 60, y: base + 40 }, { x: vx - 150, y: base + 40 }], true);
-      g.fillStyle(0xff6a2a, 0.75);
-      g.fillPoints([{ x: vx - 6, y: top + 3 }, { x: vx + 6, y: top + 3 }, { x: vx - 12, y: top + 60 }, { x: vx - 21, y: top + 60 }], true);
-      g.fillPoints([{ x: vx + 12, y: top + 3 }, { x: vx + 18, y: top + 3 }, { x: vx + 33, y: top + 42 }, { x: vx + 27, y: top + 42 }], true);
+      // 一條往左下流的岩漿，一格一格往外偏，像素畫裡的斜線就是這樣走的。
+      g.fillStyle(0xff6a2a, 0.8);
+      for (let i = 0; i < 14; i += 1) {
+        g.fillRect(vx - 3 - Math.floor(i / 2) * 3, top + 3 + i * 3, 3, 3);
+      }
       g.fillStyle(0xffb04a, 0.9);
       g.fillRect(vx - 27, top - 3, 54, 6);
       g.fillStyle(0xff8a3a, 0.1);
