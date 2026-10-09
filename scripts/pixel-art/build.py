@@ -206,7 +206,8 @@ def yeti_frames():
     ]
     legs0 = ["....wWWWW..WWWWw......", "....wWWWW..WWWWw......", "....bbbbb..bbbbb......"]
     legs1 = [".....wWWW..WWWw.......", ".....wWWW..WWWw.......", ".....bbbb..bbbb.......", ]
-    pal = dict(w="#a8bccc", W="#eef4fa", b="#7fa8c8", e="#1d2a40", T="#ffffff", M="#2a3a5a")
+    # 毛色刻意壓成藍灰：純白的雪怪在戰場上和受擊閃白分不出來，遠看只是一團白塊。
+    pal = dict(w="#5f7898", W="#a6bad3", b="#4a7099", e="#1d2a40", T="#ffffff", M="#2a3a5a")
     out = []
     for f in (0, 1):
         rows = bottom(top + (legs0 if f == 0 else legs1), 23)
