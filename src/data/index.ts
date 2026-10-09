@@ -91,6 +91,9 @@ const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
   'libraryFloors',
   'sectMasteryAll',
   'karmaLevels',
+  'omens',
+  'bossSkills',
+  'tribulations',
 ];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',

@@ -41,6 +41,12 @@ function reached(save: SaveData, item: Achievement): boolean {
       return SECTS.every((sect) => masteryTier(save, sect.id) >= item.value);
     case 'karmaLevels':
       return karmaLevels(save) >= item.value;
+    case 'omens':
+      return stats.omensTaken >= item.value;
+    case 'bossSkills':
+      return stats.bossSkillsBeaten.length >= item.value;
+    case 'tribulations':
+      return stats.maxTribulations >= item.value;
   }
 }
 
@@ -127,5 +133,11 @@ export function progressOf(save: SaveData, item: Achievement): string {
     }
     case 'karmaLevels':
       return `${karmaLevels(save)} / ${item.value} 級`;
+    case 'omens':
+      return `${stats.omensTaken} / ${item.value} 次`;
+    case 'bossSkills':
+      return `${stats.bossSkillsBeaten.length} / ${item.value} 種`;
+    case 'tribulations':
+      return `最高 ${stats.maxTribulations} / ${item.value} 重`;
   }
 }

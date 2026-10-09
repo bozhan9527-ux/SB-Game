@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { OMENS } from '../src/data';
 import { createDefaultSave, loadSave } from '../src/save';
+import { detectAchievements } from '../src/systems/achievements';
 import { createMemoryStorage } from '../src/save/storage';
 import { SAVE_KEY } from '../src/save/types';
 import { buildLoadoutFromSpec, loadoutSpecOf, ARENA_RULE } from '../src/systems/loadout';
@@ -138,5 +139,24 @@ describe('關間奇遇的效果', () => {
     expect(loadSave(storage).player.omen).toEqual({ id: 'spring', stage: 9, runs: 30 });
     storage.write(SAVE_KEY, JSON.stringify({ ...save, player: { ...save.player, omen: { id: 3 } } }));
     expect(loadSave(storage).player.omen).toBeNull();
+  });
+});
+
+describe('新內容的成就', () => {
+  it('奇遇次數、斬過的招式種類、天劫重數都接上成就，存檔讀得回來', () => {
+    const save = createDefaultSave(0);
+    save.player.stats.omensTaken = 1;
+    save.player.stats.bossSkillsBeaten = ['summon', 'seal', 'shield', 'rage'];
+    save.player.stats.maxTribulations = 1;
+    const unlocked = detectAchievements(save).map((item) => item.id);
+    expect(unlocked).toEqual(expect.arrayContaining(['omen_1', 'skills_4', 'trib_1']));
+    expect(unlocked).not.toContain('skills_8');
+
+    const storage = createMemoryStorage();
+    storage.write(SAVE_KEY, JSON.stringify(save));
+    const back = loadSave(storage).player.stats;
+    expect(back.omensTaken).toBe(1);
+    expect(back.bossSkillsBeaten).toHaveLength(4);
+    expect(back.maxTribulations).toBe(1);
   });
 });

@@ -58,6 +58,10 @@ export interface RunResultData {
   victory: boolean;
   stage: number;
   bossName: string;
+  /** 關底首領的招式種類。斬過哪幾種記進成就。 */
+  bossSkill: string;
+  /** 這一場帶著幾重天劫。 */
+  tribulations: number;
   /** 結束時剩餘的山門耐久。 */
   survivors: number;
   /** 起始耐久，用於顯示「守下了幾成」。 */

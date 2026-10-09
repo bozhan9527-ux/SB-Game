@@ -711,7 +711,13 @@ export type AchievementKind =
   /** 四個門派**全部**都到這個修為階數。和 sectMastery 的「任一派」是兩件事。 */
   | 'sectMasteryAll'
   /** 仙緣總共買了幾級。轉世之後唯一會繼續長的數字。 */
-  | 'karmaLevels';
+  | 'karmaLevels'
+  /** 選過幾次關間奇遇。 */
+  | 'omens'
+  /** 斬殺過幾種招式的首領。 */
+  | 'bossSkills'
+  /** 單場帶著幾重天劫通關（取最高）。 */
+  | 'tribulations';
 
 export interface Achievement {
   id: string;

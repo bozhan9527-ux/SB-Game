@@ -230,5 +230,53 @@
     "kind": "stage",
     "value": 200,
     "reward": 9000000000
+  },
+  {
+    "id": "omen_1",
+    "name": "福緣初現",
+    "desc": "選擇一次關間奇遇",
+    "kind": "omens",
+    "value": 1,
+    "reward": 300
+  },
+  {
+    "id": "omen_10",
+    "name": "機緣不斷",
+    "desc": "選擇十次關間奇遇",
+    "kind": "omens",
+    "value": 10,
+    "reward": 60000
+  },
+  {
+    "id": "skills_4",
+    "name": "見招拆招",
+    "desc": "斬殺四種招式的首領",
+    "kind": "bossSkills",
+    "value": 4,
+    "reward": 20000
+  },
+  {
+    "id": "skills_8",
+    "name": "萬法皆通",
+    "desc": "八種招式的首領全部斬過",
+    "kind": "bossSkills",
+    "value": 8,
+    "reward": 2000000
+  },
+  {
+    "id": "trib_1",
+    "name": "渡劫",
+    "desc": "帶著天劫通關一次",
+    "kind": "tribulations",
+    "value": 1,
+    "reward": 5000000
+  },
+  {
+    "id": "trib_3",
+    "name": "三重天劫",
+    "desc": "帶著三重天劫通關",
+    "kind": "tribulations",
+    "value": 3,
+    "reward": 500000000
   }
 ]

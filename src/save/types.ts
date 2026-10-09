@@ -98,6 +98,12 @@ export interface StatsState {
   totalGoldEarned: number;
   /** 曾用來通關的門派 id。 */
   clearedSects: string[];
+  /** 選過幾次關間奇遇。 */
+  omensTaken: number;
+  /** 斬殺過的首領招式種類。 */
+  bossSkillsBeaten: string[];
+  /** 單場帶著幾重天劫通關，取最高。 */
+  maxTribulations: number;
 }
 
 export interface PlayerState {

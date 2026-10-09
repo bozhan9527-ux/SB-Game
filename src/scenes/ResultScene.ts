@@ -77,6 +77,11 @@ export class ResultScene extends Phaser.Scene {
     stats.maxTier = Math.max(stats.maxTier, result.peakTier);
     stats.totalKills += result.kills;
     if (result.victory && result.leaks === 0) stats.perfectClears += 1;
+    // 新內容接上長期目標：斬過哪幾種招式、帶著幾重天劫通關。
+    if (result.bossKilled && !stats.bossSkillsBeaten.includes(result.bossSkill)) {
+      stats.bossSkillsBeaten.push(result.bossSkill);
+    }
+    if (result.victory) stats.maxTribulations = Math.max(stats.maxTribulations, result.tribulations);
     // **重挑的一場不給金幣。** 見 recordReplay：不擋的話，回頭刷第 5 關
     // 會變成全遊戲最好賺的金幣來源。這件事結算表上要寫出來，
     // 不然玩家看到「金幣 0」只會以為壞掉了。
@@ -567,6 +572,8 @@ export class ResultScene extends Phaser.Scene {
       frame.on("pointerup", () => {
         const save = state();
         save.player.omen = { id: omen.id, stage, runs };
+        save.player.stats.omensTaken += 1;
+        detectAchievements(save);
         persist();
         audio.play("gold");
         burstPixels(this, cx, y, GOLD, 12);
