@@ -30,6 +30,8 @@ import {
   textStyle,
 } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
+import { burstPixels, floatLabel } from '../ui/effects';
+import { audio } from '../audio';
 
 interface Row {
   track: KarmaTrack;
@@ -136,6 +138,12 @@ export class RebirthScene extends Phaser.Scene {
     }
     persist();
     this.refresh();
+    audio.play('gold');
+    const row = this.rows.find((item) => item.track.id === track.id);
+    if (row !== undefined) {
+      burstPixels(this, row.button.container.x, row.button.container.y, JADE, 8);
+      floatLabel(this, row.button.container.x, row.button.container.y - 34, `+${track.perLevel}${track.unit}`, JADE);
+    }
   }
 
   private async doRebirth(): Promise<void> {

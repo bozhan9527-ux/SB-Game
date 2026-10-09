@@ -3,7 +3,7 @@
  */
 import Phaser from 'phaser';
 import { GAME_WIDTH } from '../config';
-import { hexToNumber } from './theme';
+import { hexToNumber, textStyle } from './theme';
 
 /** 特效方塊的邊長。背景的像素也是三點一格，兩邊對得上。 */
 const PX = 3;
@@ -52,4 +52,26 @@ export function burstPixels(scene: Phaser.Scene, x: number, y: number, color: st
       onComplete: () => bit.destroy(),
     });
   }
+}
+
+/**
+ * 往上飄的一行字（「+60 金」）。領到、買到的東西要看得到數目，
+ * 不然只有右上角的總數悄悄變大，玩家不會注意到。分格往上、分格淡出，和其他像素特效同一種節奏。
+ */
+export function floatLabel(scene: Phaser.Scene, x: number, y: number, text: string, color: string, size = 22): void {
+  const label = scene.add
+    .text(snap(x), snap(y), text, textStyle({ size, color, bold: true }))
+    .setOrigin(0.5)
+    .setStroke('#0b0f14', 6)
+    .setDepth(1000);
+  scene.tweens.add({
+    targets: label,
+    y: snap(y - 36),
+    alpha: 0,
+    delay: 250,
+    duration: 650,
+    ease: 'Stepped',
+    easeParams: [6],
+    onComplete: () => label.destroy(),
+  });
 }

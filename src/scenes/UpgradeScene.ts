@@ -21,7 +21,7 @@ import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, hexToNumber, textStyle } from '../ui/theme';
 import { realmForStage } from '../systems/realms';
 import { fadeIn, fadeToScene } from '../ui/transition';
-import { burstPixels } from '../ui/effects';
+import { burstPixels, floatLabel } from '../ui/effects';
 import { audio } from '../audio';
 
 interface Row {
@@ -191,7 +191,11 @@ export class UpgradeScene extends Phaser.Scene {
     }
     persist();
     this.refresh();
-    if (this.sectRow !== null) this.celebrate(this.sectRow);
+    if (this.sectRow !== null) {
+      const level = sectUpgradeLevel(save);
+      const gain = sectUpgradeAmount(this.sectRow.track, level) - sectUpgradeAmount(this.sectRow.track, level - 1);
+      this.celebrate(this.sectRow, `+${Math.round(gain * 100) / 100}${this.sectRow.track.unit}`);
+    }
   }
 
   private purchase(track: UpgradeTrack): void {
@@ -206,19 +210,24 @@ export class UpgradeScene extends Phaser.Scene {
     persist();
     this.refresh();
     const row = this.rows.find((item) => item.track.id === track.id);
-    if (row !== undefined) this.celebrate(row);
+    if (row !== undefined) {
+      const level = save.player.upgrades[track.id] ?? 0;
+      const gain = upgradeAmount(track, level) - upgradeAmount(track, level - 1);
+      this.celebrate(row, `+${Math.round(gain * 100) / 100}${track.unit}`);
+    }
   }
 
   /**
    * 買到了。原本只有數字悄悄換掉——連點的時候根本分不出哪一下有買到、哪一下錢不夠。
    * 整列閃一下、按鈕噴幾顆像素、等級跳一下，再加一聲金幣聲。
    */
-  private celebrate(row: Row | SectRow): void {
+  private celebrate(row: Row | SectRow, gain: string): void {
     audio.play('gold');
     this.tweens.killTweensOf(row.flash);
     row.flash.setAlpha(0.28);
     this.tweens.add({ targets: row.flash, alpha: 0, duration: 420, ease: 'Stepped', easeParams: [4] });
     burstPixels(this, row.buttonX, row.flash.y, GOLD, 8);
+    floatLabel(this, row.buttonX, row.flash.y - 30, gain, JADE);
     this.tweens.killTweensOf(row.level);
     row.level.setScale(1.25);
     this.tweens.add({ targets: row.level, scale: 1, duration: 180, ease: 'Stepped', easeParams: [3] });

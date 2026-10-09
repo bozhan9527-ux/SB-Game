@@ -19,6 +19,7 @@ import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, GOLD, INK, INK_DIM, JADE, LINE, formatNumber, hexToNumber, textStyle } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 import { dragScroll } from '../ui/scroll';
+import { burstPixels, floatLabel } from '../ui/effects';
 
 /** 成就一覽。可上下拖曳捲動，因為條目比一頁多。 */
 export class AchievementScene extends Phaser.Scene {
@@ -96,6 +97,10 @@ export class AchievementScene extends Phaser.Scene {
           persist();
           audio.play('gold');
           this.refresh();
+          // 按鈕在捲動清單裡，位置要加上清單目前的位移。
+          const at = list.y + y;
+          burstPixels(this, button.container.x, at, GOLD, 8);
+          floatLabel(this, button.container.x - 70, at - 10, `+${formatNumber(gold)} 金`, GOLD);
         },
       });
       list.add(button.container);
@@ -129,6 +134,8 @@ export class AchievementScene extends Phaser.Scene {
         persist();
         audio.play('gold');
         this.refresh();
+        burstPixels(this, cx, GAME_HEIGHT - 128, GOLD, 12);
+        floatLabel(this, cx, GAME_HEIGHT - 178, `+${formatNumber(total)} 金`, GOLD, 26);
       },
     });
 
@@ -170,6 +177,8 @@ export class AchievementScene extends Phaser.Scene {
         .setText(claimed ? '已領取' : unlocked ? '可領取' : progressOf(save, item))
         .setColor(claimed ? INK_DIM : unlocked ? JADE : INK_DIM);
       row.reward.setAlpha(claimed ? 0.4 : 1);
+      // 按鈕上的字跟著狀態走：領過的還寫「領取」只是變暗，看起來像按不下去的 bug。
+      row.button.setLabel(claimed ? '已領' : unlocked ? '領取' : '未達成');
       row.button.setEnabled(unlocked && !claimed);
     }
   }
