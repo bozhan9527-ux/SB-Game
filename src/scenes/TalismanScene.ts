@@ -251,7 +251,7 @@ export class TalismanScene extends Phaser.Scene {
         .rectangle(0, 0, TILE_W, CHOSEN_H, BG_PANEL, 0.92)
         .setStrokeStyle(2, LINE)
         .setInteractive({ useHandCursor: true });
-      const glyph = this.add.image(0, -10, glyphTexture('sword')).setDisplaySize(28, 34);
+      const glyph = this.add.image(0, -10, glyphTexture('sword'));
       const name = this.add.text(0, 20, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
       const container = this.add.container(x, CHOSEN_Y, [background, glyph, name]);
       container.setData('glyph', glyph);
@@ -296,7 +296,6 @@ export class TalismanScene extends Phaser.Scene {
       // 每張符的顏色也上到圖騰上，讓同一系的符在視覺上先聚成一群。
       const glyph = this.add
         .image(x, y - 12, glyphTexture(def.art))
-        .setDisplaySize(38, 46)
         .setAlpha(unlocked ? 1 : 0.22);
       if (unlocked) glyph.setTint(hexToNumber(def.color));
       const name = this.add

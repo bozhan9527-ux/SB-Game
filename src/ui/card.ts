@@ -32,6 +32,13 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0x000000, 0.3)
     .setStrokeStyle(3, LINE, 0.9);
 
+  // 升階那一刻外圍閃三下光框：合成上去要感覺「變強了」。
+  // 只在升階時閃，不常駐——中後期每張符都是高階，常駐的話滿場都在發光，等於沒有重點。
+  const aura = scene.add
+    .rectangle(0, 0, CARD_WIDTH + 9, CARD_HEIGHT + 9, 0x000000, 0)
+    .setVisible(false);
+  let shown: Card | null = null;
+
   // 像素牌框：外圈深色描邊、符種色的厚框、內側再一圈暗線，三層都是硬邊。
   const body = scene.add
     .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0xffffff, 1)
@@ -50,12 +57,13 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     .setVisible(false);
   const pips = scene.add.container(0, 0);
 
-  const container = scene.add.container(x, y, [slot, body, inner, glyph, tierText, pips]);
+  const container = scene.add.container(x, y, [aura, slot, body, inner, glyph, tierText, pips]);
 
   const refresh = (card: Card | null): void => {
     pips.removeAll(true);
     if (card === null) {
       slot.setVisible(true);
+      shown = null;
       body.setVisible(false);
       inner.setVisible(false);
       glyph.setVisible(false);
@@ -65,6 +73,21 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     const color = cardColor(card.type);
     slot.setVisible(false);
     body.setVisible(true).setFillStyle(hexToNumber(color), 1);
+    if (shown !== null && shown.type === card.type && card.tier > shown.tier) {
+      scene.tweens.killTweensOf(aura);
+      aura.setVisible(true).setAlpha(1).setStrokeStyle(4, hexToNumber(color), 1);
+      scene.tweens.add({
+        targets: aura,
+        alpha: 0,
+        duration: 180,
+        yoyo: true,
+        repeat: 2,
+        ease: 'Stepped',
+        easeParams: [2],
+        onComplete: () => aura.setVisible(false),
+      });
+    }
+    shown = { ...card };
     inner.setVisible(true);
     glyph.setVisible(true).setTexture(glyphTexture(card.type));
     tierText.setVisible(true).setText(`${card.tier}`).setColor(color);

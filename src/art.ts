@@ -1,10 +1,10 @@
 /**
  * 美術資源。
  *
- * 全部是像素畫，以 SVG 的方格存檔（public/art/），由 Phaser 在載入時點陣化。
- * 檔案由 scripts/pixel-art/ 的產生器輸出，改圖請改產生器再重跑，不要手改 SVG。
+ * 全部是像素畫，存成一格一點的 PNG（public/art/）。
+ * 檔案由 scripts/pixel-art/ 的產生器輸出，改圖請改產生器再重跑，不要手改 PNG。
  *
- * 點陣化的尺寸一律是格數的整數倍，畫面上每一格才會一樣大。
+ * 遊戲開了 pixelArt，放大時取最近點；顯示倍數盡量取整數，每一格才會一樣大。
  */
 import { CARDS } from './data';
 import type { BossArt, MobArt, SectArt } from './data/types';
@@ -44,17 +44,11 @@ export function glyphTexture(art: string): string {
  */
 const GLYPH_ARTS: readonly string[] = [...new Set(CARDS.map((card) => card.art))];
 
-/**
- * 門人與妖物都是 28 格高。點陣化成 4 倍（112），顯示成 2 倍（56）與 3 倍（84）——
- * 顯示倍數不是整數的話，有的格子會被畫成兩點、有的三點，像素畫一眼就看得出歪。
- */
-export const DISCIPLE_SOURCE_HEIGHT = 112;
+/** 門人與妖物的貼圖都是 56 格高；門人原寸顯示，妖物放大 1.5 倍。 */
+export const DISCIPLE_SOURCE_HEIGHT = 56;
 export const DISCIPLE_DISPLAY_HEIGHT = 56;
-export const ENEMY_SOURCE_HEIGHT = 112;
+export const ENEMY_SOURCE_HEIGHT = 56;
 export const ENEMY_DISPLAY_HEIGHT = 84;
-
-/** 首領是 50×50 格，點陣化成 8 倍。 */
-const BOSS_SOURCE_SIZE = 400;
 
 export function bossTexture(art: BossArt, frame = 0): string {
   return `boss-${art}-${frame}`;
@@ -98,17 +92,9 @@ export function enemyWalkKey(art: MobArt): string {
   return `walk-enemy-${art}`;
 }
 
-/** 各敵陣造型的 viewBox 寬度，未列出者為 46。 */
-const MOB_VIEWBOX_WIDTH: Partial<Record<MobArt, number>> = {
-  centipede: 58,
-  scorpion: 50,
-};
-
-interface SvgSpec {
+interface ArtSpec {
   key: string;
   file: string;
-  width: number;
-  height: number;
 }
 
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
@@ -118,49 +104,22 @@ const MOB_ARTS: readonly MobArt[] = [
   'bandit', 'undead', 'demon', 'celestial',
 ];
 
-const SVGS: readonly SvgSpec[] = [
+const ASSETS: readonly ArtSpec[] = [
   ...SECT_ARTS.flatMap((art) =>
     DISCIPLE_TIERS.flatMap((tier) =>
-      WALK_FRAMES.map((frame) => ({
-        key: discipleTexture(art, tier, frame),
-        file: `disciple-${art}-t${tier}-${frame}.svg`,
-        width: 80,
-        height: DISCIPLE_SOURCE_HEIGHT,
-      })),
+      WALK_FRAMES.map((frame) => ({ key: discipleTexture(art, tier, frame), file: `disciple-${art}-t${tier}-${frame}` })),
     ),
   ),
   ...MOB_ARTS.flatMap((art) =>
-    WALK_FRAMES.map((frame) => ({
-      key: enemyTexture(art, frame),
-      file: `enemy-${art}-${frame}.svg`,
-      // 蜈蚣與火蠍的 viewBox 較寬，貼圖寬度要跟著走，否則會被拉扁。
-      width: (MOB_VIEWBOX_WIDTH[art] ?? 46) * 2,
-      height: ENEMY_SOURCE_HEIGHT,
-    })),
+    WALK_FRAMES.map((frame) => ({ key: enemyTexture(art, frame), file: `enemy-${art}-${frame}` })),
   ),
-  ...GLYPH_ARTS.map((art) => ({
-    key: glyphTexture(art),
-    file: `glyph-${art}.svg`,
-    width: 64,
-    height: 80,
-  })),
-  ...ICON_NAMES.map((name) => ({
-    key: iconTexture(name),
-    file: `icon-${name}.svg`,
-    // 兩倍尺寸點陣化再縮小，和門人圖同一個理由：手機的 DPR 多半是 2 或 3。
-    width: 64,
-    height: 64,
-  })),
-  { key: ART.cloud, file: 'cloud.svg', width: 240, height: 80 },
-  { key: ART.slash, file: 'slash.svg', width: 160, height: 160 },
   ...BOSS_ARTS.flatMap((art) =>
-    WALK_FRAMES.map((frame) => ({
-      key: bossTexture(art, frame),
-      file: `boss-${art}-${frame}.svg`,
-      width: BOSS_SOURCE_SIZE,
-      height: BOSS_SOURCE_SIZE,
-    })),
+    WALK_FRAMES.map((frame) => ({ key: bossTexture(art, frame), file: `boss-${art}-${frame}` })),
   ),
+  ...GLYPH_ARTS.map((art) => ({ key: glyphTexture(art), file: `glyph-${art}` })),
+  ...ICON_NAMES.map((name) => ({ key: iconTexture(name), file: `icon-${name}` })),
+  { key: ART.cloud, file: 'cloud' },
+  { key: ART.slash, file: 'slash' },
 ];
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
@@ -191,7 +150,7 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
 export function preloadArt(scene: Phaser.Scene): void {
   // BASE_URL 在 GitHub Pages 上是 /SB-Game/，寫死路徑會 404。
   const base = import.meta.env.BASE_URL;
-  for (const svg of SVGS) {
-    scene.load.svg(svg.key, `${base}art/${svg.file}`, { width: svg.width, height: svg.height });
+  for (const asset of ASSETS) {
+    scene.load.image(asset.key, `${base}art/${asset.file}.png`);
   }
 }

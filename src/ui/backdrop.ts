@@ -251,12 +251,12 @@ export function drawBackdrop(
   g.destroy();
   layer.add(sky);
 
-  // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。雲的貼圖是 4 倍點陣化，
-  // 縮放取 0.75 與 1.5，雲上的一格才會剛好是背景的一格或兩格。
+  // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。雲的貼圖一格一點，
+  // 縮放取 3 與 6，雲上的一格才會剛好是背景的一格或兩格。
   const clouds: { y: number; scale: number; alpha: number; duration: number }[] = [
-    { y: GAME_HEIGHT * 0.13, scale: 1.5, alpha: 0.12, duration: 46000 },
-    { y: GAME_HEIGHT * 0.24, scale: 0.75, alpha: 0.1, duration: 62000 },
-    { y: GAME_HEIGHT * 0.34, scale: 1.5, alpha: 0.07, duration: 78000 },
+    { y: GAME_HEIGHT * 0.13, scale: 6, alpha: 0.12, duration: 46000 },
+    { y: GAME_HEIGHT * 0.24, scale: 3, alpha: 0.1, duration: 62000 },
+    { y: GAME_HEIGHT * 0.34, scale: 6, alpha: 0.07, duration: 78000 },
   ];
   for (const spec of clouds) {
     if (!scene.textures.exists(ART.cloud)) break;

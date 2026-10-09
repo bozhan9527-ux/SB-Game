@@ -105,7 +105,7 @@ export class DungeonScene extends Phaser.Scene {
 
     this.add
       .image(left + 42, top + 46, iconTexture(dungeon.icon as IconName))
-      .setDisplaySize(38, 38)
+      .setDisplaySize(32, 32)
       .setAlpha(available ? 1 : 0.4);
 
     const name = this.add

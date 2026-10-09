@@ -84,6 +84,7 @@ import type { CardView } from "../ui/card";
 import {
   BG_PANEL,
   DANGER,
+  EDGE,
   GOLD,
   INK,
   INK_DIM,
@@ -178,6 +179,8 @@ const FLASH_GAP_MS = 160;
 
 /** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
 const FREEZE_BOSS_HIT_MS = 28;
+/** 首領外圍光暈與火星的顏色。 */
+const BOSS_GLOW = 0xb06aff;
 const FREEZE_BOSS_HIT_GAP_MS = 500;
 const FREEZE_BOSS_KILL_MS = 160;
 const FREEZE_MERGE_MS = 24;
@@ -461,10 +464,11 @@ export class RunScene extends Phaser.Scene {
 
   private ensureSparkTexture(): void {
     if (this.textures.exists("spark")) return;
+    // 一個 3×3 的實心方塊：火花、彈道、魔焰都用它，畫面上全是方的，才和像素畫同一個世界。
     const g = this.make.graphics({ x: 0, y: 0 });
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(5, 5, 5);
-    g.generateTexture("spark", 10, 10);
+    g.fillRect(0, 0, 3, 3);
+    g.generateTexture("spark", 3, 3);
     g.destroy();
   }
 
@@ -529,13 +533,13 @@ export class RunScene extends Phaser.Scene {
     const guard = this.add
       .sprite(GAME_WIDTH / 2 - 150, GATE_Y + 34, discipleTexture(art, tier, 0))
       .setOrigin(0.5, 0.5)
-      .setScale((DISCIPLE_DISPLAY_HEIGHT * 0.8) / DISCIPLE_SOURCE_HEIGHT)
+      .setScale(DISCIPLE_DISPLAY_HEIGHT / DISCIPLE_SOURCE_HEIGHT)
       .setDepth(29);
     guard.play(discipleWalkKey(art, tier));
     const guard2 = this.add
       .sprite(GAME_WIDTH / 2 + 150, GATE_Y + 34, discipleTexture(art, tier, 0))
       .setOrigin(0.5, 0.5)
-      .setScale((DISCIPLE_DISPLAY_HEIGHT * 0.8) / DISCIPLE_SOURCE_HEIGHT)
+      .setScale(DISCIPLE_DISPLAY_HEIGHT / DISCIPLE_SOURCE_HEIGHT)
       .setDepth(29);
     guard2.play(discipleWalkKey(art, tier));
     guard2.anims.setProgress(0.5);
@@ -1663,6 +1667,7 @@ export class RunScene extends Phaser.Scene {
       if (!hitThisFrame.has(shot.enemyId)) {
         hitThisFrame.add(shot.enemyId);
         this.flashEnemy(view, shot.killed);
+        this.burst(view.x, view.y - 18, "#fff2bf", 4, 0.6);
         // 打在首領身上的每一下都是這一場的重點，給它重量。
         if (
           view.getData("boss") === true &&
@@ -1824,10 +1829,35 @@ export class RunScene extends Phaser.Scene {
         .sprite(0, 0, bossTexture(enemy.bossArt, 0))
         .setDisplaySize(150, 150);
       body.play(bossIdleKey(enemy.bossArt));
+      // 首領發光：只有 WebGL 有 preFX，Canvas 後備時就是沒有光暈，其他照常。
+      const glow = body.preFX?.addGlow(BOSS_GLOW, 3, 0, false, 0.1, 12);
+      if (glow !== undefined) {
+        this.tweens.add({
+          targets: glow,
+          outerStrength: 6,
+          duration: 900,
+          ease: "Stepped",
+          easeParams: [4],
+          yoyo: true,
+          repeat: -1,
+        });
+      }
+      // 魔焰火星：從身後往上飄的小方塊。掛在容器裡，跟著首領走。
+      const embers = this.add.particles(0, 20, "spark", {
+        x: { min: -56, max: 56 },
+        speedY: { min: -70, max: -30 },
+        speedX: { min: -10, max: 10 },
+        lifespan: { min: 600, max: 1100 },
+        scale: { start: 1.2, end: 0 },
+        alpha: { start: 0.9, end: 0 },
+        tint: [BOSS_GLOW, 0xffd6ff, hexToNumber(GOLD)],
+        frequency: 90,
+        blendMode: Phaser.BlendModes.ADD,
+      });
       // 浮動放在外面這一層：受擊時會停掉 body 自己的補間來做後退，
       // 浮動要是也掛在 body 上，被打一下就不動了。
       const hover = this.add.container(0, 0, [body]);
-      container.add([aura, hover]);
+      container.add([aura, embers, hover]);
       container.setData("body", body);
       container.setData("boss", true);
       this.tweens.add({
@@ -1870,7 +1900,7 @@ export class RunScene extends Phaser.Scene {
     // 一般妖魔各有一條小血條：沒有它就看不出「打不動」和「快死了」的差別。
     // 首領不畫，它的血量已經在畫面頂端有一條大的，畫兩條只是干擾。
     if (!enemy.boss) {
-      const barBg = this.add.rectangle(0, -56, 46, 6, 0x000000, 0.7);
+      const barBg = this.add.rectangle(0, -56, 46, 6, 0x000000, 0.7).setStrokeStyle(2, EDGE);
       const bar = this.add
         .rectangle(-23, -56, 46, 6, 0xd8434f, 1)
         .setOrigin(0, 0.5);
@@ -2074,25 +2104,43 @@ export class RunScene extends Phaser.Scene {
       card === null || card === undefined
         ? INK
         : (CARDS.find((c) => c.id === card.type)?.color ?? INK);
-    const bolt = this.add
-      .image(fromX, fromY, "spark")
-      .setDisplaySize(8, 26)
-      .setTint(hexToNumber(color))
-      .setBlendMode(Phaser.BlendModes.ADD)
-      .setDepth(30);
-    bolt.setRotation(Math.atan2(toY - fromY, toX - fromX) + Math.PI / 2);
-    this.tweens.add({
-      targets: bolt,
-      x: toX,
-      y: toY,
-      duration: Phaser.Math.Clamp(
-        Phaser.Math.Distance.Between(fromX, fromY, toX, toY) * 0.5,
-        90,
-        260,
-      ),
-      ease: "Quad.easeIn",
-      onComplete: () => bolt.destroy(),
-    });
+    // 外層是符色的光暈、內層是調亮的芯，後面再拖一小段尾巴：
+    // 加法混色疊起來，中心最亮、邊緣帶色，就是「發光」。
+    const angle = Math.atan2(toY - fromY, toX - fromX) + Math.PI / 2;
+    const tint = hexToNumber(color);
+    // 芯用符色調亮，不用純白：純白的一條在深色底上像飛來飛去的木棍。
+    const core = Phaser.Display.Color.ValueToColor(tint).lighten(30).color;
+    const duration = Phaser.Math.Clamp(
+      Phaser.Math.Distance.Between(fromX, fromY, toX, toY) * 0.5,
+      90,
+      260,
+    );
+    const parts: [number, number, number, number, number][] = [
+      // 寬, 高, 顏色, 透明度, 延遲
+      [12, 30, tint, 0.45, 0],
+      [6, 24, core, 1, 0],
+      [3, 9, tint, 0.7, 30],
+      [3, 6, tint, 0.4, 60],
+    ];
+    for (const [w, h, c, a, delay] of parts) {
+      const piece = this.add
+        .image(fromX, fromY, "spark")
+        .setDisplaySize(w, h)
+        .setTint(c)
+        .setAlpha(a)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setRotation(angle)
+        .setDepth(30);
+      this.tweens.add({
+        targets: piece,
+        x: toX,
+        y: toY,
+        delay,
+        duration,
+        ease: "Quad.easeIn",
+        onComplete: () => piece.destroy(),
+      });
+    }
   }
 
   /**
@@ -2222,11 +2270,11 @@ export class RunScene extends Phaser.Scene {
     }
   }
 
-  private burst(x: number, y: number, color: string, count: number): void {
+  private burst(x: number, y: number, color: string, count: number, size = 1): void {
     const emitter = this.add.particles(x, y, "spark", {
       speed: { min: 60, max: 200 },
       lifespan: { min: 220, max: 520 },
-      scale: { start: 0.7, end: 0 },
+      scale: { start: 1.4 * size, end: 0.3 * size },
       alpha: { start: 0.9, end: 0 },
       tint: hexToNumber(color),
       blendMode: Phaser.BlendModes.ADD,

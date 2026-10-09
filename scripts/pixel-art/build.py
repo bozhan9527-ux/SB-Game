@@ -9,15 +9,20 @@ import random
 import sys
 
 import sprites as gen
+from refine import plain, refine, write_png
 from sprites import blank, paint, put, outline, to_svg, check, GOLD, OUTLINE
 
 ART = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "public", "art")
 os.makedirs(ART, exist_ok=True)
 
 
+# 雲與斬擊是純白、遊戲裡會染色，不打明暗；其餘角色、圖騰、圖示都精修。
+PLAIN = ("cloud.svg", "slash.svg")
+
+
 def save(name, text):
-    with open(os.path.join(ART, name), "w") as f:
-        f.write(text)
+    grid = plain(text) if name in PLAIN else refine(text)
+    write_png(grid, os.path.join(ART, name.replace(".svg", ".png")))
 
 
 def inner(svg_text):

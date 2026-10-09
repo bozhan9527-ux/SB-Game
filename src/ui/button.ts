@@ -55,7 +55,10 @@ export function createButton(
   const children: Phaser.GameObjects.GameObject[] = [shadow, background, bevelLight, bevelDark, text];
 
   const hasIcon = options.icon !== undefined && scene.textures.exists(options.icon);
-  const iconSize = hasIcon ? (options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15)) : 0;
+  // 圖示是 32 點見方的像素畫，顯示尺寸往上取到 16 的倍數：縮成 22 點的話，
+  // 最近點取樣會整排整排地丟格子，圖示看起來會缺角。
+  const requested = options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15);
+  const iconSize = hasIcon ? Math.max(16, Math.ceil(requested / 16) * 16) : 0;
   const gap = 10;
 
   /**

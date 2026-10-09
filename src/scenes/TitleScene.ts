@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { libraryFloor } from '../systems/dungeons';
 import { audio } from '../audio';
 import type { IconName } from '../art';
-import { DISCIPLE_DISPLAY_HEIGHT, discipleTexture, glyphTexture, iconTexture } from '../art';
+import { discipleTexture, glyphTexture, iconTexture } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { storageUnavailable } from '../save/storage';
@@ -257,9 +257,11 @@ export class TitleScene extends Phaser.Scene {
     this.add
       .rectangle(x, y, cell - 6, cell - 6, BG_PANEL_ALT, 0.9)
       .setStrokeStyle(2, hexToNumber(sect.color));
+    // 原寸、只裁頭與上半身：格子只有 44 點，整個人縮進去會掉格子變形。
     this.add
       .image(x, y, discipleTexture(sect.art, 0, 0))
-      .setDisplaySize(DISCIPLE_DISPLAY_HEIGHT * 0.52, DISCIPLE_DISPLAY_HEIGHT * 0.62);
+      .setCrop(0, 2, 40, 42)
+      .setOrigin(0.5, 23 / 56);
     x += cell / 2 + 13;
 
     // 一條細線分開「我是誰」和「我帶什麼」——五個等距的方格會讓人以為是同一類東西。
@@ -270,7 +272,7 @@ export class TitleScene extends Phaser.Scene {
       this.add
         .rectangle(x, y, cell - 8, cell - 8, BG_PANEL_ALT, 0.9)
         .setStrokeStyle(1, hexToNumber(def.color));
-      this.add.image(x, y, glyphTexture(def.art)).setDisplaySize(23, 29);
+      this.add.image(x, y, glyphTexture(def.art));
       x += cell;
     });
 
