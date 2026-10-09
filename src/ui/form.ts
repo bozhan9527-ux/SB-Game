@@ -13,6 +13,8 @@
  * 不需要和遊戲座標對齊，也就不必處理 FIT 之後的縮放與置中。
  */
 
+import { cleanEmail } from '../net/protocol';
+
 export interface FormField {
   key: string;
   label: string;
@@ -93,7 +95,12 @@ function ensureStyle(): void {
   outline: none;
   border-color: #f0c95a;
 }
-.sb-form-error { margin: 0 0 12px; font-size: 14px; color: #e0796d; min-height: 1em; white-space: pre-line; }
+.sb-form .sb-form-error {
+  margin: 0 0 12px; font-size: 15px; color: #ff9a8f; min-height: 1em; white-space: pre-line;
+  border-left: 3px solid #e0616a; padding-left: 8px;
+}
+.sb-form .sb-form-error:empty { border-left: 0; padding-left: 0; }
+.sb-form p { text-wrap: pretty; }
 .sb-form-row { display: flex; gap: 10px; }
 .sb-form button {
   flex: 1; padding: 12px 0; border-radius: 0; font-size: 18px; cursor: pointer; font-family: inherit;
@@ -213,6 +220,17 @@ export function showForm(options: FormOptions): Promise<FormResult> {
       event.preventDefault();
       const values: Record<string, string> = {};
       for (const [key, input] of inputs) values[key] = input.value;
+      // 信箱欄先擋：全空送出時，訊息要指著第一個沒填的欄位，
+      // 不是跳到表單後面去說「密碼至少要 8 個字」。
+      for (const field of options.fields) {
+        const input = inputs.get(field.key);
+        if (field.email !== true || input === undefined) continue;
+        if (cleanEmail(input.value) === null) {
+          error.textContent = input.value.trim().length === 0 ? '先填電子信箱' : '電子信箱看起來不對';
+          input.focus();
+          return;
+        }
+      }
       const complaint = options.validate?.(values) ?? null;
       if (complaint !== null) {
         // 留在表單上：他已經打的東西不該因為一個錯字全部消失。
