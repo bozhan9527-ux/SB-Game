@@ -44,6 +44,14 @@ describe('文字排版', () => {
     expect(lines[0]).toContain('（上限 14）');
   });
 
+  it('短詞塊整塊換行時不會自己掛一行', () => {
+    const text = '【被動】符籙相生：合成有 30% 機率保留一張符；天雷符傷害 +25%';
+    const lines = wrapText(text, 452, 14).split('\n');
+    expect(lines.length).toBe(2);
+    expect(lines[1]).not.toBe('+25%');
+    expect(lines[1]).toBe('傷害 +25%');
+  });
+
   it('短字串不動它', () => {
     expect(wrapText('確定入門', 400, 20)).toBe('確定入門');
   });

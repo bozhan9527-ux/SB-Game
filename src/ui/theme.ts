@@ -81,8 +81,13 @@ export function wrapText(text: string, widthPx: number, fontSize: number): strin
   const limit = Math.max(4, widthPx / fontSize);
   const lines: string[] = [];
 
+  const minTail = Math.max(4, Math.floor(limit / FULL_WIDTH_EM / 4));
+
   for (const paragraph of text.split('\n')) {
     let line = '';
+    const start = lines.length;
+    /** 這一行是被整塊移下來的短詞塊開頭的，和上一行之間原本隔著一個空白。 */
+    let spaced = false;
     const flush = (): void => {
       if (line.length > 0) lines.push(line);
       line = '';
@@ -100,8 +105,13 @@ export function wrapText(text: string, widthPx: number, fontSize: number): strin
       // 「…11 階（上限」這一行會只寫了一半，括號也被拆到兩行。
       const long = textWidthInEm(token) > limit * 0.4;
       let chunk = long && line.length > 0 ? `${line} ` : '';
-      if (!long || line.length === 0) flush();
-      else line = '';
+      if (!long || line.length === 0) {
+        spaced = line.length > 0;
+        flush();
+      } else {
+        line = '';
+        spaced = false;
+      }
       let broke = false;
       for (const char of token) {
         if (textWidthInEm(chunk + char) > limit) {
@@ -121,13 +131,32 @@ export function wrapText(text: string, widthPx: number, fontSize: number): strin
       // 孤行：段落最後一行只掛兩三個字很難看，從上一行借字，補到一行可容納字數的四分之一（至少四個）。
       const tail = [...chunk];
       const prev = [...(lines[lines.length - 1] ?? '')];
-      const minTail = Math.max(4, Math.floor(limit / FULL_WIDTH_EM / 4));
       const need = minTail - tail.length;
       if (broke && need > 0 && prev.length - need >= minTail) {
         lines[lines.length - 1] = prev.slice(0, -need).join('');
         chunk = prev.slice(-need).join('') + chunk;
       }
       line = chunk;
+      if (broke) spaced = false;
+    }
+    // 短詞塊整塊換行也會變孤行（「+25%」自己一行）：從上一行尾巴借中文字下來。
+    // 這裡只補到四個字寬：借太多會把詞拆開（「天｜雷符傷害 +25%」）。
+    const tokenTail = 4;
+    if (spaced && lines.length > start && textWidthInEm(line) < tokenTail) {
+      const prev = [...(lines[lines.length - 1] ?? '')];
+      let borrowed = '';
+      while (
+        prev.length > minTail &&
+        prev[prev.length - 1] !== ' ' &&
+        (textWidthInEm(borrowed + ' ' + line) < tokenTail ||
+          NO_LINE_START.test(borrowed.charAt(0)))
+      ) {
+        borrowed = (prev.pop() ?? '') + borrowed;
+      }
+      if (borrowed.length > 0 && textWidthInEm(`${borrowed} ${line}`) <= limit) {
+        lines[lines.length - 1] = prev.join('');
+        line = `${borrowed} ${line}`;
+      }
     }
     flush();
   }

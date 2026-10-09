@@ -70,8 +70,9 @@ export class SectScene extends Phaser.Scene {
       this.buildCard(sect, cx, y, cardHeight);
     });
 
-    const confirm = createButton(this, cx, 896, {
-      width: 340,
+    // 返回在左、確定在右，兩顆並排不重疊：返回 26～130，確定 146～514。
+    const confirm = createButton(this, 330, 896, {
+      width: 368,
       height: 66,
       label: '確定入門',
       fontSize: 26,
@@ -89,8 +90,8 @@ export class SectScene extends Phaser.Scene {
     });
     this.confirm = confirm;
 
-    createButton(this, 74, 896, {
-      width: 96,
+    createButton(this, 78, 896, {
+      width: 104,
       height: 70,
       label: '返回',
       fontSize: 22,
@@ -98,7 +99,7 @@ export class SectScene extends Phaser.Scene {
     });
 
     this.costLabel = this.add
-      .text(cx, 848, '', textStyle({ size: 18, color: GOLD }))
+      .text(330, 848, '', textStyle({ size: 18, color: GOLD }))
       .setOrigin(0.5);
 
     this.refresh();
