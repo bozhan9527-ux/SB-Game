@@ -23,6 +23,7 @@ import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { DANGER, GOLD, INK, INK_DIM, JADE, textStyle, wrapText } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
+import { showForm } from '../ui/form';
 
 /** 版面。每一段的高度都是算過的，加東西就要重算——這是 PROGRESS 的 L-08。 */
 const RECORDS_TOP = 92;
@@ -118,7 +119,7 @@ export class ArchiveScene extends Phaser.Scene {
       height: 56,
       label: '匯入　貼上',
       fontSize: 20,
-      onClick: () => this.doImport(),
+      onClick: () => void this.doImport(),
     });
 
     this.status = this.add
@@ -306,19 +307,36 @@ export class ArchiveScene extends Phaser.Scene {
     }
   }
 
-  private doImport(): void {
-    const raw = window.prompt('貼上存檔碼：', '');
-    if (raw === null) return;
-    const result = importCode(raw);
+  /**
+   * 匯入。用遊戲內的表單，不用 window.prompt／confirm：
+   * 瀏覽器的對話框長得像錯誤訊息，部分 App 內建瀏覽器還會直接忽略它（見 ui/form.ts）。
+   */
+  private async doImport(): Promise<void> {
+    const values = await showForm({
+      title: '匯入存檔',
+      note: '貼上之前「匯出　複製」得到的存檔碼。',
+      fields: [{ key: 'code', label: '存檔碼', placeholder: '貼在這裡' }],
+      submit: '匯入',
+      // 碼不對就留在表單上說明原因，不關掉——貼錯一次就要重開表單重貼，很煩。
+      validate: (input) => {
+        const check = importCode(input.code ?? '');
+        return check.ok ? null : check.reason;
+      },
+    });
+    if (values === null) return;
+    const result = importCode(values.code ?? '');
     if (!result.ok) {
       this.say(result.reason, DANGER);
       return;
     }
     const current = state();
-    const confirmed = window.confirm(
-      `匯入會覆蓋目前的進度（第 ${current.world.stage} 關、金幣 ${Math.floor(current.player.wallet.gold)}）。要繼續嗎？`,
-    );
-    if (!confirmed) {
+    const confirmed = await showForm({
+      title: '覆蓋目前的進度？',
+      note: `目前是第 ${current.world.stage} 關、金幣 ${Math.floor(current.player.wallet.gold)}。\n匯入後會換成存檔碼裡的進度，這一步不能復原。`,
+      fields: [],
+      submit: '覆蓋匯入',
+    });
+    if (confirmed === null) {
       this.say('已取消，目前的進度沒有動。', INK_DIM);
       return;
     }
