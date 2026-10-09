@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修仙遊戲視覺升級對比</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --gold: #e8c46a;
+            --jade: #7fdba0;
+            --danger: #e0616a;
+            --gold-glow: #f5d76e;
+            --jade-glow: #9fffc8;
+            --bg-deep: #0d1116;
+            --bg-panel: #161d24;
+            --ink: #e9e2cf;
+            --ink-dim: #9a917c;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0d1116 0%, #161d24 100%);
+            color: var(--ink);
+            font-family: "PingFang TC", "Noto Sans TC", sans-serif;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: var(--gold);
+            text-shadow: 0 0 20px rgba(232, 196, 106, 0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--ink-dim);
+            margin-bottom: 50px;
+            font-size: 1.1em;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .side {
+            padding: 30px;
+            border-radius: 10px;
+            background: rgba(22, 29, 36, 0.8);
+            border: 2px solid var(--ink-dim);
+        }
+
+        .side.after {
+            border: 2px solid var(--gold);
+            box-shadow: 0 0 20px rgba(232, 196, 106, 0.2),
+                        inset 0 1px 0 rgba(232, 196, 106, 0.1);
+        }
+
+        .side h2 {
+            font-size: 1.8em;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .side.before h2 {
+            color: var(--ink-dim);
+        }
+
+        .side.after h2 {
+            color: var(--gold);
+            text-shadow: 0 0 15px rgba(232, 196, 106, 0.3);
+        }
+
+        .component {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(13, 17, 22, 0.6);
+            border-radius: 8px;
+        }
+
+        .component-name {
+            font-size: 0.9em;
+            color: var(--ink-dim);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* 升級前的按鈕 */
+        .button-before {
+            width: 100%;
+            padding: 12px;
+            background: #1e2730;
+            border: 2px solid #3a4652;
+            color: var(--ink);
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .button-before:hover {
+            border-color: var(--gold);
+        }
+
+        /* 升級後的按鈕 */
+        .button-after {
+            width: 100%;
+            padding: 12px;
+            background: #1e2730;
+            border: 2px solid var(--gold);
+            color: var(--ink);
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3),
+                        0 0 12px rgba(232, 196, 106, 0.2);
+            position: relative;
+        }
+
+        .button-after::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border: 1px solid rgba(245, 215, 110, 0.3);
+            border-radius: 6px;
+            pointer-events: none;
+        }
+
+        .button-after:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4),
+                        0 0 20px rgba(232, 196, 106, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* 卡牌 */
+        .card-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .card-before {
+            width: 80px;
+            height: 100px;
+            background: #ffffff;
+            border: 2px solid #3a4652;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            color: var(--gold);
+        }
+
+        .card-after {
+            width: 80px;
+            height: 100px;
+            background: #ffffff;
+            border: 2px solid var(--gold);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            color: var(--gold);
+            box-shadow: 0 0 15px rgba(232, 196, 106, 0.4),
+                        0 0 25px rgba(232, 196, 106, 0.15);
+            position: relative;
+        }
+
+        .card-after::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 1px solid rgba(232, 196, 106, 0.5);
+            border-radius: 6px;
+            pointer-events: none;
+        }
+
+        /* 面板 */
+        .panel-before {
+            background: var(--bg-panel);
+            border: 2px solid #3a4652;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .panel-after {
+            background: var(--bg-panel);
+            border: 2px solid var(--gold);
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            line-height: 1.6;
+            box-shadow: 0 0 20px rgba(232, 196, 106, 0.15),
+                        inset 0 1px 0 rgba(232, 196, 106, 0.1),
+                        0 -2px 8px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .panel-after::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border: 1px solid rgba(245, 215, 110, 0.2);
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        .panel-after::after {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 12px;
+            height: 12px;
+            background: var(--gold);
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        /* 特性列表 */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+            padding-top: 40px;
+            border-top: 1px solid rgba(232, 196, 106, 0.2);
+        }
+
+        .feature {
+            padding: 25px;
+            background: rgba(232, 196, 106, 0.05);
+            border-left: 3px solid var(--gold);
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .feature:hover {
+            background: rgba(232, 196, 106, 0.1);
+            box-shadow: 0 0 15px rgba(232, 196, 106, 0.15);
+        }
+
+        .feature h3 {
+            color: var(--gold);
+            margin-bottom: 12px;
+            font-size: 1.2em;
+        }
+
+        .feature p {
+            color: var(--ink-dim);
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        @media (max-width: 768px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .side {
+                padding: 20px;
+            }
+        }
+
+        .glow-effect {
+            display: inline-block;
+            color: var(--gold);
+            text-shadow: 0 0 10px rgba(232, 196, 106, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                text-shadow: 0 0 10px rgba(232, 196, 106, 0.5);
+            }
+            50% {
+                text-shadow: 0 0 20px rgba(232, 196, 106, 0.8);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ 修仙遊戲視覺升級對比</h1>
+        <p class="subtitle">從簡單線條到精緻修仙風格的蛻變</p>
+
+        <div class="comparison">
+            <!-- 升級前 -->
+            <div class="side before">
+                <h2>升級前</h2>
+
+                <div class="component">
+                    <div class="component-name">按鈕</div>
+                    <button class="button-before">開始挑戰</button>
+                </div>
+
+                <div class="component">
+                    <div class="component-name">符牌</div>
+                    <div class="card-container">
+                        <div class="card-before">劍</div>
+                        <div class="card-before">盾</div>
+                        <div class="card-before">火</div>
+                    </div>
+                </div>
+
+                <div class="component">
+                    <div class="component-name">信息面板</div>
+                    <div class="panel-before">
+                        境界：煉氣初期<br>
+                        經驗：2350/5000<br>
+                        金幣：15,680
+                    </div>
+                </div>
+
+                <div class="component">
+                    <div class="component-name">特點</div>
+                    <ul style="margin-left: 20px; color: var(--ink-dim);">
+                        <li>簡單線條邊框</li>
+                        <li>最小視覺層次</li>
+                        <li>基礎顏色區分</li>
+                        <li>無光暈效果</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 升級後 -->
+            <div class="side after">
+                <h2>升級後 <span class="glow-effect">✨</span></h2>
+
+                <div class="component">
+                    <div class="component-name">按鈕</div>
+                    <button class="button-after">開始挑戰</button>
+                </div>
+
+                <div class="component">
+                    <div class="component-name">符牌</div>
+                    <div class="card-container">
+                        <div class="card-after">劍</div>
+                        <div class="card-after">盾</div>
+                        <div class="card-after">火</div>
+                    </div>
+                </div>
+
+                <div class="component">
+                    <div class="component-name">信息面板</div>
+                    <div class="panel-after">
+                        境界：煉氣初期<br>
+                        經驗：2350/5000<br>
+                        金幣：15,680
+                    </div>
+                </div>
+
+                <div class="component">
+                    <div class="component-name">升級特點</div>
+                    <ul style="margin-left: 20px; color: var(--gold);">
+                        <li>✨ 光暈邊框效果</li>
+                        <li>🎭 多層次視覺深度</li>
+                        <li>💫 陰影與發光效果</li>
+                        <li>🌟 點擊粒子反饋</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新增效果特性 -->
+        <div class="features">
+            <div class="feature">
+                <h3>🎨 按鈕增強</h3>
+                <p>陰影效果增加深度感，外層光暈邊框提升修仙質感，點擊時觸發上升靈光粒子</p>
+            </div>
+
+            <div class="feature">
+                <h3>🃏 符牌提升</h3>
+                <p>邊框光暈與卡牌顏色相配，增強視覺識別度，強化修仙遊戲的沉浸感</p>
+            </div>
+
+            <div class="feature">
+                <h3>🖼️ 面板框架</h3>
+                <p>傳統中式邊框設計，四角裝飾，整體光暈效果，營造修仙風格視覺統一</p>
+            </div>
+
+            <div class="feature">
+                <h3>📋 表單美化</h3>
+                <p>輸入框聚焦時發光，按鈕懸停動畫，整體框架發光邊框，增強交互反饋</p>
+            </div>
+
+            <div class="feature">
+                <h3>🎚️ 拉條優化</h3>
+                <p>填充條光暈效果，把手周圍發光圈，實時反映調整狀態，視覺流暢優雅</p>
+            </div>
+
+            <div class="feature">
+                <h3>✨ 粒子系統</h3>
+                <p>環境光影粒子、靈光上升、旋轉軌跡、下落粒子雨等多種視覺效果</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
