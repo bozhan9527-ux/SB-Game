@@ -239,13 +239,15 @@ export class TitleScene extends Phaser.Scene {
       .text(
         cx,
         top + 116,
-        omen !== null
-          ? `奇遇「${omen.name}」　${omenSummary(omen)}`
-          : tribulations.length > 0
-            ? `本關天劫：${tribulationNames(tribulations)}`
-            : toBreak > 900
-              ? '已至無盡飛升境'
-              : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
+        omen !== null && tribulations.length > 0
+          ? `奇遇「${omen.name}」・天劫：${tribulationNames(tribulations)}`
+          : omen !== null
+            ? `奇遇「${omen.name}」　${omenSummary(omen)}`
+            : tribulations.length > 0
+              ? `本關天劫：${tribulationNames(tribulations)}`
+              : toBreak > 900
+                ? '已至無盡飛升境'
+                : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
         textStyle({ size: 17, color: omen !== null ? JADE : tribulations.length > 0 ? '#9fd8ff' : GOLD }),
       )
       .setOrigin(0.5);

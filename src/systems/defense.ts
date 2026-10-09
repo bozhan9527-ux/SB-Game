@@ -697,6 +697,9 @@ function frontMost(state: DefenseState, count: number): ActiveEnemy[] {
     .slice(0, count);
 }
 
+/** 隱：走過全程的這個比例之後就不再隱身。 */
+const PHASE_REVEAL_AT = 0.75;
+
 /**
  * 隱：這一刻是不是隱身（打不到）。
  *
@@ -705,6 +708,8 @@ function frontMost(state: DefenseState, count: number): ActiveEnemy[] {
  */
 export function isHidden(state: DefenseState, enemy: ActiveEnemy): boolean {
   if (enemy.trait !== "phase") return false;
+  // 走到最後一段就現形：在山門口隱身溜進去，玩家沒有任何操作可以應對。
+  if (enemy.y >= BALANCE.wave.trackPx * PHASE_REVEAL_AT) return false;
   const { phaseCycleMs, phaseHiddenMs } = BALANCE.trait;
   return (state.elapsedMs + enemy.id * 397) % phaseCycleMs < phaseHiddenMs;
 }
@@ -1448,7 +1453,9 @@ function spawnMinions(
       boss: false,
       hp,
       maxHp: hp,
-      y: boss.y,
+      // 最前只到半條路：首領停在山門砸門時若就地生成，護衛下一拍就攻進山門，
+      // 玩家連看都來不及看——那不是招式，是扣血。從後方趕來才有應對的時間。
+      y: Math.min(boss.y, BALANCE.wave.trackPx * MINION_FRONT_LIMIT),
       lane: Math.max(0, Math.min(LANES - 1, boss.lane + offset)),
       speed: mobSpeed(state.threat) * def.speedMultiplier * state.loadout.mobSpeedMultiplier,
       slowUntilMs: 0,
@@ -1466,6 +1473,9 @@ function spawnMinions(
     report.spawned.push(minion);
   }
 }
+
+/** 召喚物最前出現在全程的哪裡（見 spawnMinions）。 */
+const MINION_FRONT_LIMIT = 0.5;
 
 /** 首領當前的血量比例，沒有首領在場時為 null。 */
 export function bossProgress(

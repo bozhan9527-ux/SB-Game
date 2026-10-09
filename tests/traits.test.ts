@@ -188,6 +188,8 @@ describe('轉世加成的習性', () => {
     for (const [index, entry] of hardened.entries()) {
       const base = plain[index];
       if (base === undefined || entry.trait === 'none') continue;
+      // 「隱」不打折（它的懲罰在最後一段已經拿掉），沒有折扣就沒有深淺可比。
+      if (traitHpRatioOf(entry.trait) === 1) continue;
       const fullDiscount = base.hp * traitHpRatioOf(entry.trait);
       expect(entry.hp).toBeGreaterThan(fullDiscount);
       expect(entry.hp).toBeLessThanOrEqual(base.hp);

@@ -69,12 +69,12 @@
     "splitCount": 2,
     "splitHpRatio": 0.24,
     "splitSpeedMultiplier": 1.15,
-    "regenHpRatio": 0.8,
-    "regenPerSecond": 0.06,
-    "phaseHpRatio": 0.8,
+    "regenHpRatio": 0.86,
+    "regenPerSecond": 0.05,
+    "phaseHpRatio": 0.88,
     "phaseCycleMs": 3000,
-    "phaseHiddenMs": 1000,
-    "wardHpRatio": 0.75,
+    "phaseHiddenMs": 800,
+    "wardHpRatio": 0.95,
     "wardHits": 3
   },
   "sect": {

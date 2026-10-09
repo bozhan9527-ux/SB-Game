@@ -187,6 +187,8 @@ const FLASH_GAP_MS = 160;
  * 加上外圈的光暈，玩家幾乎看不到首領長什麼樣子。
  */
 const BOSS_FLASH_GAP_MS = 450;
+/** 首領幻身的底色。 */
+const SHADE_TINT = 0xc8a0ff;
 /** 封印的顏色。和首領的紫色光暈同一系，一看就知道是首領幹的。 */
 const SEAL_COLOR = "#b98cff";
 /** 施展招式時公告帶上的那半句後果。 */
@@ -303,6 +305,8 @@ export class RunScene extends Phaser.Scene {
   /** 這一場帶著的關間奇遇。 */
   private omen: OmenDef | null = null;
   private introEndsAt = 0;
+  /** 提示帶什麼時候空出來。 */
+  private hintFreeAt = 0;
   private bossText: Phaser.GameObjects.Text | null = null;
   private discardZone!: Phaser.GameObjects.Rectangle;
   /** 落點框：拖曳中跟著磁吸移動，停在符會落下的那一格。 */
@@ -469,6 +473,9 @@ export class RunScene extends Phaser.Scene {
     // Phaser 重用 Scene 實例，這幾個單場狀態不清就會帶進下一關。
     this.paused = false;
     this.freezeMs = 0;
+    this.hintFreeAt = 0;
+    this.introEndsAt = 0;
+    this.introParts = [];
     this.selected = null;
     this.pauseOverlay = undefined;
     this.speed = SPEED_STEPS.includes(save.settings.speed as 1 | 2 | 3)
@@ -522,7 +529,8 @@ export class RunScene extends Phaser.Scene {
     // 帶著奇遇開場要講一次，玩家才知道這一場的數字為什麼和上一場不一樣。
     // banner 會自己排到開場說明之後。
     if (this.omen !== null) {
-      this.banner("hint", `奇遇「${this.omen.name}」：${omenSummary(this.omen)}`, GOLD, 3200);
+      // 主畫面已經寫過一次，這裡只是提醒——停短一點，別在第一波上場時還佔著畫面。
+      this.banner("hint", `奇遇「${this.omen.name}」：${omenSummary(this.omen)}`, GOLD, 2200);
     }
     // 天劫同理：開場就講清楚這一關多了什麼條件。
     const tribulations = this.run.loadout.tribulations;
@@ -531,7 +539,7 @@ export class RunScene extends Phaser.Scene {
         "hint",
         `天劫降臨——${tribulations.map((item) => `${item.name}：${item.desc}`).join("；")}`,
         "#9fd8ff",
-        4200,
+        3000,
       );
     }
     else this.refreshCoach();
@@ -1973,6 +1981,21 @@ export class RunScene extends Phaser.Scene {
       }
       this.refreshCards();
     }
+    // 幻身染成首領光暈的紫、半透明：它們用的是一般妖魔的造型，
+    // 不這樣做就只是「突然多了三隻怪」，看不出是首領分出來的。
+    if (kind === "mirror" || kind === "summon") {
+      for (const enemy of report.spawned) {
+        const view = this.enemySprites.get(enemy.id);
+        const body = view?.getData("body") as EnemyBody | undefined;
+        if (view === undefined || body === undefined) continue;
+        if (kind === "mirror") {
+          body.setTint(SHADE_TINT);
+          view.setData("baseTint", SHADE_TINT);
+          view.setAlpha(0.78);
+        }
+        this.burst(view.x, view.y, SEAL_COLOR, 8, 0.8);
+      }
+    }
     const bossView = this.bossView();
     if (bossView !== null && (kind === "charge" || kind === "rage")) {
       this.burst(bossView.x, bossView.y + 40, "#f0c95a", 10, 1);
@@ -2256,7 +2279,11 @@ export class RunScene extends Phaser.Scene {
       const tintUntil = view.getData("tintUntil") as number | undefined;
       if (tintUntil !== undefined && this.time.now >= tintUntil) {
         view.setData("tintUntil", undefined);
-        (view.getData("body") as EnemyBody | undefined)?.clearTint();
+        // 有底色的（幻身）閃完回到底色，沒有的才清掉。
+        const body = view.getData("body") as EnemyBody | undefined;
+        const baseTint = view.getData("baseTint") as number | undefined;
+        if (baseTint !== undefined) body?.setTint(baseTint);
+        else body?.clearTint();
         (view.getData("flashCopy") as Phaser.GameObjects.Sprite | undefined)?.setVisible(false);
       }
       if (enemy.boss) {
@@ -2801,6 +2828,17 @@ export class RunScene extends Phaser.Scene {
       );
       return;
     }
+    // 提示一則一則來。奇遇、天劫、首領招式的說明可能同一刻排到，
+    // 直接覆蓋的話只看得到最後一則——前面的等於沒講。
+    if (kind === "hint") {
+      if (this.time.now < this.hintFreeAt) {
+        this.time.delayedCall(this.hintFreeAt - this.time.now, () =>
+          this.banner(kind, text, color, holdMs),
+        );
+        return;
+      }
+      this.hintFreeAt = this.time.now + holdMs + 400;
+    }
     const topEdge = this.fieldTopEdge();
     let box = kind === "notice" ? this.noticeBox : this.hintBox;
     if (box === undefined || !box.text.active) {
@@ -3072,12 +3110,15 @@ export class RunScene extends Phaser.Scene {
  * 這一場的紀錄當然也對不上伺服器，那不重要——它本來就不該上榜。
  */
 function applyDebugBoss(run: DefenseState): void {
-  const kind = new URLSearchParams(window.location.search).get("debugBoss");
+  const params = new URLSearchParams(window.location.search);
+  const kind = params.get("debugBoss");
+  // 血量倍率可調：看狂暴、分身這種半血才觸發的招式時要打得到半血。
+  const hpScale = Number(params.get("debugBossHp") ?? "10") || 10;
   if (kind === null) return;
   const sample = ENEMIES.bosses.find((boss) => boss.skill === kind);
   if (sample === undefined) return;
   run.bossDef = { ...run.bossDef, skill: sample.skill, skillName: sample.skillName };
   run.queue = run.queue
     .filter((entry) => entry.boss)
-    .map((entry) => ({ ...entry, atMs: 1500, hp: entry.hp * 10 }));
+    .map((entry) => ({ ...entry, atMs: 1500, hp: entry.hp * hpScale }));
 }
