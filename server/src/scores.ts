@@ -17,6 +17,7 @@
 import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
 import { LIMITS, ipKey, sweep, take, tooMany } from './limits';
+import { omenRulesValid } from '../../src/systems/omens';
 import { REPLAY_CONTRACT_VERSION, anonName, isBoardKind, trackOfBoard } from '../../src/net/protocol';
 import type {
   LeaderboardEntry,
@@ -104,7 +105,7 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   const depth = Number(record['sectDepth'] ?? 0);
 
   // 副本規則每一條都只讓這一場更難，所以不必夾——照收，
-  // 否則在副本裡通關的玩家永遠驗不過。
+  // 否則在副本裡通關的玩家永遠驗不過。唯一的例外是關間奇遇，見 submitScore 的驗證。
   const rulesRaw = record['rules'];
   const rules: string[] = Array.isArray(rulesRaw)
     ? rulesRaw.filter((id): id is string => typeof id === 'string')
@@ -304,6 +305,12 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   const input = { stage: claimed, runs, totalSteps: steps, actions, tutorial };
   const rejection = validateReplay(input);
   if (rejection !== null) return fail('rejected', env, origin, rejection);
+
+  // 關間奇遇是規則裡唯一可能讓一場**變好打**的東西，所以它不能照收：
+  // 給過哪三個選項是由上一關與挑戰次數決定的，算一次就知道宣稱的那個有沒有被給過。
+  if (!omenRulesValid(loadout.rules, claimed, runs)) {
+    return fail('rejected', env, origin, '這一場帶的奇遇對不上');
+  }
 
   const board = boardOf(record['board']);
   if (board === null) return fail('badRequest', env, origin, '不認得這個榜');

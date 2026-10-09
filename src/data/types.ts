@@ -810,3 +810,24 @@ export interface ChallengeDef {
   /** 幾關之後才開放。太早開只會讓新玩家用它把自己卡死。 */
   minStage: number;
 }
+
+/**
+ * 關間奇遇。
+ *
+ * 過關之後偶爾遇到，三選一（或不理會），**只影響下一場主線**。
+ * 欄位都是倍率（1 為不變），tierBonus 是階數上限加值。
+ * 大多數奇遇是「拿一樣、付一樣」的交換——純好處的只有少數幾個，而且幅度小。
+ */
+export interface OmenDef {
+  id: string;
+  name: string;
+  /** 一句情境。效果另外由程式依倍率組成，不寫死在文字裡，免得兩邊對不上。 */
+  flavor: string;
+  disciples: number;
+  damage: number;
+  drawSpeed: number;
+  gold: number;
+  mobHp: number;
+  bossTime: number;
+  tierBonus: number;
+}

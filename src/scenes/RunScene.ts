@@ -19,7 +19,8 @@ import {
 } from "../art";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { BALANCE, CARDS, ENEMIES, bossSkill } from "../data";
-import type { BossSkillKind, MobTrait } from "../data/types";
+import type { BossSkillKind, MobTrait, OmenDef } from "../data/types";
+import { omenById, omenRule, omenSummary } from "../systems/omens";
 import { persist, state } from "../state";
 import type { ReplayAction, ReplayActionInput } from "../systems/replay";
 import {
@@ -295,6 +296,8 @@ export class RunScene extends Phaser.Scene {
   private bossSkillTag: Phaser.GameObjects.Text | null = null;
   /** 開場的境界名與說明框。它和公告條佔同一塊位置，公告要出來時得知道它還在不在。 */
   private introParts: Phaser.GameObjects.GameObject[] = [];
+  /** 這一場帶著的關間奇遇。 */
+  private omen: OmenDef | null = null;
   private introEndsAt = 0;
   private bossText: Phaser.GameObjects.Text | null = null;
   private discardZone!: Phaser.GameObjects.Rectangle;
@@ -420,10 +423,28 @@ export class RunScene extends Phaser.Scene {
     const entry = this.dungeonRun;
     const dungeon = entry === null ? null : dungeonById(entry.id);
     // 副本走同一個組裝函式，只是規則、倍率與深度由副本填。
-    const spec =
+    let spec =
       dungeon === null || entry === null
         ? loadoutSpecOf(save, this.replayStage ?? save.world.stage)
         : dungeonSpecOf(save, dungeon, entry.floor);
+    // 關間奇遇：只給「緊接著的那一場主線」。不管這一場用不用得上，開場就把它收掉——
+    // 留著的話，先去打一場副本再回來，它還會在，而伺服器那邊已經驗不過了。
+    this.omen = null;
+    const pending = save.player.omen;
+    if (pending !== null) {
+      const omen = omenById(pending.id);
+      const fits =
+        dungeon === null &&
+        this.replayStage === null &&
+        pending.stage === spec.stage &&
+        pending.runs === save.world.runs;
+      if (omen !== null && fits) {
+        spec = { ...spec, rules: [...spec.rules, omenRule(omen.id)] };
+        this.omen = omen;
+      }
+      save.player.omen = null;
+      persist();
+    }
     const stage = spec.stage;
     const loadout = buildLoadoutFromSpec(spec);
     // **配置在這裡就記下來，和種子同一個理由。**
@@ -494,6 +515,11 @@ export class RunScene extends Phaser.Scene {
     this.refreshCards();
     this.updateHud();
     if (this.step === "done") this.showIntro(realm.color);
+    // 帶著奇遇開場要講一次，玩家才知道這一場的數字為什麼和上一場不一樣。
+    // banner 會自己排到開場說明之後。
+    if (this.omen !== null) {
+      this.banner("hint", `奇遇「${this.omen.name}」：${omenSummary(this.omen)}`, GOLD, 3200);
+    }
     else this.refreshCoach();
 
     // 與 stage_end 成對。兩者的差就是中離——沒有它，「第幾關流失」只看得到一半。

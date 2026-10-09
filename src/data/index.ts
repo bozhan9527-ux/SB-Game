@@ -17,6 +17,7 @@ import karmaJson from '../../data/karma.json';
 import challengesJson from '../../data/challenges.json';
 import dungeonsJson from '../../data/dungeons.json';
 import bossSkillsJson from '../../data/boss-skills.json';
+import omensJson from '../../data/omens.json';
 
 import { ICON_NAMES } from './types';
 import type {
@@ -28,6 +29,7 @@ import type {
   BossDef,
   BossSkillDef,
   BossSkillKind,
+  OmenDef,
   CardDef,
   CardEffect,
   ChallengeDef,
@@ -473,7 +475,35 @@ export function parseBossSkills(raw: unknown, path = 'boss-skills.json'): BossSk
   return skills;
 }
 
+export function parseOmens(raw: unknown, path = 'omens.json'): OmenDef[] {
+  const omens = list(raw, path, (item, p) => ({
+    id: str(item, 'id', p),
+    name: str(item, 'name', p),
+    flavor: str(item, 'flavor', p),
+    disciples: num(item, 'disciples', p),
+    damage: num(item, 'damage', p),
+    drawSpeed: num(item, 'drawSpeed', p),
+    gold: num(item, 'gold', p),
+    mobHp: num(item, 'mobHp', p),
+    bossTime: num(item, 'bossTime', p),
+    tierBonus: num(item, 'tierBonus', p),
+  }));
+  assertUniqueIds(omens, path);
+  for (const omen of omens) {
+    for (const key of ['disciples', 'damage', 'drawSpeed', 'gold', 'mobHp', 'bossTime'] as const) {
+      if (omen[key] <= 0) throw new DataError(path, `奇遇 ${omen.id} 的 ${key} 必須大於 0`);
+    }
+    if (!Number.isInteger(omen.tierBonus) || omen.tierBonus < 0) {
+      throw new DataError(path, `奇遇 ${omen.id} 的 tierBonus 必須是非負整數`);
+    }
+  }
+  // 一次給三選一，少於三個就湊不齊。
+  if (omens.length < 3) throw new DataError(path, '奇遇至少要有三個');
+  return omens;
+}
+
 export const BALANCE: Balance = parseBalance(balanceJson);
+export const OMENS: readonly OmenDef[] = parseOmens(omensJson);
 export const BOSS_SKILLS: readonly BossSkillDef[] = parseBossSkills(bossSkillsJson);
 
 /** 查一種招式的參數。資料驗證保證每一種都有，查不到是程式錯誤。 */

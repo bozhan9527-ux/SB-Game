@@ -315,6 +315,7 @@ export function buildSpawnQueue(
   stage: number,
   rng: Rng,
   traitChance = 0,
+  hpMultiplier = 1,
 ): { queue: SpawnEntry[]; boss: BossDef } {
   const { wave: cfg } = BALANCE;
   const realm = realmForStage(stage);
@@ -353,7 +354,7 @@ export function buildSpawnQueue(
         art: mob?.art ?? "bandit",
         bossArt: null,
         boss: false,
-        hp: hp * hpRatio,
+        hp: hp * hpRatio * hpMultiplier,
         speed:
           trait === "swift" ? speed * BALANCE.trait.swiftMultiplier : speed,
         trait,
@@ -369,7 +370,7 @@ export function buildSpawnQueue(
     bossArt: boss.art,
     boss: true,
     // 帶招式的首領血量打折：招式換的是打法，不是單純加難度（見 BossSkillDef.hpRatio）。
-    hp: bossHp(stage) * bossSkill(boss.skill).hpRatio,
+    hp: bossHp(stage) * bossSkill(boss.skill).hpRatio * hpMultiplier,
     speed: BALANCE.boss.speed,
     // 首領不帶習性：牠已經有厚血、砸門與時限三件事，再加一層只會變得看不懂。
     trait: "none",
@@ -420,6 +421,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     loadout.threat,
     rng,
     loadout.traitChance,
+    loadout.mobHpMultiplier,
   );
 
   const hand: (Card | null)[] = new Array<Card | null>(field.handSlots).fill(
@@ -1177,6 +1179,7 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
     state.threat,
     rng,
     state.loadout.traitChance,
+    state.loadout.mobHpMultiplier,
   );
   const offset = state.elapsedMs + BALANCE.wave.waveIntervalMs * 0.5;
   state.queue = queue.map((entry) => ({ ...entry, atMs: entry.atMs + offset }));
@@ -1328,7 +1331,7 @@ function spawnMinions(
   const mob = mobs[rng.int(0, Math.max(0, mobs.length - 1))];
   const hp = Math.max(
     1,
-    waveHp(state.threat, BALANCE.wave.wavesPerStage) * def.amount,
+    waveHp(state.threat, BALANCE.wave.wavesPerStage) * def.amount * state.loadout.mobHpMultiplier,
   );
   for (let i = 0; i < def.count; i += 1) {
     // 從首領兩側往外排，不和首領疊在同一路。

@@ -3,6 +3,9 @@ import { pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { CARDS } from "../data";
+import type { OmenDef } from "../data/types";
+import { omenEffects, omenOffer } from "../systems/omens";
+import { burstPixels, floatLabel } from "../ui/effects";
 import { recordClear, recordDefeat, recordDungeonRun, recordReplay } from "../save";
 import { dungeonById, grantFloor, nextOpenFloor } from "../systems/dungeons";
 import { detectAchievements } from "../systems/achievements";
@@ -80,6 +83,12 @@ export class ResultScene extends Phaser.Scene {
     const gold = result.replay ? 0 : result.goldCollected + result.goldReward;
     const dungeon =
       result.dungeon === null ? null : dungeonById(result.dungeon.id);
+    // 奇遇看的是「這一場」的挑戰次數，記帳之後它就往前走了，所以先記下來。
+    const runsBefore = save.world.runs;
+    const omens =
+      result.victory && !result.replay && result.dungeon === null
+        ? omenOffer(result.stage, runsBefore)
+        : [];
     // 副本的一場走另一條記帳：給錢、算次數，但不動主線進度。
     if (result.replay) recordReplay(save);
     else if (result.dungeon !== null) recordDungeonRun(save, gold);
@@ -124,6 +133,12 @@ export class ResultScene extends Phaser.Scene {
     // 只判定達成，不入帳——獎勵要玩家自己到仙途錄領。
     const unlocked = detectAchievements(save);
     persist();
+    if (omens.length > 0) {
+      // 結算表先讓玩家看一眼，再浮出奇遇：一進來就蓋住，連這一場打得怎樣都看不到。
+      this.time.delayedCall(700, () =>
+        this.showOmenPicker(omens, result.stage + 1, runsBefore + 1),
+      );
+    }
     const afterRealm = realmForStage(save.world.stage);
     const breakthrough = result.victory && afterRealm.id !== beforeRealm.id;
 
@@ -479,6 +494,105 @@ export class ResultScene extends Phaser.Scene {
   }
 
   /** 回傳面板底緣的 y，讓上層知道下一行可以從哪裡開始寫。 */
+  /**
+   * 關間奇遇：三選一，或不理會。選了就記進存檔，下一場主線開場時套用。
+   *
+   * 整個蓋在結算頁上面，底下的按鈕在選完之前按不到——
+   * 不擋的話，玩家順手按了「下一關」，奇遇就這樣無聲地丟了。
+   */
+  private showOmenPicker(omens: readonly OmenDef[], stage: number, runs: number): void {
+    const cx = GAME_WIDTH / 2;
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    const add = <T extends Phaser.GameObjects.GameObject>(item: T): T => {
+      parts.push(item);
+      return item;
+    };
+    add(
+      this.add
+        .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x05060c, 0.78)
+        .setInteractive(),
+    );
+    const optionH = 124;
+    const gap = 12;
+    const panelH = 150 + omens.length * (optionH + gap) + 70;
+    const top = GAME_HEIGHT / 2 - panelH / 2;
+    add(pixelPanel(this, cx, GAME_HEIGHT / 2, GAME_WIDTH - 36, panelH, { accent: hexToNumber(GOLD) }));
+    add(
+      this.add
+        .text(cx, top + 42, "奇　遇", textStyle({ size: 34, color: GOLD, bold: true }))
+        .setOrigin(0.5)
+        .setStroke("#0b0f14", 6),
+    );
+    add(
+      this.add
+        .text(cx, top + 86, "下山途中遇到一件事。只影響下一場主線。", textStyle({ size: 16, color: INK_DIM }))
+        .setOrigin(0.5),
+    );
+
+    const close = (): void => {
+      for (const part of parts) part.destroy();
+    };
+    omens.forEach((omen, index) => {
+      const y = top + 120 + index * (optionH + gap) + optionH / 2;
+      const width = GAME_WIDTH - 76;
+      const left = cx - width / 2 + 18;
+      const frame = add(
+        this.add
+          .rectangle(cx, y, width, optionH, BG_PANEL, 1)
+          .setStrokeStyle(3, LINE)
+          .setInteractive({ useHandCursor: true }),
+      );
+      add(this.add.text(left, y - optionH / 2 + 12, omen.name, textStyle({ size: 22, color: GOLD, bold: true })));
+      add(
+        this.add
+          .text(left, y - optionH / 2 + 44, wrapText(omen.flavor, width - 36, 15), textStyle({ size: 15, color: INK_DIM }))
+          .setLineSpacing(4),
+      );
+      const { gains, costs } = omenEffects(omen);
+      const gain = add(
+        this.add.text(left, y + optionH / 2 - 30, gains.join("、"), textStyle({ size: 16, color: JADE, bold: true })),
+      );
+      if (costs.length > 0) {
+        add(
+          this.add.text(
+            gain.x + gain.width + 10,
+            y + optionH / 2 - 30,
+            `但${costs.join("、")}`,
+            textStyle({ size: 16, color: DANGER, bold: true }),
+          ),
+        );
+      }
+      frame.on("pointerover", () => frame.setStrokeStyle(3, hexToNumber(GOLD)));
+      frame.on("pointerout", () => frame.setStrokeStyle(3, LINE));
+      frame.on("pointerup", () => {
+        const save = state();
+        save.player.omen = { id: omen.id, stage, runs };
+        persist();
+        audio.play("gold");
+        burstPixels(this, cx, y, GOLD, 12);
+        close();
+        floatLabel(this, cx, GAME_HEIGHT / 2, `下一場：${omen.name}`, GOLD, 26);
+        track("omen_pick", { omen: omen.id, stage });
+      });
+    });
+
+    const skip = createButton(this, cx, top + panelH - 44, {
+      width: 220,
+      height: 48,
+      label: "不理會",
+      fontSize: 19,
+      onClick: () => {
+        close();
+        track("omen_pick", { omen: "skip", stage });
+      },
+    });
+    parts.push(skip.container);
+    for (const part of parts) {
+      const item = part as unknown as { setDepth?: (depth: number) => unknown };
+      item.setDepth?.(300);
+    }
+  }
+
   private buildPanel(
     cx: number,
     cy: number,

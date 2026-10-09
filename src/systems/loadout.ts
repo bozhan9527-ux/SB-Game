@@ -16,6 +16,7 @@ import { karmaAmountOf } from './karma';
 import { masteryBonus, masteryTierFor } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
+import { omenOfRules } from './omens';
 import { amountOf } from './upgrades';
 
 /**
@@ -108,6 +109,8 @@ export interface Loadout {
    * 分開乘會讓後期的專精符變成一個獨立的指數。
    */
   favoredDamageBonus: number;
+  /** 妖魔（含首領）血量倍率。只有關間奇遇會動它，平常是 1。 */
+  mobHpMultiplier: number;
 }
 
 export function sectById(id: string | null): Sect | null {
@@ -284,6 +287,18 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
     loadout.favoredDamageBonus = 0;
   }
 
+  // 關間奇遇。競技場不吃：那一場要的是所有人起點完全一樣。
+  const omen = loadout.arena ? null : omenOfRules(spec.rules);
+  if (omen !== null) {
+    loadout.disciples = Math.max(1, Math.round(loadout.disciples * omen.disciples));
+    loadout.damageMultiplier *= omen.damage;
+    loadout.drawSpeedMultiplier *= omen.drawSpeed;
+    loadout.goldMultiplier *= omen.gold;
+    loadout.mobHpMultiplier *= omen.mobHp;
+    loadout.rules = { ...loadout.rules, bossTimeMultiplier: loadout.rules.bossTimeMultiplier * omen.bossTime };
+    loadout.tierBonus += omen.tierBonus;
+  }
+
   applySectDepth(loadout, spec.sectDepth);
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
   // 習性的機率也是養成的一部分，所以競技場一樣要關掉——**而且它是反過來的**：
@@ -375,6 +390,7 @@ export function buildLoadoutFor(
     sect,
     stage,
     favoredDamageBonus: 0,
+    mobHpMultiplier: 1,
     arena: false,
     // 沒有轉世資訊時威脅度就是關卡本身、妖魔也不額外長習性。
     // 平衡模擬與測試大多走這條路。

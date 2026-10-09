@@ -8,7 +8,7 @@ import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { CloudIdentity, DistributionCache, KarmaState, RecordsState, SaveData } from './types';
+import type { CloudIdentity, DistributionCache, KarmaState, PendingOmen, RecordsState, SaveData } from './types';
 import { SAVE_KEY, SAVE_VERSION } from './types';
 
 export function createDefaultSave(now: number = Date.now()): SaveData {
@@ -29,6 +29,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       sectClears: {},
       sectDepth: {},
       dungeons: {},
+      omen: null,
       challenges: [],
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
@@ -166,6 +167,18 @@ function normalizeSectClears(raw: unknown): Record<string, number> {
   return out;
 }
 
+/** 待用的奇遇。任何一欄不對就當成沒有——最壞只是少一個奇遇。 */
+function normalizeOmen(raw: unknown): PendingOmen | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const id = record['id'];
+  const stage = record['stage'];
+  const runs = record['runs'];
+  if (typeof id !== 'string' || typeof stage !== 'number' || typeof runs !== 'number') return null;
+  if (!Number.isInteger(stage) || !Number.isInteger(runs) || stage < 1 || runs < 0) return null;
+  return { id, stage, runs };
+}
+
 /** 把讀進來的物件補齊成完整存檔。欄位缺漏一律以預設值補，不讓壞存檔炸掉遊戲。 */
 function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const base = createDefaultSave(now);
@@ -217,6 +230,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       sectClears: normalizeSectClears(player['sectClears']),
       sectDepth: normalizeSectClears(player['sectDepth']),
       dungeons,
+      omen: normalizeOmen(player['omen']),
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),
       records: normalizeRecords(player['records']),

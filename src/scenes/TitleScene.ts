@@ -1,3 +1,4 @@
+import { omenById, omenSummary } from '../systems/omens';
 import Phaser from 'phaser';
 import { pixelPanel } from '../ui/panel';
 import { libraryFloor } from '../systems/dungeons';
@@ -21,6 +22,7 @@ import {
   BG_PANEL_ALT,
   DANGER,
   GOLD,
+  JADE,
   INK,
   INK_DIM,
   LINE,
@@ -224,14 +226,25 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
     // 距離突破還有幾關，是修仙題材最直接的推進動機。
     const toBreak = realm.stageTo - save.world.stage + 1;
-    this.add
+    // 帶著奇遇時這一行讓給它：奇遇只管下一場，這時候它比「還差幾關突破」急。
+    const pending = save.player.omen;
+    const omen =
+      pending !== null && pending.stage === save.world.stage && pending.runs === save.world.runs
+        ? omenById(pending.id)
+        : null;
+    const line = this.add
       .text(
         cx,
         top + 116,
-        toBreak > 900 ? '已至無盡飛升境' : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
-        textStyle({ size: 17, color: GOLD }),
+        omen !== null
+          ? `奇遇「${omen.name}」　${omenSummary(omen)}`
+          : toBreak > 900
+            ? '已至無盡飛升境'
+            : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,
+        textStyle({ size: 17, color: omen !== null ? JADE : GOLD }),
       )
       .setOrigin(0.5);
+    fitText(line, GAME_WIDTH - 80);
 
     this.buildIcons(top + 166, save, sect);
     return top + height;

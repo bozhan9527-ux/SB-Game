@@ -16,6 +16,12 @@
  */
 
 export interface TelemetryEvents {
+  /** 關間奇遇選了哪一個（skip 為不理會）。回答「哪幾個奇遇沒人要」。 */
+  omen_pick: {
+    omen: string;
+    stage: number;
+  };
+
   /** 開遊戲。回答「有多少人回來」與「他們停在哪一關」。 */
   app_open: {
     stage: number;

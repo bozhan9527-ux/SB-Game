@@ -175,6 +175,17 @@ export interface PlayerState {
    */
   achievementsClaimed: string[];
   dungeons: Record<string, number>;
+  /**
+   * 選了、還沒用掉的關間奇遇。只對「第 stage 關、挑戰次數剛好是 runs」的那一場主線生效——
+   * 中間先去打了副本或重挑（挑戰次數會往前走），它就作廢。
+   */
+  omen: PendingOmen | null;
+}
+
+export interface PendingOmen {
+  id: string;
+  stage: number;
+  runs: number;
 }
 
 export interface WorldState {
