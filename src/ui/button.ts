@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { audio } from '../audio';
 import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, fitText, textStyle, hexToNumber, ACCENT_GLOW, JADE_GLOW } from './theme';
+import { createAscendingGlow } from './decorations';
 
 export interface ButtonOptions {
   width: number;
@@ -109,6 +110,8 @@ export function createButton(
     container.setScale(1);
     if (!enabled) return;
     audio.play('ui');
+    // 點擊時的靈光效果
+    createAscendingGlow(scene, x, y, glowColor, 6, 500);
     options.onClick();
   });
 
