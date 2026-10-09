@@ -59,11 +59,13 @@ export function tierOf(pattern: FormationPattern): FormationTierBalance {
   return pattern === 'same' ? BALANCE.formation.same : BALANCE.formation.distinct;
 }
 
-export function formationEffect(line: FormationLine): string {
+/** scale 是陣法縮放（天劫「陣崩」會把它減半）：公告上的數字要和實際吃到的一致。 */
+export function formationEffect(line: FormationLine, scale = 1): string {
   const tier = tierOf(line.pattern);
-  if (line.kind === 'row') return `傷害 +${Math.round(tier.rowDamage * 100)}%`;
-  if (line.kind === 'column') return `出手 +${Math.round(tier.columnFireRate * 100)}%`;
-  return `傷害 +${Math.round(tier.diagonalDamage * 100)}%`;
+  const pct = (value: number): number => Math.round(value * scale * 100);
+  if (line.kind === 'row') return `傷害 +${pct(tier.rowDamage)}%`;
+  if (line.kind === 'column') return `出手 +${pct(tier.columnFireRate)}%`;
+  return `傷害 +${pct(tier.diagonalDamage)}%`;
 }
 
 /**

@@ -1697,7 +1697,7 @@ export class RunScene extends Phaser.Scene {
     const color = first.pattern === "distinct" ? JADE : GOLD;
     const text =
       fresh.length === 1
-        ? `${formationName(first)}成　${formationEffect(first)}`
+        ? `${formationName(first)}成　${formationEffect(first, this.run.loadout.formationMultiplier)}`
         : `一口氣成 ${fresh.length} 條陣`;
     // 停住 1.1 秒再淡出，中文讀得完。
     this.banner("notice", text, color, 1100);
