@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { LESSONS, parseLessons } from '../src/data';
+import { ENEMIES, LESSONS, REALMS, parseLessons } from '../src/data';
+import { tribulationStart } from '../src/systems/tribulations';
 import { createDefaultSave } from '../src/save';
 import type { SaveData } from '../src/save/types';
 import {
@@ -30,15 +31,33 @@ describe('分關卡教學', () => {
     }
   });
 
-  it('依關卡遞增排列，而且都落在前三十關', () => {
+  it('依關卡遞增排列；新手課落在前三十關，晚出現的機制則在它第一次出現時講', () => {
     // 教學要在玩家還在學的時候講完。排在第 60 關的「新手教學」等於沒有。
+    // 例外是第 30 關以後才第一次出現的機制（隱、盾、天劫）：它們的課只能跟著機制走，
+    // 但也不能拖——要在機制第一次出現的三關之內講。
+    const firstSeen: Record<string, number> = {
+      phase: firstStageWithTrait('phase'),
+      ward: firstStageWithTrait('ward'),
+      tribulation: tribulationStart(),
+    };
     let previous = 0;
     for (const lesson of LESSONS) {
       expect(lesson.stage).toBeGreaterThanOrEqual(previous);
       previous = lesson.stage;
+      const first = firstSeen[lesson.id];
+      if (first === undefined) expect(lesson.stage, lesson.id).toBeLessThanOrEqual(30);
+      else {
+        expect(lesson.stage, lesson.id).toBeGreaterThanOrEqual(first);
+        expect(lesson.stage, lesson.id).toBeLessThanOrEqual(first + 3);
+      }
     }
-    expect(previous).toBeLessThanOrEqual(30);
   });
+
+  function firstStageWithTrait(trait: string): number {
+    const realm = REALMS.find((item) => ENEMIES.mobs.some((mob) => mob.realm === item.id && mob.trait === trait));
+    if (realm === undefined) throw new Error(trait);
+    return realm.stageFrom;
+  }
 
   it('一場只上一課，而且照順序補', () => {
     // 玩家可能一口氣連過好幾關，或是舊存檔直接跳到深處。

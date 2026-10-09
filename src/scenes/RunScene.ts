@@ -195,7 +195,7 @@ const SEAL_COLOR = "#b98cff";
 const SKILL_EFFECT: Record<BossSkillKind, string> = {
   summon: "護衛衝向山門",
   shield: "罩上護體罡氣",
-  seal: "一格陣位被封，把符搬開",
+  seal: "一格被封，把好符換出來",
   charge: "猛然往前衝",
   regen: "回復了一截血",
   rage: "狂暴了，走得更快",
@@ -2015,7 +2015,7 @@ export class RunScene extends Phaser.Scene {
     const item = this.run.loadout.tribulations.find((trib) => trib.id === report.tribulation);
     if (item === undefined) return;
     if (item.id === "thunder") {
-      this.banner("notice", "雷劫！一格陣位被劈封，把符搬開", "#9fd8ff", 1200);
+      this.banner("notice", "雷劫！一格被劈封，把好符換出來", "#9fd8ff", 1200);
       audio.play("bossAttack");
       this.cameras.main.shake(160, 0.006);
       for (const slot of report.sealed) {
@@ -2220,8 +2220,9 @@ export class RunScene extends Phaser.Scene {
       : Math.round(-0.6 * ENEMY_DISPLAY_HEIGHT + ENEMY_ART_TOP[enemy.art] * enemyScale - 8);
     if (!enemy.boss) {
       const barBg = this.add.rectangle(0, barY, 46, 6, 0x000000, 0.7).setStrokeStyle(3, EDGE);
+      // 會回血的血條用綠色：血條自己慢慢變長時，玩家要一眼看得出那是回血，不是看錯。
       const bar = this.add
-        .rectangle(-23, barY, 46, 6, 0xd8434f, 1)
+        .rectangle(-23, barY, 46, 6, enemy.trait === "regen" ? 0x5fd068 : 0xd8434f, 1)
         .setOrigin(0, 0.5);
       container.add([barBg, bar]);
       container.setData("bar", bar);
