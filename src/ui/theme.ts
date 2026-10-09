@@ -10,20 +10,22 @@ export const GOLD = '#e8c46a';
 export const DANGER = '#e0616a';
 export const JADE = '#7fdba0';
 
-export const BG_DEEP = 0x0d1116;
-export const BG_PANEL = 0x161d24;
-export const BG_PANEL_ALT = 0x1e2730;
-export const LINE = 0x3a4652;
+// 帶一點藍紫的深色，和像素夜空背景同一個色系。
+export const BG_DEEP = 0x0f1328;
+export const BG_PANEL = 0x181d38;
+export const BG_PANEL_ALT = 0x232a52;
+export const LINE = 0x3a427a;
 
-// Xianxia visual enhancements
-export const ACCENT_GLOW = '#f5d76e';
-export const JADE_GLOW = '#9fffc8';
-export const DANGER_GLOW = '#ff8a8f';
+/** 像素描邊：所有面板、按鈕、符牌的最外圈。 */
+export const EDGE = 0x12141c;
 
 /** 觸控熱區下限（TECH_SPEC 第 6 節）。 */
 export const MIN_TOUCH_SIZE = 44;
 
-export const FONT = '"PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+/** 點陣字型的 family 名稱，由 main.ts 在開遊戲前載入。 */
+export const PIXEL_FONT = 'Cubic11';
+
+export const FONT = `"${PIXEL_FONT}", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
 
 /** "#7fdba0" → 0x7fdba0，供 Phaser 的幾何圖形使用。 */
 export function hexToNumber(hex: string): number {
@@ -41,7 +43,9 @@ export function textStyle(options: TextStyleOptions): Phaser.Types.GameObjects.T
     fontFamily: FONT,
     fontSize: `${options.size}px`,
     color: options.color ?? INK,
-    fontStyle: options.bold === true ? 'bold' : 'normal',
+    // 點陣字沒有粗體字重，硬加粗是把每一筆抹寬一點，像素邊就糊了。
+    // bold 參數保留給呼叫端表達意圖，畫面上靠字級與顏色區分。
+    fontStyle: 'normal',
   };
 }
 
@@ -123,106 +127,4 @@ export function formatTime(ms: number): string {
   const hours = Math.floor(total / 3600);
   const mm = hours > 0 ? String(minutes).padStart(2, '0') : String(minutes);
   return `${hours > 0 ? `${hours}:` : ''}${mm}:${String(seconds).padStart(2, '0')}`;
-}
-
-/**
- * 繪製帶有修仙風格陰影與光暈的按鈕背景。
- */
-export function drawButtonWithGlow(
-  scene: Phaser.Scene,
-  g: Phaser.GameObjects.Graphics,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  fillColor: number,
-  glowColor: string,
-): void {
-  // 外層光暈（暈染效果）
-  g.fillStyle(hexToNumber(glowColor), 0.15);
-  g.fillRect(x - width / 2 - 12, y - height / 2 - 12, width + 24, height + 24);
-
-  // 邊框內側陰影
-  g.lineStyle(1, 0x000000, 0.3);
-  g.strokeRect(x - width / 2 + 1, y - height / 2 + 1, width - 2, height - 2);
-
-  // 主體背景
-  g.fillStyle(fillColor, 1);
-  g.fillRect(x - width / 2, y - height / 2, width, height);
-
-  // 邊框
-  g.lineStyle(2, hexToNumber(glowColor), 0.8);
-  g.strokeRect(x - width / 2, y - height / 2, width, height);
-
-  // 邊框外側光暈
-  g.lineStyle(1, hexToNumber(glowColor), 0.3);
-  g.strokeRect(x - width / 2 - 2, y - height / 2 - 2, width + 4, height + 4);
-}
-
-/**
- * 繪製帶有修仙風格裝飾的面板邊框。
- */
-export function drawPanelFrame(
-  scene: Phaser.Scene,
-  g: Phaser.GameObjects.Graphics,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  accentColor: number,
-): void {
-  const cornerSize = 12;
-
-  // 背景陰影
-  g.fillStyle(0x000000, 0.4);
-  g.fillRect(x - width / 2 + 2, y - height / 2 + 2, width, height);
-
-  // 主邊框
-  g.lineStyle(2, accentColor, 0.8);
-  g.strokeRect(x - width / 2, y - height / 2, width, height);
-
-  // 四角裝飾
-  const corners = [
-    { x: x - width / 2, y: y - height / 2 }, // 左上
-    { x: x + width / 2, y: y - height / 2 }, // 右上
-    { x: x - width / 2, y: y + height / 2 }, // 左下
-    { x: x + width / 2, y: y + height / 2 }, // 右下
-  ];
-
-  for (const corner of corners) {
-    g.fillStyle(accentColor, 0.4);
-    g.fillCircle(corner.x, corner.y, 4);
-  }
-
-  // 邊框光暈
-  g.lineStyle(1, accentColor, 0.2);
-  g.strokeRect(x - width / 2 - 3, y - height / 2 - 3, width + 6, height + 6);
-}
-
-/**
- * 添加浮動靈光粒子效果到目標物件。
- */
-export function addGlowParticles(
-  scene: Phaser.Scene,
-  targetX: number,
-  targetY: number,
-  glowColor: string,
-  particleCount: number = 5,
-): void {
-  for (let i = 0; i < particleCount; i += 1) {
-    const angle = (i / particleCount) * Math.PI * 2;
-    const distance = 15 + Math.random() * 10;
-    const x = targetX + Math.cos(angle) * distance;
-    const y = targetY + Math.sin(angle) * distance;
-
-    const particle = scene.add.circle(x, y, 2, hexToNumber(glowColor), 0.6);
-    scene.tweens.add({
-      targets: particle,
-      x: x + Math.cos(angle) * 20,
-      y: y + Math.sin(angle) * 20,
-      alpha: 0,
-      duration: 1000 + Math.random() * 500,
-      onComplete: () => particle.destroy(),
-    });
-  }
 }

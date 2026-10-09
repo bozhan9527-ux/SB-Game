@@ -3,8 +3,8 @@
  */
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, fitText, textStyle, hexToNumber, ACCENT_GLOW, JADE_GLOW } from './theme';
-import { createAscendingGlow } from './decorations';
+import { BG_PANEL_ALT, EDGE, GOLD, INK, INK_DIM, MIN_TOUCH_SIZE, fitText, textStyle } from './theme';
+import { burstPixels } from './effects';
 
 export interface ButtonOptions {
   width: number;
@@ -36,26 +36,23 @@ export function createButton(
   const width = Math.max(MIN_TOUCH_SIZE, options.width);
   const height = Math.max(MIN_TOUCH_SIZE, options.height);
 
+  // 像素按鈕：實心投影＋深色描邊＋上亮下暗的一圈斜角，看起來是「凸出來可以按」的。
+  const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.45);
   const background = scene.add
     .rectangle(0, 0, width, height, options.fillColor ?? BG_PANEL_ALT)
-    .setStrokeStyle(2, options.strokeColor ?? LINE);
-
-  // 按鈕光暈效果：外層漸淡的邊框增加質感
-  const glowColor = options.fillColor === hexToNumber('#e8c46a') ? ACCENT_GLOW : JADE_GLOW;
-  const outerGlow = scene.add
-    .rectangle(0, 0, width + 6, height + 6, 0x000000, 0)
-    .setStrokeStyle(1, hexToNumber(glowColor), 0.3);
-
-  // 陰影效果：按鈕下方的深色投影
-  const shadowOffset = 3;
-  const shadow = scene.add
-    .rectangle(0, shadowOffset, width, height, 0x000000, 0.25);
+    .setStrokeStyle(3, options.strokeColor ?? EDGE);
+  const bevelLight = scene.add
+    .rectangle(-width / 2 + 3, -height / 2 + 3, width - 6, 3, 0xffffff, 0.16)
+    .setOrigin(0, 0);
+  const bevelDark = scene.add
+    .rectangle(-width / 2 + 3, height / 2 - 6, width - 6, 3, 0x000000, 0.28)
+    .setOrigin(0, 0);
 
   const text = scene.add
     .text(0, 0, options.label, textStyle({ size: options.fontSize ?? 26, color: options.textColor ?? INK }))
     .setOrigin(0.5);
 
-  const children: Phaser.GameObjects.GameObject[] = [shadow, background, outerGlow, text];
+  const children: Phaser.GameObjects.GameObject[] = [shadow, background, bevelLight, bevelDark, text];
 
   const hasIcon = options.icon !== undefined && scene.textures.exists(options.icon);
   const iconSize = hasIcon ? (options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15)) : 0;
@@ -100,18 +97,30 @@ export function createButton(
   container.setSize(width, height);
 
   let enabled = true;
+  let pressed = false;
+  // 按下是「往投影的方向沉兩點」，不是縮小：縮放會讓像素格變得一格大一格小。
+  const press = (down: boolean): void => {
+    if (pressed === down) return;
+    pressed = down;
+    const shift = down ? 3 : -3;
+    for (const child of [background, bevelLight, bevelDark, text, ...(icon === null ? [] : [icon])]) {
+      (child as Phaser.GameObjects.Components.Transform).x += shift;
+      (child as Phaser.GameObjects.Components.Transform).y += shift;
+    }
+    shadow.setVisible(!down);
+  };
   background.setInteractive({ useHandCursor: true });
   background.on('pointerdown', () => {
     if (!enabled) return;
-    container.setScale(0.96);
+    press(true);
   });
-  background.on('pointerout', () => container.setScale(1));
+  background.on('pointerout', () => press(false));
   background.on('pointerup', () => {
-    container.setScale(1);
+    press(false);
     if (!enabled) return;
     audio.play('ui');
-    // 點擊時的靈光效果
-    createAscendingGlow(scene, x, y, glowColor, 6, 500);
+    const bounds = container.getBounds();
+    burstPixels(scene, bounds.centerX, bounds.centerY, GOLD);
     options.onClick();
   });
 

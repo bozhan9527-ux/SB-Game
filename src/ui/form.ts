@@ -61,58 +61,49 @@ function ensureStyle(): void {
   background: rgba(6, 9, 13, 0.82);
   /* 遊戲本體關掉了觸控手勢，這一層要自己開回來，否則點不動。 */
   touch-action: auto;
-  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  font-family: "Cubic11", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
 }
 .sb-form {
   width: min(88vw, 360px);
   box-sizing: border-box;
   padding: 22px 20px 18px;
-  border: 2px solid #3a4652;
-  border-radius: 10px;
-  background: #131a22;
-  color: #e8eef5;
-  box-shadow: 0 0 20px rgba(232, 196, 106, 0.15),
-              inset 0 1px 0 rgba(232, 196, 106, 0.1);
+  border: 3px solid #12141c;
+  border-radius: 0;
+  background: #181d38;
+  color: #ece6d2;
+  box-shadow: inset 0 0 0 3px #333b6b, 6px 6px 0 #070912;
   position: relative;
 }
-.sb-form h2 { margin: 0 0 6px; font-size: 22px; color: #e8c46a; font-weight: 700; }
+.sb-form h2 { margin: 0 0 6px; font-size: 24px; color: #f0c95a; font-weight: 400; text-shadow: 2px 2px 0 #5a3a10; }
 .sb-form p { margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #8fa0b0; white-space: pre-line; }
 .sb-form label { display: block; margin: 0 0 12px; font-size: 14px; color: #8fa0b0; }
 .sb-form input {
   box-sizing: border-box; width: 100%; margin-top: 5px; padding: 11px 10px;
-  border: 1px solid #3a4652; border-radius: 6px;
-  background: #0d1116; color: #e8eef5; font-size: 17px;
-  transition: all 0.2s ease;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  border: 2px solid #12141c; border-radius: 0;
+  background: #0f1328; color: #ece6d2; font-size: 18px; font-family: inherit;
+  box-shadow: inset 2px 2px 0 #070912;
 }
 .sb-form input:focus {
   outline: none;
-  border-color: #e8c46a;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3),
-              0 0 12px rgba(232, 196, 106, 0.2);
+  border-color: #f0c95a;
 }
 .sb-form-error { margin: 0 0 12px; font-size: 14px; color: #e0796d; min-height: 1em; white-space: pre-line; }
 .sb-form-row { display: flex; gap: 10px; }
 .sb-form button {
-  flex: 1; padding: 12px 0; border-radius: 6px; font-size: 17px; cursor: pointer;
-  border: 1px solid #3a4652; background: #1b242e; color: #e8eef5;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  flex: 1; padding: 12px 0; border-radius: 0; font-size: 18px; cursor: pointer; font-family: inherit;
+  border: 2px solid #12141c; background: #2a3160; color: #ece6d2;
+  box-shadow: inset -3px -3px 0 #1a1f44, inset 3px 3px 0 #4a55a0;
 }
-.sb-form button:hover:not(:disabled) {
-  border-color: #e8c46a;
-  box-shadow: 0 2px 8px rgba(232, 196, 106, 0.2);
+.sb-form button:active:not(:disabled) {
+  box-shadow: inset 3px 3px 0 #1a1f44;
 }
 .sb-form button.sb-primary {
-  border-color: #e8c46a;
-  background: #e8c46a;
+  background: #f0c95a;
   color: #1a1408;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(232, 196, 106, 0.3);
+  box-shadow: inset -3px -3px 0 #b8862a, inset 3px 3px 0 #fff2bf;
 }
-.sb-form button.sb-primary:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(232, 196, 106, 0.4);
-  transform: translateY(-1px);
+.sb-form button.sb-primary:active:not(:disabled) {
+  box-shadow: inset 3px 3px 0 #b8862a;
 }
 .sb-form button:disabled { opacity: 0.5; cursor: default; }
 `;

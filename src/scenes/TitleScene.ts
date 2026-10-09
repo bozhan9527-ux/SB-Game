@@ -31,7 +31,7 @@ import {
   textStyle,
 } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
-import { addTwinklingStars, addAmbientLighting } from '../ui/effects';
+import { addTwinklingStars } from '../ui/effects';
 
 /** 標題畫面：顯示目前境界與金幣，通往挑戰、升級、換門派。 */
 export class TitleScene extends Phaser.Scene {
@@ -48,11 +48,7 @@ export class TitleScene extends Phaser.Scene {
     audio.playMusic(realmIndexForStage(save.world.stage));
     drawBackdrop(this, realm.color, realm.scenery);
 
-    // 新增修仙風格視覺效果
-    const accentColor = realm.color;
-    addTwinklingStars(this, 10, accentColor);
-    addAmbientLighting(this, GAME_WIDTH * 0.25, GAME_HEIGHT * 0.3, 120, accentColor, 0.25);
-    addAmbientLighting(this, GAME_WIDTH * 0.75, GAME_HEIGHT * 0.35, 100, accentColor, 0.2);
+    addTwinklingStars(this, 10, realm.color);
 
     const cx = GAME_WIDTH / 2;
     const hasSect = sect !== null;

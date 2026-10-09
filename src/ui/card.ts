@@ -7,7 +7,7 @@ import Phaser from 'phaser';
 import { glyphTexture } from '../art';
 import { CARDS } from '../data';
 import type { Card } from '../systems/deck';
-import { INK, LINE, hexToNumber, textStyle, ACCENT_GLOW, JADE_GLOW } from './theme';
+import { EDGE, INK, LINE, hexToNumber, textStyle } from './theme';
 
 export const CARD_WIDTH = 84;
 export const CARD_HEIGHT = 100;
@@ -28,41 +28,35 @@ function cardColor(type: string): string {
  * 重建 Container 會讓正在跑的 tween 與 hit area 一起失效。
  */
 export function createCardView(scene: Phaser.Scene, x: number, y: number): CardView {
-  // 空位槽：帶有光暈效果
   const slot = scene.add
-    .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0x000000, 0.25)
-    .setStrokeStyle(2, LINE, 0.9);
-  const slotGlow = scene.add
-    .rectangle(0, 0, CARD_WIDTH + 4, CARD_HEIGHT + 4, 0x000000, 0)
-    .setStrokeStyle(1, LINE, 0.4)
-    .setVisible(false);
+    .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0x000000, 0.3)
+    .setStrokeStyle(3, LINE, 0.9);
 
-  const body = scene.add.rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0xffffff, 1).setVisible(false);
+  // 像素牌框：外圈深色描邊、符種色的厚框、內側再一圈暗線，三層都是硬邊。
+  const body = scene.add
+    .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0xffffff, 1)
+    .setStrokeStyle(3, EDGE)
+    .setVisible(false);
   const inner = scene.add
-    .rectangle(0, 0, CARD_WIDTH - 10, CARD_HEIGHT - 10, 0x11161c, 0.92)
+    .rectangle(0, 0, CARD_WIDTH - 12, CARD_HEIGHT - 12, 0x141830, 1)
+    .setStrokeStyle(3, 0x0b0d1a)
     .setVisible(false);
 
-  // 卡片邊框光暈：根據卡牌顏色添加額外的光暈邊框
-  const cardGlow = scene.add
-    .rectangle(0, 0, CARD_WIDTH + 3, CARD_HEIGHT + 3, 0x000000, 0)
-    .setVisible(false);
-
-  const glyph = scene.add.image(0, -22, glyphTexture('sword')).setDisplaySize(34, 42).setVisible(false);
+  // 圖騰是 16×20 格，顯示成兩倍。
+  const glyph = scene.add.image(0, -18, glyphTexture('sword')).setDisplaySize(32, 40).setVisible(false);
   const tierText = scene.add
     .text(0, 26, '', textStyle({ size: 30, bold: true }))
     .setOrigin(0.5)
     .setVisible(false);
   const pips = scene.add.container(0, 0);
 
-  const container = scene.add.container(x, y, [slot, slotGlow, body, cardGlow, inner, glyph, tierText, pips]);
+  const container = scene.add.container(x, y, [slot, body, inner, glyph, tierText, pips]);
 
   const refresh = (card: Card | null): void => {
     pips.removeAll(true);
     if (card === null) {
       slot.setVisible(true);
-      slotGlow.setVisible(true);
       body.setVisible(false);
-      cardGlow.setVisible(false);
       inner.setVisible(false);
       glyph.setVisible(false);
       tierText.setVisible(false);
@@ -70,9 +64,7 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     }
     const color = cardColor(card.type);
     slot.setVisible(false);
-    slotGlow.setVisible(false);
     body.setVisible(true).setFillStyle(hexToNumber(color), 1);
-    cardGlow.setVisible(true).setStrokeStyle(1.5, hexToNumber(color), 0.5);
     inner.setVisible(true);
     glyph.setVisible(true).setTexture(glyphTexture(card.type));
     tierText.setVisible(true).setText(`${card.tier}`).setColor(color);
@@ -80,10 +72,11 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     // 一到六階在牌緣點上對應數量的階點，六階以上只看數字——點超過六顆就數不清了。
     if (card.tier <= 6) {
       for (let i = 0; i < card.tier; i += 1) {
-        const dot = scene.add.circle(
-          -CARD_WIDTH / 2 + 12 + i * 12,
-          CARD_HEIGHT / 2 - 12,
-          3.6,
+        const dot = scene.add.rectangle(
+          -CARD_WIDTH / 2 + 13 + i * 11,
+          CARD_HEIGHT / 2 - 13,
+          6,
+          6,
           hexToNumber(color),
           1,
         );

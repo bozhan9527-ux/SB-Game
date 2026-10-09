@@ -1,9 +1,10 @@
 /**
  * 美術資源。
  *
- * 全部是手寫的 SVG（public/art/），由 Phaser 在載入時點陣化。
- * 用 SVG 的理由：檔案小、可任意縮放、可以用 setTint 依門派／境界換色，
- * 不需要為每個配色各存一張圖。
+ * 全部是像素畫，以 SVG 的方格存檔（public/art/），由 Phaser 在載入時點陣化。
+ * 檔案由 scripts/pixel-art/ 的產生器輸出，改圖請改產生器再重跑，不要手改 SVG。
+ *
+ * 點陣化的尺寸一律是格數的整數倍，畫面上每一格才會一樣大。
  */
 import { CARDS } from './data';
 import type { BossArt, MobArt, SectArt } from './data/types';
@@ -43,14 +44,24 @@ export function glyphTexture(art: string): string {
  */
 const GLYPH_ARTS: readonly string[] = [...new Set(CARDS.map((card) => card.art))];
 
-/** 人物圖以兩倍尺寸點陣化再縮小，避免在高解析度手機上糊掉。 */
+/**
+ * 門人與妖物都是 28 格高。點陣化成 4 倍（112），顯示成 2 倍（56）與 3 倍（84）——
+ * 顯示倍數不是整數的話，有的格子會被畫成兩點、有的三點，像素畫一眼就看得出歪。
+ */
 export const DISCIPLE_SOURCE_HEIGHT = 112;
-export const DISCIPLE_DISPLAY_HEIGHT = 62;
+export const DISCIPLE_DISPLAY_HEIGHT = 56;
 export const ENEMY_SOURCE_HEIGHT = 112;
-export const ENEMY_DISPLAY_HEIGHT = 76;
+export const ENEMY_DISPLAY_HEIGHT = 84;
 
-export function bossTexture(art: BossArt): string {
-  return `boss-${art}`;
+/** 首領是 50×50 格，點陣化成 8 倍。 */
+const BOSS_SOURCE_SIZE = 400;
+
+export function bossTexture(art: BossArt, frame = 0): string {
+  return `boss-${art}-${frame}`;
+}
+
+export function bossIdleKey(art: BossArt): string {
+  return `idle-boss-${art}`;
 }
 
 /** 走路循環的兩幀。以兩張獨立貼圖組成動畫，不需要 spritesheet。 */
@@ -101,6 +112,7 @@ interface SvgSpec {
 }
 
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
+const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial',
@@ -139,22 +151,26 @@ const SVGS: readonly SvgSpec[] = [
     width: 64,
     height: 64,
   })),
-  { key: ART.cloud, file: 'cloud.svg', width: 240, height: 76 },
-  { key: ART.slash, file: 'slash.svg', width: 240, height: 240 },
-  { key: bossTexture('beast'), file: 'boss-beast.svg', width: 320, height: 320 },
-  { key: bossTexture('demon'), file: 'boss-demon.svg', width: 320, height: 320 },
-  { key: bossTexture('storm'), file: 'boss-storm.svg', width: 320, height: 320 },
-  { key: bossTexture('celestial'), file: 'boss-celestial.svg', width: 320, height: 320 },
+  { key: ART.cloud, file: 'cloud.svg', width: 240, height: 80 },
+  { key: ART.slash, file: 'slash.svg', width: 160, height: 160 },
+  ...BOSS_ARTS.flatMap((art) =>
+    WALK_FRAMES.map((frame) => ({
+      key: bossTexture(art, frame),
+      file: `boss-${art}-${frame}.svg`,
+      width: BOSS_SOURCE_SIZE,
+      height: BOSS_SOURCE_SIZE,
+    })),
+  ),
 ];
 
-/** 建立走路動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
+/** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
 export function createWalkAnimations(scene: Phaser.Scene): void {
-  const define = (key: string, frames: string[]): void => {
+  const define = (key: string, frames: string[], frameRate = 7): void => {
     if (scene.anims.exists(key)) return;
     scene.anims.create({
       key,
       frames: frames.map((texture) => ({ key: texture })),
-      frameRate: 7,
+      frameRate,
       repeat: -1,
     });
   };
@@ -165,6 +181,10 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
   }
   for (const art of MOB_ARTS) {
     define(enemyWalkKey(art), WALK_FRAMES.map((f) => enemyTexture(art, f)));
+  }
+  // 首領比小妖慢一拍：牠是在呼吸，不是在跑。
+  for (const art of BOSS_ARTS) {
+    define(bossIdleKey(art), WALK_FRAMES.map((f) => bossTexture(art, f)), 3);
   }
 }
 

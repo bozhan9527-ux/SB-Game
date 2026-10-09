@@ -1,5 +1,5 @@
 /**
- * 水墨風背景：遠山、明月、飄浮靈光。全部以程式繪製，不需美術素材。
+ * 像素風背景：遠山、明月、飄浮靈光。全部以程式繪製，不需美術素材。
  */
 import Phaser from 'phaser';
 import { ART } from '../art';
@@ -182,39 +182,25 @@ function drawScenery(g: G, scenery: Scenery, accent: number): void {
   }
 }
 
-/** 依境界色調畫一層背景。回傳的容器已置於最底層。 */
-/**
- * 明月的貼圖：一張放射漸層。
- *
- * 產生一次就快取在 Phaser 的貼圖管理員裡，之後每個場景共用同一張。
- * 取不到 2D context 時回 null，呼叫端就不畫月亮——少一顆月亮不影響任何玩法，
- * 但為了它讓開場崩掉就太蠢了。
- */
-function moonTexture(scene: Phaser.Scene): string | null {
-  const key = 'backdrop-moon';
-  if (scene.textures.exists(key)) return key;
+/** 背景一格像素等於幾個遊戲座標點。540×960 剛好是 180×320 格。 */
+const PIXEL = 3;
 
-  const size = 256;
-  const canvas = scene.textures.createCanvas(key, size, size);
-  if (canvas === null || canvas === undefined) return null;
-  const ctx = canvas.getContext();
-  if (ctx === null || ctx === undefined) return null;
-
-  const half = size / 2;
-  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
-  gradient.addColorStop(0, 'rgba(250, 246, 235, 0.95)');
-  gradient.addColorStop(0.36, 'rgba(246, 241, 228, 0.88)');
-  // 這一段是月盤的邊緣：從 0.88 掉到 0.2 只花 4% 的半徑，所以看得出是一顆球，
-  // 而不是一團霧。之後那一段才是光暈。
-  gradient.addColorStop(0.4, 'rgba(238, 232, 214, 0.2)');
-  gradient.addColorStop(0.62, 'rgba(226, 220, 202, 0.06)');
-  gradient.addColorStop(1, 'rgba(226, 220, 202, 0)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-  canvas.refresh();
-  return key;
+/** 明月：實心月盤加兩圈淡光，畫在低解析度那一層，邊緣自然是一格一格的。 */
+function drawMoon(g: G): void {
+  const x = GAME_WIDTH * 0.71;
+  const y = GAME_HEIGHT * 0.215;
+  g.fillStyle(0xe2dcca, 0.06);
+  g.fillCircle(x, y, 78);
+  g.fillStyle(0xe2dcca, 0.08);
+  g.fillCircle(x, y, 60);
+  g.fillStyle(0xf3ecd2, 0.92);
+  g.fillCircle(x, y, 42);
+  g.fillStyle(0xd8d0b4, 0.9);
+  g.fillCircle(x + 14, y - 9, 9);
+  g.fillCircle(x - 12, y + 12, 6);
 }
 
+/** 依境界色調畫一層背景。回傳的容器已置於最底層。 */
 export function drawBackdrop(
   scene: Phaser.Scene,
   accentHex: string,
@@ -225,25 +211,27 @@ export function drawBackdrop(
   const g = scene.add.graphics();
 
   // 天空：由上而下疊三段色塊，避免使用漸層貼圖。
-  g.fillStyle(0x0b0f14, 1);
+  g.fillStyle(0x0f1328, 1);
   g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
   g.fillStyle(accent, 0.06);
   g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT * 0.55);
   g.fillStyle(accent, 0.04);
   g.fillRect(0, GAME_HEIGHT * 0.55, GAME_WIDTH, GAME_HEIGHT * 0.45);
 
+  // 明月放在頂列與資訊面板之間那一段空白裡：那裡本來就沒有東西，
+  // 而月亮不該和任何一個要點的東西搶地方。
+  drawMoon(g);
   drawScenery(g, scenery, accent);
 
   // 由下而上的暗幕。
   //
   // 沒有它的話，遠山會一路頂到按鈕底下，而按鈕是半透明的——結果按鈕看起來像
   // 浮在山上，而不是一層介面。壓暗下半部之後，UI 自然就「浮」起來了。
-  // 用二十段矩形疊出漸層，不需要漸層貼圖。
   const scrimTop = GAME_HEIGHT * 0.42;
-  const bands = 20;
+  const bands = 10;
   for (let i = 0; i < bands; i += 1) {
     const t = (i + 1) / bands;
-    g.fillStyle(0x070a0e, 0.5 * t * t);
+    g.fillStyle(0x070a14, 0.5 * t * t);
     g.fillRect(
       0,
       scrimTop + ((GAME_HEIGHT - scrimTop) * i) / bands,
@@ -252,31 +240,23 @@ export function drawBackdrop(
     );
   }
 
-  layer.add(g);
+  // 像素化：整張先畫進三分之一大小的貼圖，再放大三倍。
+  // 地貌的程式完全不用改，斜邊與圓弧自然變成一格一格的階梯。
+  g.setScale(1 / PIXEL);
+  const sky = scene.add
+    .renderTexture(0, 0, GAME_WIDTH / PIXEL, GAME_HEIGHT / PIXEL)
+    .setOrigin(0, 0)
+    .setScale(PIXEL);
+  sky.draw(g);
+  g.destroy();
+  layer.add(sky);
 
-  // 明月。
-  //
-  // 位置與畫法都重來過兩次。原本落在 (0.74, 0.16)、亮度 0.5，正好壓在標題的
-  // 筆畫上；移開之後改用幾圈遞減透明度的實心圓堆柔邊，結果在深色背景上看得到
-  // 一圈一圈的階梯——**堆疊的圓做不出柔邊，只會做出年輪**。
-  //
-  // 現在畫成一張放射漸層貼圖，一次產生、全遊戲共用。位置放在頂列與資訊面板之間
-  // 那一段空白裡：那裡本來就沒有東西，而月亮不該和任何一個要點的東西搶地方。
-  const moon = moonTexture(scene);
-  if (moon !== null) {
-    layer.add(
-      scene.add
-        .image(GAME_WIDTH * 0.71, GAME_HEIGHT * 0.215, moon)
-        .setDisplaySize(224, 224)
-        .setAlpha(0.9),
-    );
-  }
-
-  // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。
+  // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。雲的貼圖是 4 倍點陣化，
+  // 縮放取 0.75 與 1.5，雲上的一格才會剛好是背景的一格或兩格。
   const clouds: { y: number; scale: number; alpha: number; duration: number }[] = [
-    { y: GAME_HEIGHT * 0.13, scale: 1.1, alpha: 0.12, duration: 46000 },
-    { y: GAME_HEIGHT * 0.24, scale: 0.8, alpha: 0.09, duration: 62000 },
-    { y: GAME_HEIGHT * 0.34, scale: 1.4, alpha: 0.07, duration: 78000 },
+    { y: GAME_HEIGHT * 0.13, scale: 1.5, alpha: 0.12, duration: 46000 },
+    { y: GAME_HEIGHT * 0.24, scale: 0.75, alpha: 0.1, duration: 62000 },
+    { y: GAME_HEIGHT * 0.34, scale: 1.5, alpha: 0.07, duration: 78000 },
   ];
   for (const spec of clouds) {
     if (!scene.textures.exists(ART.cloud)) break;
@@ -295,12 +275,14 @@ export function drawBackdrop(
     });
   }
 
-  // 飄浮靈光：緩慢上升的小點，讓靜態畫面有呼吸感。
+  // 飄浮靈光：緩慢上升的小方塊，讓靜態畫面有呼吸感。
   for (let i = 0; i < 18; i += 1) {
-    const mote = scene.add.circle(
+    const size = PIXEL * Phaser.Math.Between(1, 2);
+    const mote = scene.add.rectangle(
       Phaser.Math.Between(20, GAME_WIDTH - 20),
       Phaser.Math.Between(80, GAME_HEIGHT - 80),
-      Phaser.Math.Between(1, 3),
+      size,
+      size,
       accent,
       Phaser.Math.FloatBetween(0.25, 0.6),
     );
@@ -310,6 +292,8 @@ export function drawBackdrop(
       y: mote.y - Phaser.Math.Between(60, 160),
       alpha: 0,
       duration: Phaser.Math.Between(4000, 9000),
+      ease: 'Stepped',
+      easeParams: [12],
       delay: Phaser.Math.Between(0, 4000),
       repeat: -1,
       onRepeat: () => {

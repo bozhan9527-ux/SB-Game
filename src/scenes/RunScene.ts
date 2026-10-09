@@ -5,6 +5,7 @@ import {
   ENEMY_SOURCE_HEIGHT,
   DISCIPLE_DISPLAY_HEIGHT,
   DISCIPLE_SOURCE_HEIGHT,
+  bossIdleKey,
   bossTexture,
   createWalkAnimations,
   discipleTexture,
@@ -1820,15 +1821,28 @@ export class RunScene extends Phaser.Scene {
     if (enemy.boss && enemy.bossArt !== null) {
       const aura = this.add.circle(0, 0, 62, hexToNumber(DANGER), 0.16);
       const body = this.add
-        .image(0, 0, bossTexture(enemy.bossArt))
-        .setDisplaySize(140, 140);
-      container.add([aura, body]);
+        .sprite(0, 0, bossTexture(enemy.bossArt, 0))
+        .setDisplaySize(150, 150);
+      body.play(bossIdleKey(enemy.bossArt));
+      // 浮動放在外面這一層：受擊時會停掉 body 自己的補間來做後退，
+      // 浮動要是也掛在 body 上，被打一下就不動了。
+      const hover = this.add.container(0, 0, [body]);
+      container.add([aura, hover]);
       container.setData("body", body);
       container.setData("boss", true);
       this.tweens.add({
         targets: aura,
         alpha: 0.3,
         duration: 900,
+        yoyo: true,
+        repeat: -1,
+      });
+      this.tweens.add({
+        targets: hover,
+        y: -6,
+        duration: 1000,
+        ease: "Stepped",
+        easeParams: [4],
         yoyo: true,
         repeat: -1,
       });
@@ -1856,9 +1870,9 @@ export class RunScene extends Phaser.Scene {
     // 一般妖魔各有一條小血條：沒有它就看不出「打不動」和「快死了」的差別。
     // 首領不畫，它的血量已經在畫面頂端有一條大的，畫兩條只是干擾。
     if (!enemy.boss) {
-      const barBg = this.add.rectangle(0, -46, 46, 5, 0x000000, 0.6);
+      const barBg = this.add.rectangle(0, -56, 46, 6, 0x000000, 0.7);
       const bar = this.add
-        .rectangle(-23, -46, 46, 5, 0xd8434f, 1)
+        .rectangle(-23, -56, 46, 6, 0xd8434f, 1)
         .setOrigin(0, 0.5);
       container.add([barBg, bar]);
       container.setData("bar", bar);
@@ -1872,7 +1886,7 @@ export class RunScene extends Phaser.Scene {
         this.add
           .text(
             26,
-            -46,
+            -56,
             mark.text,
             textStyle({ size: 15, color: mark.color, bold: true }),
           )

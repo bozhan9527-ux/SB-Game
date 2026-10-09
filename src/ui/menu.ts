@@ -16,7 +16,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { createButton } from './button';
 import { createSlider } from './slider';
-import { BG_PANEL, GOLD, INK, INK_DIM, LINE, hexToNumber, textStyle, ACCENT_GLOW } from './theme';
+import { BG_PANEL, EDGE, GOLD, INK, INK_DIM, LINE, hexToNumber, textStyle } from './theme';
 import { fadeToScene } from './transition';
 import { realmIndexForStage } from '../systems/realms';
 
@@ -68,18 +68,16 @@ export function openMenu(scene: Phaser.Scene, entries: readonly MenuEntry[]): vo
     // 指的是面板以外，不是面板上沒有按鈕的地方。
     const panel = scene.add
       .rectangle(cx, top + height / 2, width, height, BG_PANEL, 0.98)
-      .setStrokeStyle(2, LINE)
+      .setStrokeStyle(4, EDGE)
       .setInteractive();
-
-    // 面板光暈效果：添加額外的邊框增加質感
-    const panelGlow = scene.add
-      .rectangle(cx, top + height / 2, width + 4, height + 4, 0x000000, 0)
-      .setStrokeStyle(1, hexToNumber(ACCENT_GLOW), 0.3);
+    const panelInset = scene.add
+      .rectangle(cx, top + height / 2, width - 8, height - 8, 0x000000, 0)
+      .setStrokeStyle(3, LINE);
 
     const title = scene.add
       .text(cx, top + 46, '選　單', textStyle({ size: 28, color: INK, bold: true }))
       .setOrigin(0.5);
-    body.add([panel, panelGlow, title]);
+    body.add([panel, panelInset, title]);
 
     entries.forEach((entry, index) => {
       const y = top + 96 + index * rowHeight + 26;
@@ -118,13 +116,11 @@ export function openMenu(scene: Phaser.Scene, entries: readonly MenuEntry[]): vo
     const height = 300;
     const panel = scene.add
       .rectangle(cx, top + height / 2, width, height, BG_PANEL, 0.98)
-      .setStrokeStyle(2, hexToNumber(GOLD))
+      .setStrokeStyle(4, EDGE)
       .setInteractive();
-
-    // 面板光暈效果：添加額外的邊框增加質感
-    const panelGlow = scene.add
-      .rectangle(cx, top + height / 2, width + 4, height + 4, 0x000000, 0)
-      .setStrokeStyle(1, hexToNumber(GOLD), 0.4);
+    const panelInset = scene.add
+      .rectangle(cx, top + height / 2, width - 8, height - 8, 0x000000, 0)
+      .setStrokeStyle(3, hexToNumber(GOLD));
 
     const title = scene.add
       .text(cx, top + 44, '音　樂', textStyle({ size: 28, color: GOLD, bold: true }))
@@ -132,7 +128,7 @@ export function openMenu(scene: Phaser.Scene, entries: readonly MenuEntry[]): vo
     const hint = scene.add
       .text(cx, top + 76, '歸零就是關掉', textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(0.5);
-    body.add([panel, panelGlow, title, hint]);
+    body.add([panel, panelInset, title, hint]);
 
     const sfx = createSlider(scene, cx, top + 122, {
       width: width - 56,

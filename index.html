@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0d1116" />
+    <meta name="theme-color" content="#0f1328" />
     <!-- 內嵌 favicon，避免瀏覽器對 /favicon.ico 發出 404 請求 -->
     <link
       rel="icon"
@@ -24,7 +24,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #0d1116;
+        background: #0f1328;
         /* 觸控遊戲：關閉瀏覽器的手勢攔截，否則拖曳符牌會被下拉刷新／選字吃掉 */
         overscroll-behavior: none;
         touch-action: none;
@@ -38,6 +38,8 @@
       }
       canvas {
         display: block;
+        /* 畫布縮放到螢幕大小時也不做平滑，否則像素會糊成一片。 */
+        image-rendering: pixelated;
       }
     </style>
   </head>
