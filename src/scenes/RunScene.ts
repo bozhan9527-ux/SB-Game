@@ -2597,6 +2597,12 @@ export class RunScene extends Phaser.Scene {
   }
 
   private showIntro(accentHex: string): void {
+    // 起手就排成陣的場（副本會預擺符）在這之前已經報過一次陣法，公告條正好落在
+    // 開場說明的位置上。開場說明優先，那一條收掉——場上的連線本身還看得到。
+    if (this.noticeBox !== undefined && this.noticeBox.text.active) {
+      this.tweens.killTweensOf(this.noticeBox.container);
+      this.noticeBox.container.setVisible(false);
+    }
     const realm = realmForStage(this.run.stage);
     // 這一關該學的那一條掛在境界名底下：規則在它第一次派上用場的當下講，
     // 比塞在一頁說明裡有效得多。
