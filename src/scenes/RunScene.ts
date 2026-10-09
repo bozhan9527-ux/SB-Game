@@ -568,7 +568,10 @@ export class RunScene extends Phaser.Scene {
       .rectangle(GAME_WIDTH / 2, 880, GAME_WIDTH, 160, BG_PANEL, 1)
       .setDepth(40);
     this.add
-      .rectangle(GAME_WIDTH / 2, 800, GAME_WIDTH, 2, LINE, 0.8)
+      .rectangle(GAME_WIDTH / 2, 801.5, GAME_WIDTH, 3, EDGE, 1)
+      .setDepth(40);
+    this.add
+      .rectangle(GAME_WIDTH / 2, 804.5, GAME_WIDTH, 3, hexToNumber(GOLD), 0.75)
       .setDepth(40);
     this.discardZone = this.add
       .rectangle(GAME_WIDTH / 2, 946, GAME_WIDTH, 28, hexToNumber(DANGER), 0.12)
@@ -622,9 +625,10 @@ export class RunScene extends Phaser.Scene {
     this.add
       .rectangle(GAME_WIDTH / 2, 55, GAME_WIDTH, 110, BG_PANEL, 1)
       .setDepth(50);
+    // 底緣是波次進度條（見下方 waveBar），再往下壓一條深色硬邊收邊。
     this.add
-      .rectangle(GAME_WIDTH / 2, 110, GAME_WIDTH, 2, LINE, 0.8)
-      .setDepth(50);
+      .rectangle(GAME_WIDTH / 2, 111.5, GAME_WIDTH, 3, EDGE, 1)
+      .setDepth(52);
 
     this.add
       .text(
@@ -738,7 +742,7 @@ export class RunScene extends Phaser.Scene {
       .setInteractive();
     const panel = this.add
       .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH - 96, 320, BG_PANEL, 0.98)
-      .setStrokeStyle(2, hexToNumber(GOLD));
+      .setStrokeStyle(3, hexToNumber(GOLD));
     const title = this.add
       .text(
         cx,
@@ -1917,7 +1921,7 @@ export class RunScene extends Phaser.Scene {
     // 一般妖魔各有一條小血條：沒有它就看不出「打不動」和「快死了」的差別。
     // 首領不畫，它的血量已經在畫面頂端有一條大的，畫兩條只是干擾。
     if (!enemy.boss) {
-      const barBg = this.add.rectangle(0, -56, 46, 6, 0x000000, 0.7).setStrokeStyle(2, EDGE);
+      const barBg = this.add.rectangle(0, -56, 46, 6, 0x000000, 0.7).setStrokeStyle(3, EDGE);
       const bar = this.add
         .rectangle(-23, -56, 46, 6, 0xd8434f, 1)
         .setOrigin(0, 0.5);
@@ -1992,7 +1996,7 @@ export class RunScene extends Phaser.Scene {
       .setStroke("#0b0f14", 6);
     const bg = this.add
       .rectangle(cx, 160, width, 22, 0x2a1216, 1)
-      .setStrokeStyle(2, LINE);
+      .setStrokeStyle(3, LINE);
     this.bossBar = this.add
       .rectangle(cx - width / 2, 160, width, 18, 0xc03a4a, 1)
       .setOrigin(0, 0.5);
@@ -2341,7 +2345,7 @@ export class RunScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const panel = this.add
       .rectangle(cx, 0, GAME_WIDTH - 56, 128, BG_PANEL, 0.97)
-      .setStrokeStyle(2, hexToNumber(GOLD));
+      .setStrokeStyle(3, hexToNumber(GOLD));
     this.coachTitle = this.add
       .text(cx, -36, "", textStyle({ size: 24, color: GOLD, bold: true }))
       .setOrigin(0.5);
@@ -2478,7 +2482,7 @@ export class RunScene extends Phaser.Scene {
     } else {
       const panel = this.add
         .rectangle(GAME_WIDTH / 2, 528, GAME_WIDTH - 60, 132, BG_PANEL, 0.95)
-        .setStrokeStyle(2, hexToNumber(GOLD))
+        .setStrokeStyle(3, hexToNumber(GOLD))
         .setDepth(80);
       const heading = this.add
         .text(

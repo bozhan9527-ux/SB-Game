@@ -6,6 +6,7 @@
  * 一個不可逆的操作，資訊必須全部在按下去之前就攤開。
  */
 import Phaser from 'phaser';
+import { pixelPanel } from '../ui/panel';
 import { GAME_WIDTH } from '../config';
 import { BALANCE, KARMA } from '../data';
 import type { KarmaTrack } from '../data/types';
@@ -70,9 +71,7 @@ export class RebirthScene extends Phaser.Scene {
 
     // 轉世區。留下什麼、失去什麼要寫在同一個地方，玩家才不必自己猜。
     const panelTop = top + KARMA.length * (rowHeight + rowGap) + 8;
-    this.add
-      .rectangle(cx, panelTop + 76, GAME_WIDTH - 40, 152, BG_PANEL, 0.9)
-      .setStrokeStyle(2, hexToNumber(GOLD));
+    pixelPanel(this, cx, panelTop + 76, GAME_WIDTH - 40, 152, { accent: hexToNumber(GOLD) });
     this.offerText = this.add
       .text(cx, panelTop + 40, '', textStyle({ size: 17, color: INK }))
       .setOrigin(0.5)
@@ -105,7 +104,7 @@ export class RebirthScene extends Phaser.Scene {
     const top = cy - height / 2;
     const textWidth = width - 176;
 
-    this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(2, LINE);
+    this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(3, LINE);
     this.add.text(left, top + 8, track.name, textStyle({ size: 25, color: INK, bold: true }));
     const level = this.add.text(left + 140, top + 14, '', textStyle({ size: 17, color: JADE }));
     const desc = this.add.text(left, top + 42, track.desc, textStyle({ size: 15, color: INK_DIM }));

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { CARDS } from "../data";
@@ -401,7 +402,7 @@ export class ResultScene extends Phaser.Scene {
     const y = 66;
     const panel = this.add
       .rectangle(cx, y, GAME_WIDTH - 60, 58, BG_PANEL, 0.96)
-      .setStrokeStyle(2, hexToNumber(GOLD))
+      .setStrokeStyle(3, hexToNumber(GOLD))
       .setDepth(90)
       .setAlpha(0);
     const label = this.add
@@ -521,9 +522,7 @@ export class ResultScene extends Phaser.Scene {
     );
     const height = rows.length * 40 + 24;
 
-    this.add
-      .rectangle(cx, cy, width, height, BG_PANEL, 0.9)
-      .setStrokeStyle(2, LINE);
+    pixelPanel(this, cx, cy, width, height);
     rows.forEach((row, index) => {
       const y = cy - height / 2 + 32 + index * 40;
       this.add
@@ -742,7 +741,7 @@ export class ResultScene extends Phaser.Scene {
     parts.push(
       this.add
         .rectangle(cx, chartTop + height / 2, width, height, BG_PANEL, 0.7)
-        .setStrokeStyle(2, LINE),
+        .setStrokeStyle(3, LINE),
     );
     if (curve.length < 2 || peak <= 0) {
       parts.push(

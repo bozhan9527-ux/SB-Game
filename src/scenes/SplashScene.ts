@@ -3,7 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { state } from '../state';
 import { realmForStage } from '../systems/realms';
 import { drawBackdrop } from '../ui/backdrop';
-import { GOLD, INK, INK_DIM, hexToNumber, textStyle } from '../ui/theme';
+import { GOLD, INK_DIM, hexToNumber, textStyle } from '../ui/theme';
 import { fadeToScene } from '../ui/transition';
 
 /**
@@ -45,7 +45,10 @@ export class SplashScene extends Phaser.Scene {
     CHARS.forEach((char, index) => {
       const x = cx - total / 2 + CHAR_SIZE / 2 + index * (CHAR_SIZE + CHAR_GAP);
       const text = this.add
-        .text(x, cy + 26, char, textStyle({ size: CHAR_SIZE, color: INK, bold: true }))
+        .text(x, cy + 26, char, textStyle({ size: CHAR_SIZE, color: GOLD, bold: true }))
+        // 招牌字：深色描邊加一層往下的實心影，不模糊——像素遊戲的標題都是這樣做出厚度。
+        .setStroke('#12141c', 8)
+        .setShadow(0, 7, '#5a3a10', 0, true, true)
         .setOrigin(0.5)
         .setAlpha(0)
         .setScale(1.14);
@@ -67,7 +70,7 @@ export class SplashScene extends Phaser.Scene {
     // 用 scaleX 而不是補間 width：Phaser 的 Rectangle 改 width 是往右長的，
     // 補出來的線會從中央一路長到畫面右緣，看起來像跑掉了而不是像展開。
     const rule = this.add
-      .rectangle(cx, cy + 62, total + 20, 2, hexToNumber(GOLD))
+      .rectangle(cx, cy + 66, total + 20, 3, hexToNumber(GOLD))
       .setAlpha(0)
       .setScale(0, 1);
     this.tweens.add({

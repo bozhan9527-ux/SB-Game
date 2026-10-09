@@ -249,7 +249,7 @@ export class TalismanScene extends Phaser.Scene {
       const x = cx + (i - (TALISMAN_SLOTS - 1) / 2) * CHOSEN_STEP;
       const background = this.add
         .rectangle(0, 0, TILE_W, CHOSEN_H, BG_PANEL, 0.92)
-        .setStrokeStyle(2, LINE)
+        .setStrokeStyle(3, LINE)
         .setInteractive({ useHandCursor: true });
       const glyph = this.add.image(0, -10, glyphTexture('sword'));
       const name = this.add.text(0, 20, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
@@ -289,7 +289,7 @@ export class TalismanScene extends Phaser.Scene {
 
       const background = this.add
         .rectangle(x, y, TILE_W, TILE_H, BG_PANEL, 0.92)
-        .setStrokeStyle(2, LINE)
+        .setStrokeStyle(3, LINE)
         .setInteractive({ useHandCursor: true });
       // 圖騰放大成格子的主體。二十張符靠名字分辨要一個一個讀，
       // 靠形狀是掃過去就認得——而這一頁的工作正是「比較」。
@@ -409,7 +409,7 @@ export class TalismanScene extends Phaser.Scene {
   private buildDetail(cx: number): void {
     this.add
       .rectangle(cx, DETAIL_TOP + 95, GAME_WIDTH - 36, 190, BG_PANEL, 0.9)
-      .setStrokeStyle(2, LINE);
+      .setStrokeStyle(3, LINE);
     this.detailTitle = this.add.text(30, DETAIL_TOP + 10, '', textStyle({ size: 21, bold: true }));
     this.detail = this.add
       .text(30, DETAIL_TOP + 40, '', textStyle({ size: 15, color: INK }))

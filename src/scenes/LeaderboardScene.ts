@@ -262,7 +262,7 @@ export class LeaderboardScene extends Phaser.Scene {
     const height = this.visibleRows * ROW_HEIGHT + 20;
     this.add
       .rectangle(cx, this.listTop + height / 2, width, height, BG_PANEL, 0.9)
-      .setStrokeStyle(2, LINE);
+      .setStrokeStyle(3, LINE);
     // 一列拆成三塊：獎牌、名字、成績。
     //
     // 原本是一整條字串，於是名字只能和名次、成績共用同一個字級——而**名字
@@ -272,7 +272,7 @@ export class LeaderboardScene extends Phaser.Scene {
     for (let i = 0; i < this.visibleRows; i += 1) {
       const y = this.listTop + 24 + i * ROW_HEIGHT;
       this.rows.push({
-        medal: this.add.circle(left + 32, y, 15).setStrokeStyle(2, LINE).setVisible(false),
+        medal: this.add.circle(left + 32, y, 15).setStrokeStyle(3, LINE).setVisible(false),
         rank: this.add
           .text(left + 32, y, '', textStyle({ size: 15, color: INK_DIM, bold: true }))
           .setOrigin(0.5),
@@ -704,10 +704,10 @@ export class LeaderboardScene extends Phaser.Scene {
         row.medal
           .setVisible(true)
           .setFillStyle(hexToNumber(medal))
-          .setStrokeStyle(2, hexToNumber(medal));
+          .setStrokeStyle(3, hexToNumber(medal));
         row.rank.setColor('#1a1408');
       } else if (entry.rank <= MEDAL_RANKS) {
-        row.medal.setVisible(true).setFillStyle(BG_PANEL_ALT).setStrokeStyle(2, LINE);
+        row.medal.setVisible(true).setFillStyle(BG_PANEL_ALT).setStrokeStyle(3, LINE);
         row.rank.setColor(INK_DIM);
       } else {
         row.medal.setVisible(false);

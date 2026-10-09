@@ -105,7 +105,7 @@ export class UpgradeScene extends Phaser.Scene {
     // 右側留給購買按鈕，文字寬度要扣掉。
     const textWidth = width - 176;
 
-    this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(2, LINE);
+    this.add.rectangle(cx, cy, width, height, BG_PANEL, 0.9).setStrokeStyle(3, LINE);
     this.add.text(left, top + 8, track.name, textStyle({ size: 25, color: INK, bold: true }));
     const level = this.add.text(left + 140, top + 14, '', textStyle({ size: 17, color: JADE }));
     // 說明固定一行：列高只有 96，換行會把下面的效果數字擠出面板。
@@ -143,7 +143,7 @@ export class UpgradeScene extends Phaser.Scene {
 
     this.add
       .rectangle(cx, cy, width, height, BG_PANEL, 0.9)
-      .setStrokeStyle(2, hexToNumber(accent));
+      .setStrokeStyle(3, hexToNumber(accent));
 
     if (sect === null || track === null) {
       this.add

@@ -64,7 +64,7 @@ export class AchievementScene extends Phaser.Scene {
       const width = GAME_WIDTH - 40;
       const frame = this.add
         .rectangle(cx, y, width, rowHeight - 8, BG_PANEL, 0.9)
-        .setStrokeStyle(2, LINE);
+        .setStrokeStyle(3, LINE);
       list.add(frame);
       const left = cx - width / 2 + 18;
       list.add(
@@ -166,7 +166,7 @@ export class AchievementScene extends Phaser.Scene {
       if (item === undefined) continue;
       const unlocked = isUnlocked(save, item.id);
       const claimed = isClaimed(save, item.id);
-      row.frame.setStrokeStyle(2, unlocked && !claimed ? hexToNumber(GOLD) : LINE);
+      row.frame.setStrokeStyle(3, unlocked && !claimed ? hexToNumber(GOLD) : LINE);
       row.status
         .setText(claimed ? '已領取' : unlocked ? '可領取' : progressOf(save, item))
         .setColor(claimed ? INK_DIM : unlocked ? JADE : INK_DIM);

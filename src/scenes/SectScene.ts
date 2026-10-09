@@ -118,7 +118,7 @@ export class SectScene extends Phaser.Scene {
 
     const background = this.add
       .rectangle(cx, cy, width, height, BG_PANEL, 0.92)
-      .setStrokeStyle(2, LINE)
+      .setStrokeStyle(3, LINE)
       .setInteractive({ useHandCursor: true });
 
     // 版面依「說明兩行、被動兩行、數值一行、修為與專精一行」排。

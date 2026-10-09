@@ -9,6 +9,7 @@
  * 存檔碼是保險，兩者解決的不是同一種失敗。
  */
 import Phaser from 'phaser';
+import { pixelPanel } from '../ui/panel';
 import { GAME_WIDTH } from '../config';
 import { exportCode, importCode } from '../save/archive';
 import { adoptSave } from '../save';
@@ -20,7 +21,7 @@ import { setTelemetryEnabled } from '../telemetry';
 import { recordLines } from '../systems/records';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, textStyle, wrapText } from '../ui/theme';
+import { DANGER, GOLD, INK, INK_DIM, JADE, textStyle, wrapText } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 /** 版面。每一段的高度都是算過的，加東西就要重算——這是 PROGRESS 的 L-08。 */
@@ -69,7 +70,7 @@ export class ArchiveScene extends Phaser.Scene {
     const width = GAME_WIDTH - 44;
     const height = lines.length * RECORDS_ROW + 56;
 
-    this.add.rectangle(cx, top + height / 2, width, height, BG_PANEL, 0.9).setStrokeStyle(2, LINE);
+    pixelPanel(this, cx, top + height / 2, width, height);
     this.add
       .text(cx, top + 20, '個人紀錄', textStyle({ size: 22, color: GOLD, bold: true }))
       .setOrigin(0.5);

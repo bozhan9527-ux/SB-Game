@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { pixelPanel } from '../ui/panel';
 import { libraryFloor } from '../systems/dungeons';
 import { audio } from '../audio';
 import type { IconName } from '../art';
@@ -17,7 +18,6 @@ import { createButton } from '../ui/button';
 import { openMenu } from '../ui/menu';
 import { drawBackdrop } from '../ui/backdrop';
 import {
-  BG_PANEL,
   BG_PANEL_ALT,
   DANGER,
   GOLD,
@@ -214,9 +214,7 @@ export class TitleScene extends Phaser.Scene {
   ): number {
     const cx = GAME_WIDTH / 2;
     const height = 210;
-    this.add
-      .rectangle(cx, top + height / 2, GAME_WIDTH - 48, height, BG_PANEL, 0.72)
-      .setStrokeStyle(1, LINE);
+    pixelPanel(this, cx, top + height / 2, GAME_WIDTH - 48, height, { alpha: 0.88 });
 
     this.add
       .text(cx, top + 44, realmTitle(save.world.stage), textStyle({ size: 44, color: realm.color, bold: true }))
@@ -256,7 +254,7 @@ export class TitleScene extends Phaser.Scene {
 
     this.add
       .rectangle(x, y, cell - 6, cell - 6, BG_PANEL_ALT, 0.9)
-      .setStrokeStyle(2, hexToNumber(sect.color));
+      .setStrokeStyle(3, hexToNumber(sect.color));
     // 原寸、只裁頭與上半身：格子只有 44 點，整個人縮進去會掉格子變形。
     this.add
       .image(x, y, discipleTexture(sect.art, 0, 0))
@@ -265,13 +263,13 @@ export class TitleScene extends Phaser.Scene {
     x += cell / 2 + 13;
 
     // 一條細線分開「我是誰」和「我帶什麼」——五個等距的方格會讓人以為是同一類東西。
-    this.add.rectangle(x, y, 1, cell - 14, LINE).setAlpha(0.8);
+    this.add.rectangle(x, y, 3, cell - 14, LINE).setAlpha(0.8);
     x += 13 + cell / 2;
 
     talismans.forEach((def) => {
       this.add
         .rectangle(x, y, cell - 8, cell - 8, BG_PANEL_ALT, 0.9)
-        .setStrokeStyle(1, hexToNumber(def.color));
+        .setStrokeStyle(3, hexToNumber(def.color));
       this.add.image(x, y, glyphTexture(def.art));
       x += cell;
     });

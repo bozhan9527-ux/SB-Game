@@ -279,7 +279,7 @@ export class HelpScene extends Phaser.Scene {
       const height = 44 + text.height + 18;
       const panel = this.add
         .rectangle(cx, y + height / 2, width, height, BG_PANEL, 0.9)
-        .setStrokeStyle(2, LINE);
+        .setStrokeStyle(3, LINE);
       title.setY(y + 12);
       text.setY(y + 44);
       list.add([panel, title, text]);
