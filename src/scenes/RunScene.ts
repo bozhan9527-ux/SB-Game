@@ -1935,7 +1935,17 @@ export class RunScene extends Phaser.Scene {
       });
       // 浮動放在外面這一層：受擊時會停掉 body 自己的補間來做後退，
       // 浮動要是也掛在 body 上，被打一下就不動了。
-      const hover = this.add.container(0, 0, [body]);
+      // 受擊用的白色覆蓋層：首領有 150px，整隻換成純白剪影一秒閃兩次太刺眼，
+      // 也把造型細節整個吃掉。疊一層半透明的白，同一支動畫同時開始，幀永遠對得上。
+      const flashCopy = this.add
+        .sprite(0, 0, bossTexture(enemy.bossArt, 0))
+        .setDisplaySize(150, 150)
+        .setTintFill(0xffffff)
+        .setAlpha(0.55)
+        .setVisible(false);
+      flashCopy.play(bossIdleKey(enemy.bossArt));
+      container.setData("flashCopy", flashCopy);
+      const hover = this.add.container(0, 0, [body, flashCopy]);
       container.add([aura, embers, hover]);
       // 由大縮小、一格一格現身，像從陣法裡壓下來。
       hover.setScale(1.6).setAlpha(0);
@@ -2047,6 +2057,7 @@ export class RunScene extends Phaser.Scene {
       if (tintUntil !== undefined && this.time.now >= tintUntil) {
         view.setData("tintUntil", undefined);
         (view.getData("body") as EnemyBody | undefined)?.clearTint();
+        (view.getData("flashCopy") as Phaser.GameObjects.Sprite | undefined)?.setVisible(false);
       }
       if (enemy.boss) this.refreshBossPanel(enemy);
     }
@@ -2282,15 +2293,19 @@ export class RunScene extends Phaser.Scene {
 
     const body = view.getData("body") as EnemyBody | undefined;
     if (body === undefined) return;
-    body.setTintFill(0xffffff);
+    const flashCopy = view.getData("flashCopy") as Phaser.GameObjects.Sprite | undefined;
+    if (flashCopy !== undefined) flashCopy.setVisible(true);
+    else body.setTintFill(0xffffff);
     // 熄燈交給 syncEnemies 按時間關，不綁在位移的 tween 上：
     // 位移要 150ms 才走完，白閃只該亮 45ms，綁在一起就變成一團白。
     view.setData("tintUntil", now + FLASH_MS);
-    this.tweens.killTweensOf(body);
+    // 覆蓋層要跟著身體一起後退，不然白光會留在原地、和身體錯開。
+    const recoil = flashCopy === undefined ? [body] : [body, flashCopy];
+    this.tweens.killTweensOf(recoil);
     // 妖魔是由上往下走的，所以「往後」＝往上。
-    body.y = -7;
+    for (const part of recoil) part.y = -7;
     this.tweens.add({
-      targets: body,
+      targets: recoil,
       y: 0,
       duration: 150,
       ease: "Quad.easeOut",
