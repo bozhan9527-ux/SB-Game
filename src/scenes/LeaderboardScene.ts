@@ -202,7 +202,10 @@ export class LeaderboardScene extends Phaser.Scene {
       .text(
         cx,
         136 + shift,
-        `你最深到第 ${save.world.highestStage} 關`,
+        // 競技場不看主線進度：在那一頁寫「最深到第 85 關」會被讀成競技場成績。
+        this.board === 'arena'
+          ? '試劍台：加成歸零，比誰撐最多波'
+          : `你最深到第 ${save.world.highestStage} 關`,
         textStyle({ size: 22, color: GOLD, bold: true }),
       )
       .setOrigin(0.5);
@@ -299,8 +302,9 @@ export class LeaderboardScene extends Phaser.Scene {
     // 舊版本」在畫面上完全沒有答案——今天為了這件事來回猜了三次。
     // 一個數字就解決：和伺服器對不上時，它就是那句話的證據。
     this.add
-      .text(cx, GAME_HEIGHT - 24, `版本 ${REPLAY_CONTRACT_VERSION}`, textStyle({ size: 13, color: INK_DIM }))
-      .setOrigin(0.5)
+      // 放在右下角、按鈕底緣（933）以下：置中的話會被返回鍵的立體邊壓掉半行。
+      .text(GAME_WIDTH - 16, GAME_HEIGHT - 12, `版本 ${REPLAY_CONTRACT_VERSION}`, textStyle({ size: 13, color: INK_DIM }))
+      .setOrigin(1, 0.5)
       .setAlpha(0.7);
 
     this.status = this.add
