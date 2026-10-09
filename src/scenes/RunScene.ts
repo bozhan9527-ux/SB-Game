@@ -211,8 +211,11 @@ interface BannerBox {
  */
 const ENEMY_TEXT_DEPTH = 24;
 
-/** 首領登場演出的中心線：放在妖物出場的那一段，黑帶與字都碰不到陣位。 */
+/** 首領登場演出的中心線（陣位只有三排時）：放在妖物出場的那一段，黑帶與字都碰不到陣位。 */
 const BOSS_INTRO_Y = ARENA_TOP + 174;
+/** 上下黑帶離中心線的距離，以及黑帶的高度。 */
+const BOSS_BAND_GAP = 120;
+const BOSS_BAND_HEIGHT = 74;
 
 /**
  * 習性的標記：一個字加一個顏色。
@@ -697,16 +700,24 @@ export class RunScene extends Phaser.Scene {
     const dungeon = entry === null ? null : dungeonById(entry.id);
     if (dungeon !== null && entry !== null) {
       // 無限副本沒有層數可講，改成即時的波數——那是玩家在裡面唯一的進度感。
+      // 狀態列正下方一條專用的深色窄帶：直接把字放在 y=106 會和波次進度條、
+      // 狀態列底邊、戰場外框與角飾全部疊在一起。
+      this.add
+        .rectangle(GAME_WIDTH / 2, 124, GAME_WIDTH, 21, BG_PANEL, 1)
+        .setStrokeStyle(3, EDGE)
+        .setDepth(52);
       this.dungeonBanner = this.add
         .text(
           20,
-          106,
+          125,
           dungeon.endless
             ? `${dungeon.name} 第 1 波　${dungeon.desc}`
             : `${dungeon.name} 第 ${entry.floor} 層　${dungeon.desc}`,
           textStyle({ size: 15, color: GOLD, bold: true }),
         )
-        .setDepth(52);
+        .setOrigin(0, 0.5)
+        .setDepth(53);
+      fitText(this.dungeonBanner, GAME_WIDTH - 40);
       this.endlessBanner = dungeon.endless
         ? (waves: number): string => `${dungeon.name} 第 ${waves} 波　${dungeon.desc}`
         : null;
@@ -2078,34 +2089,34 @@ export class RunScene extends Phaser.Scene {
       onComplete: () => flash.destroy(),
     });
 
+    // 中心線跟著陣位上緣走：陣位越高，演出越往上，下方黑帶的底緣不能碰到最上排的符。
+    const room = this.fieldTopEdge() - ARENA_TOP;
+    const centerY = Math.min(BOSS_INTRO_Y, ARENA_TOP + room / 2);
+    const gap = Math.min(BOSS_BAND_GAP, room / 2 - BOSS_BAND_HEIGHT / 2);
+
     // 上下兩道黑帶收進來又打開，做出「鏡頭讓位」的感覺。
-    const bandHeight = 74;
-    const bands = [-1, 1].map((side) =>
-      this.add
-        .rectangle(
-          cx,
-          BOSS_INTRO_Y + side * 120,
-          GAME_WIDTH,
-          0,
-          0x0b0f14,
-          0.86,
-        )
-        .setDepth(47),
-    );
-    this.tweens.add({
-      targets: bands,
-      displayHeight: bandHeight,
-      duration: 220,
-      yoyo: true,
-      hold: 900,
-      ease: "Quad.easeOut",
-      onComplete: () => bands.forEach((band) => band.destroy()),
-    });
+    // 空間窄到黑帶會壓住名字時就不畫，只留名字與台詞。
+    if (gap >= 90) {
+      const bands = [-1, 1].map((side) =>
+        this.add
+          .rectangle(cx, centerY + side * gap, GAME_WIDTH, 0, 0x0b0f14, 0.86)
+          .setDepth(47),
+      );
+      this.tweens.add({
+        targets: bands,
+        displayHeight: BOSS_BAND_HEIGHT,
+        duration: 220,
+        yoyo: true,
+        hold: 900,
+        ease: "Quad.easeOut",
+        onComplete: () => bands.forEach((band) => band.destroy()),
+      });
+    }
 
     const title = this.add
       .text(
         cx,
-        BOSS_INTRO_Y - 26,
+        centerY - 26,
         boss.name,
         textStyle({ size: 44, color: DANGER, bold: true }),
       )
@@ -2131,7 +2142,7 @@ export class RunScene extends Phaser.Scene {
 
     this.floatText(
       cx,
-      BOSS_INTRO_Y + 34,
+      centerY + 34,
       `「${boss.taunt}」`,
       INK,
       22,
@@ -2566,8 +2577,11 @@ export class RunScene extends Phaser.Scene {
     const bottom = this.fieldTopEdge() - 10;
     const panelH = 132;
     const bodyTop = lesson === null ? bottom - 24 : bottom - panelH;
-    const subY = Math.max(ARENA_TOP + 92, bodyTop - 24);
+    const subY = bodyTop - 24;
     const titleY = subY - 52;
+    // 陣位很高時放不下整組：境界名頂端會撞進狀態列。這時只留說明——
+    // 境界名在頂端狀態列本來就有，說明則只會出現這一次。
+    const roomForTitle = titleY - 28 >= ARENA_TOP;
 
     const title = this.add
       .text(GAME_WIDTH / 2, titleY, realmTitle(this.run.stage), textStyle({ size: 48, color: accentHex, bold: true }))
@@ -2580,6 +2594,10 @@ export class RunScene extends Phaser.Scene {
       .setStroke("#0b0f14", 6)
       .setDepth(80);
     const parts: Phaser.GameObjects.GameObject[] = [title, sub];
+    if (!roomForTitle) {
+      title.setVisible(false);
+      sub.setVisible(false);
+    }
     let hold = 1100;
 
     if (lesson === null) {
@@ -2656,7 +2674,8 @@ export class RunScene extends Phaser.Scene {
       Math.floor(inStageMs / BALANCE.wave.waveIntervalMs) + 1,
     );
     if (this.endlessBanner !== null && this.dungeonBanner !== null) {
-      this.dungeonBanner.setText(this.endlessBanner(run.clearedStages + 1));
+      this.dungeonBanner.setText(this.endlessBanner(run.clearedStages + 1)).setScale(1);
+      fitText(this.dungeonBanner, GAME_WIDTH - 40);
     }
     this.hudWave.setText(
       run.bossSpawnedAtMs === null
