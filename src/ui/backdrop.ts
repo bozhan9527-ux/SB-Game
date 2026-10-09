@@ -75,25 +75,38 @@ function drawScenery(g: G, scenery: Scenery, accent: number): void {
       }
       break;
 
-    case 'volcano':
-      ridge(base + 40, 180, 4, near, 0.85);
-      g.fillStyle(0x1a0f10, 0.95);
+    case 'volcano': {
+      // 火山擺在右後方的地平線上，山腳讓近處的山蓋住。
+      // 原本是一整條暗色梯形直通到畫面底，正好壓在戰場中央，看起來像一根柱子。
+      const vx = GAME_WIDTH * 0.7;
+      const top = base - 96;
+      g.fillStyle(0x2a1416, 0.95);
       g.fillPoints(
         [
-          { x: GAME_WIDTH * 0.5 - 190, y: GAME_HEIGHT },
-          { x: GAME_WIDTH * 0.5 - 52, y: base - 120 },
-          { x: GAME_WIDTH * 0.5 + 52, y: base - 120 },
-          { x: GAME_WIDTH * 0.5 + 190, y: GAME_HEIGHT },
+          { x: vx - 150, y: base + 40 },
+          { x: vx - 30, y: top },
+          { x: vx + 30, y: top },
+          { x: vx + 150, y: base + 40 },
         ],
         true,
       );
-      g.fillStyle(0xff8a3a, 0.65);
-      g.fillEllipse(GAME_WIDTH * 0.5, base - 120, 104, 22);
-      g.fillStyle(0xff5a2a, 0.35);
+      // 受光面與岩漿流
+      g.fillStyle(0x4a2420, 0.9);
+      g.fillPoints([{ x: vx - 30, y: top }, { x: vx - 6, y: top }, { x: vx - 60, y: base + 40 }, { x: vx - 150, y: base + 40 }], true);
+      g.fillStyle(0xff6a2a, 0.75);
+      g.fillPoints([{ x: vx - 6, y: top + 3 }, { x: vx + 6, y: top + 3 }, { x: vx - 12, y: top + 60 }, { x: vx - 21, y: top + 60 }], true);
+      g.fillPoints([{ x: vx + 12, y: top + 3 }, { x: vx + 18, y: top + 3 }, { x: vx + 33, y: top + 42 }, { x: vx + 27, y: top + 42 }], true);
+      g.fillStyle(0xffb04a, 0.9);
+      g.fillRect(vx - 27, top - 3, 54, 6);
+      g.fillStyle(0xff8a3a, 0.1);
+      g.fillCircle(vx, top - 6, 30);
+      g.fillStyle(0xff8a3a, 0.5);
       for (let i = 0; i < 9; i += 1) {
-        g.fillCircle(GAME_WIDTH * 0.5 + Math.sin(i * 2.1) * 120, base - 160 - i * 26, 3 + (i % 3));
+        g.fillRect(vx + Math.sin(i * 2.1) * 60, top - 30 - i * 21, 3, 3);
       }
+      ridge(base + 46, 110, 5, near, 0.95);
       break;
+    }
 
     case 'voidrock':
       // 浮空島：大小不一的圓角石塊懸在半空
@@ -185,6 +198,76 @@ function drawScenery(g: G, scenery: Scenery, accent: number): void {
 /** 背景一格像素等於幾個遊戲座標點。540×960 剛好是 180×320 格。 */
 const PIXEL = 3;
 
+/** 方格網點：每隔一格填一格。像素畫裡兩個色塊之間用它過渡，不用平滑漸層。 */
+function dither(g: G, y: number, rows: number, color: number, alpha: number, phase = 0): void {
+  g.fillStyle(color, alpha);
+  for (let r = 0; r < rows; r += 1) {
+    const yy = y + r * PIXEL;
+    for (let x = ((r + phase) % 2) * PIXEL; x < GAME_WIDTH; x += PIXEL * 2) {
+      g.fillRect(x, yy, PIXEL, PIXEL);
+    }
+  }
+}
+
+/** 固定種子的亂數：同一個境界每次進來星星都在同一個位置，不會一換場景就跳。 */
+function seeded(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+/**
+ * 天空：五段色帶，越接近地平線越帶境界色，交界用網點過渡。
+ * 上半部再撒星星，少數幾顆是十字亮星。
+ */
+function drawSky(g: G, accent: number, scenery: Scenery): void {
+  const horizon = GAME_HEIGHT * 0.52;
+  const bandH = Math.floor(horizon / 5 / PIXEL) * PIXEL;
+  g.fillStyle(0x0b0e20, 1);
+  g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  for (let i = 0; i < 5; i += 1) {
+    g.fillStyle(accent, 0.02 + i * 0.025);
+    g.fillRect(0, i * bandH, GAME_WIDTH, bandH);
+    if (i > 0) dither(g, i * bandH - PIXEL * 2, 2, accent, 0.025, i);
+  }
+  g.fillStyle(accent, 0.13);
+  g.fillRect(0, bandH * 5, GAME_WIDTH, GAME_HEIGHT - bandH * 5);
+
+  const rand = seeded(scenery.length * 7919 + accent);
+  for (let i = 0; i < 70; i += 1) {
+    const x = Math.floor((rand() * GAME_WIDTH) / PIXEL) * PIXEL;
+    const y = Math.floor((rand() * horizon * 0.7) / PIXEL) * PIXEL;
+    const bright = rand();
+    g.fillStyle(bright > 0.85 ? 0xffffff : bright > 0.5 ? 0xc8d4ff : accent, bright > 0.5 ? 0.9 : 0.5);
+    g.fillRect(x, y, PIXEL, PIXEL);
+    if (bright > 0.95) {
+      g.fillStyle(0xffffff, 0.45);
+      g.fillRect(x - PIXEL, y, PIXEL, PIXEL);
+      g.fillRect(x + PIXEL, y, PIXEL, PIXEL);
+      g.fillRect(x, y - PIXEL, PIXEL, PIXEL);
+      g.fillRect(x, y + PIXEL, PIXEL, PIXEL);
+    }
+  }
+}
+
+/** 地平線的霧帶與下方地面的顆粒，讓下半部不是一整片平塗。 */
+function drawGround(g: G, accent: number): void {
+  const horizon = GAME_HEIGHT * 0.52;
+  dither(g, horizon + 30, 4, accent, 0.06);
+  g.fillStyle(accent, 0.04);
+  g.fillRect(0, horizon + 42, GAME_WIDTH, 15);
+  dither(g, horizon + 57, 3, accent, 0.04, 1);
+  const rand = seeded(accent + 17);
+  for (let i = 0; i < 90; i += 1) {
+    const x = Math.floor((rand() * GAME_WIDTH) / PIXEL) * PIXEL;
+    const y = Math.floor((horizon + 80 + rand() * (GAME_HEIGHT - horizon - 80)) / PIXEL) * PIXEL;
+    g.fillStyle(rand() > 0.5 ? 0x000000 : accent, rand() > 0.5 ? 0.18 : 0.08);
+    g.fillRect(x, y, PIXEL * (rand() > 0.7 ? 2 : 1), PIXEL);
+  }
+}
+
 /** 明月：實心月盤加兩圈淡光，畫在低解析度那一層，邊緣自然是一格一格的。 */
 function drawMoon(g: G): void {
   const x = GAME_WIDTH * 0.71;
@@ -210,18 +293,13 @@ export function drawBackdrop(
   const layer = scene.add.container(0, 0);
   const g = scene.add.graphics();
 
-  // 天空：由上而下疊三段色塊，避免使用漸層貼圖。
-  g.fillStyle(0x0f1328, 1);
-  g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-  g.fillStyle(accent, 0.06);
-  g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT * 0.55);
-  g.fillStyle(accent, 0.04);
-  g.fillRect(0, GAME_HEIGHT * 0.55, GAME_WIDTH, GAME_HEIGHT * 0.45);
+  drawSky(g, accent, scenery);
 
   // 明月放在頂列與資訊面板之間那一段空白裡：那裡本來就沒有東西，
-  // 而月亮不該和任何一個要點的東西搶地方。
-  drawMoon(g);
+  // 而月亮不該和任何一個要點的東西搶地方。雷劫的天空滿是劫雲，不該有月亮。
+  if (scenery !== 'storm') drawMoon(g);
   drawScenery(g, scenery, accent);
+  drawGround(g, accent);
 
   // 由下而上的暗幕。
   //

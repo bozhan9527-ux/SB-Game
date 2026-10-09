@@ -12,6 +12,8 @@ import type { BossArt, MobArt, SectArt } from './data/types';
 export const ART = {
   cloud: 'cloud',
   slash: 'slash',
+  gateBeam: 'gate-beam',
+  gatePost: 'gate-post',
 } as const;
 
 /**
@@ -120,6 +122,8 @@ const ASSETS: readonly ArtSpec[] = [
   ...ICON_NAMES.map((name) => ({ key: iconTexture(name), file: `icon-${name}` })),
   { key: ART.cloud, file: 'cloud' },
   { key: ART.slash, file: 'slash' },
+  { key: ART.gateBeam, file: 'gate-beam' },
+  { key: ART.gatePost, file: 'gate-post' },
 ];
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */

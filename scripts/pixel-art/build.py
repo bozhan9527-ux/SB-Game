@@ -1121,6 +1121,55 @@ def slash_svg():
     return to_svg(c, 160, 160)
 
 
+# =============== 山門牌坊（一格三點，橫跨整個畫面寬） ===============
+def gate_beam():
+    W, H = 180, 10
+    teal, teal_l, teal_d = "#2f6a62", "#4a8f84", "#1a3f3a"
+    red, red_l, red_d = "#b8322f", "#d8504a", "#6e1a1a"
+    gold, gold_d = "#f0c95a", "#a8782a"
+    c = [[None] * W for _ in range(H)]
+    for x in range(W):
+        c[0][x] = teal_l if x % 4 == 0 else teal
+        c[1][x] = teal if x % 4 else teal_d
+        c[2][x] = teal_d
+        c[3][x] = OUTLINE
+        for y in (4, 5, 6):
+            c[y][x] = red_l if y == 4 else red
+        c[7][x] = red_d
+        c[8][x] = OUTLINE
+        if x % 12 == 6:
+            c[5][x] = gold
+            c[6][x] = gold_d
+    # 中央匾額：深底金框，「山門」兩個字由遊戲疊上去
+    for y in range(1, 10):
+        for x in range(74, 106):
+            edge = y in (1, 9) or x in (74, 105)
+            c[y][x] = gold if edge else "#1a1410"
+    for x in (75, 104):
+        c[2][x] = gold_d
+    return c
+
+
+def gate_post():
+    W, H = 8, 34
+    c = [[None] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            if y < 3:
+                c[y][x] = "#f0c95a" if y == 1 else "#a8782a"
+            elif x in (0, 7):
+                c[y][x] = OUTLINE
+            else:
+                c[y][x] = "#d8504a" if x == 2 else "#6e1a1a" if x == 6 else "#b8322f"
+        if y % 9 == 5:
+            for x in range(1, 7):
+                c[y][x] = "#f0c95a"
+    for x in range(W):
+        c[H - 1][x] = OUTLINE
+        c[0][x] = OUTLINE
+    return c
+
+
 MOBS = {
     "wolf": wolf_frames, "bear": bear_frames, "yeti": yeti_frames, "centipede": centipede_frames,
     "scorpion": scorpion_frames, "serpent": serpent_frames, "bandit": bandit_frames, "undead": undead_frames,
@@ -1149,6 +1198,8 @@ if __name__ == "__main__":
     for name in ICONS:
         save(f"icon-{name}.svg", icon_svg(name))
         n += 1
+    write_png(gate_beam(), os.path.join(ART, "gate-beam.png"))
+    write_png(gate_post(), os.path.join(ART, "gate-post.png"))
     save("cloud.svg", cloud_svg())
     save("slash.svg", slash_svg())
     print("wrote", n + 2, "to", ART)

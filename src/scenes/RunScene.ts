@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { audio } from "../audio";
 import {
+  ART,
   ENEMY_DISPLAY_HEIGHT,
   ENEMY_SOURCE_HEIGHT,
   DISCIPLE_DISPLAY_HEIGHT,
@@ -484,23 +485,41 @@ export class RunScene extends Phaser.Scene {
       ARENA_RIGHT - ARENA_LEFT,
       GATE_Y - ARENA_TOP,
     );
-    g.lineStyle(2, accent, 0.22);
-    g.strokeRect(
-      ARENA_LEFT,
-      ARENA_TOP,
-      ARENA_RIGHT - ARENA_LEFT,
-      GATE_Y - ARENA_TOP,
-    );
+    // 雙層硬邊外框加四角金飾。
+    const w = ARENA_RIGHT - ARENA_LEFT;
+    const h = GATE_Y - ARENA_TOP;
+    g.lineStyle(3, EDGE, 0.9);
+    g.strokeRect(ARENA_LEFT, ARENA_TOP, w, h);
+    g.lineStyle(3, accent, 0.25);
+    g.strokeRect(ARENA_LEFT + 3, ARENA_TOP + 3, w - 6, h - 6);
+    g.fillStyle(hexToNumber(GOLD), 0.85);
+    g.fillRect(ARENA_LEFT - 3, ARENA_TOP - 3, 12, 3);
+    g.fillRect(ARENA_LEFT - 3, ARENA_TOP - 3, 3, 12);
+    g.fillRect(ARENA_RIGHT - 9, ARENA_TOP - 3, 12, 3);
+    g.fillRect(ARENA_RIGHT, ARENA_TOP - 3, 3, 12);
     // 五條縱列的分隔線：妖魔沿著列走，玩家才看得出哪一列擠了。
-    g.lineStyle(1, accent, 0.1);
+    // 畫成三點一格的虛線，和像素背景同一個格子。
+    g.fillStyle(accent, 0.14);
     for (let i = 1; i < LANES; i += 1) {
-      const x = ARENA_LEFT + LANE_WIDTH * i;
-      g.lineBetween(x, ARENA_TOP, x, GATE_Y);
+      const x = Math.round((ARENA_LEFT + LANE_WIDTH * i) / 3) * 3 - 1;
+      for (let y = ARENA_TOP + 6; y < GATE_Y - 6; y += 12) g.fillRect(x, y, 3, 6);
     }
 
-    // 山門：妖魔碰到這條線就算攻進來。
+    // 山門：妖魔碰到這條線就算攻進來。牌坊橫梁一格三點、橫跨整個畫面，
+    // 兩側立紅柱；梁下那一條細光是結界，顏色跟著耐久變（見 refreshGateDamage）。
+    this.add
+      .image(GAME_WIDTH / 2, GATE_Y + 6, ART.gateBeam)
+      .setScale(3)
+      .setDepth(27);
+    for (const x of [12, GAME_WIDTH - 12]) {
+      this.add
+        .image(x, GATE_Y + 6, ART.gatePost)
+        .setOrigin(0.5, 0.7)
+        .setScale(3)
+        .setDepth(27);
+    }
     this.gateBase = this.add
-      .rectangle(GAME_WIDTH / 2, GATE_Y + 6, GAME_WIDTH, 12, accent, 0.5)
+      .rectangle(GAME_WIDTH / 2, GATE_Y + 22, GAME_WIDTH, 3, accent, 0.5)
       .setDepth(28);
     this.gateBar = this.add
       .rectangle(
@@ -520,9 +539,9 @@ export class RunScene extends Phaser.Scene {
     this.gateLabel = this.add
       .text(
         GAME_WIDTH / 2,
-        GATE_Y + 26,
+        GATE_Y + 9,
         "山　門",
-        textStyle({ size: 17, color: INK_DIM }),
+        textStyle({ size: 17, color: GOLD }),
       )
       .setOrigin(0.5)
       .setDepth(29);
@@ -1347,9 +1366,7 @@ export class RunScene extends Phaser.Scene {
         stage
       ] ?? 0xffffff;
     this.gateBase?.setFillStyle(tint, [0.5, 0.55, 0.6, 0.75][stage] ?? 0.5);
-    this.gateLabel?.setColor(
-      [INK_DIM, INK_DIM, DANGER, DANGER][stage] ?? INK_DIM,
-    );
+    this.gateLabel?.setColor([GOLD, GOLD, DANGER, DANGER][stage] ?? GOLD);
     if (stage >= 2) {
       this.tweens.killTweensOf(this.gateLabel as Phaser.GameObjects.Text);
       this.gateLabel?.setAlpha(1);
@@ -2108,8 +2125,8 @@ export class RunScene extends Phaser.Scene {
     // 加法混色疊起來，中心最亮、邊緣帶色，就是「發光」。
     const angle = Math.atan2(toY - fromY, toX - fromX) + Math.PI / 2;
     const tint = hexToNumber(color);
-    // 芯用符色調亮，不用純白：純白的一條在深色底上像飛來飛去的木棍。
-    const core = Phaser.Display.Color.ValueToColor(tint).lighten(30).color;
+    // 芯用符色本身、外層光暈也是符色：淺色的符調亮之後幾乎是純白，
+    // 一條白棍在深色底上看起來像飛來飛去的木頭，認不出是哪一張符打的。
     const duration = Phaser.Math.Clamp(
       Phaser.Math.Distance.Between(fromX, fromY, toX, toY) * 0.5,
       90,
@@ -2117,8 +2134,9 @@ export class RunScene extends Phaser.Scene {
     );
     const parts: [number, number, number, number, number][] = [
       // 寬, 高, 顏色, 透明度, 延遲
-      [12, 30, tint, 0.45, 0],
-      [6, 24, core, 1, 0],
+      [12, 27, tint, 0.5, 0],
+      [3, 21, tint, 1, 0],
+      [3, 6, 0xffffff, 0.9, 0],
       [3, 9, tint, 0.7, 30],
       [3, 6, tint, 0.4, 60],
     ];
