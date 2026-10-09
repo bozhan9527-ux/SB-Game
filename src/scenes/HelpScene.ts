@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import { libraryFloor } from "../systems/dungeons";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
-import { BALANCE, CARDS } from "../data";
+import { BALANCE, BOSS_SKILLS, CARDS } from "../data";
+import type { BossSkillKind } from "../data/types";
 import { state } from "../state";
 import { realmForStage } from "../systems/realms";
 import {
@@ -146,6 +147,16 @@ export class HelpScene extends Phaser.Scene {
           "「裂」死掉會裂成兩隻小的往前衝——單體高傷反而拖慢清場。",
           "帶習性的妖魔血量都打過折：牠們改變的是「誰打牠有效率」，",
           "不是「大家都打不動」。看到什麼字，就知道該換哪張符。",
+        ],
+      },
+      {
+        title: "首領招式",
+        lines: [
+          "每個關底首領都有一招，名字寫在牠的血條上方。每一招都有對策：",
+          ...BOSS_SKILLS.map(
+            (skill) => `・${SKILL_LABEL[skill.kind]}：${skill.desc}——${skill.counter}`,
+          ),
+          "帶招式的首領血量都打過折：牠們換的是打法，不是單純變硬。",
         ],
       },
       {
@@ -344,3 +355,15 @@ function joinContinuations(lines: readonly string[]): string[] {
   }
   return out;
 }
+
+/** 說明頁上每一種招式的稱呼。首領各自的招式名不同，這裡講的是「哪一類」。 */
+const SKILL_LABEL: Record<BossSkillKind, string> = {
+  summon: "召喚",
+  shield: "護體",
+  seal: "封符",
+  charge: "衝鋒",
+  regen: "回春",
+  rage: "狂暴",
+  mirror: "分身",
+  devour: "噬符",
+};

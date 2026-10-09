@@ -57,7 +57,7 @@ function dummy(): ActiveEnemy {
     burnPerMs: 0,
     burnSource: null,
     trait: 'none',
-    spawnedBySplit: false,
+    spawnedBySplit: false, skill: null,
   };
 }
 

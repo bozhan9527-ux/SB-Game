@@ -50,7 +50,7 @@ function enemy(trait: MobTrait, hp: number, maxHp = hp): ActiveEnemy {
     burnPerMs: 0,
     burnSource: null,
     trait,
-    spawnedBySplit: false,
+    spawnedBySplit: false, skill: null,
   };
 }
 

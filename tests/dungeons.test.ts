@@ -108,7 +108,7 @@ describe('副本的規則真的在模擬裡成立', () => {
         burnPerMs: 0,
         burnSource: null,
         trait: 'none',
-        spawnedBySplit: false,
+        spawnedBySplit: false, skill: null,
       },
     ];
     tickCombat(state, 16, createRng(2));

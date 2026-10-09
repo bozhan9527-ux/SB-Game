@@ -607,6 +607,54 @@ export interface BossDef {
   name: string;
   taunt: string;
   art: BossArt;
+  /** 這個首領的招式種類（參數在 boss-skills.json）。 */
+  skill: BossSkillKind;
+  /** 招式在畫面上叫的名字，例如「嘯月召狼」。 */
+  skillName: string;
+}
+
+/**
+ * 首領招式。
+ *
+ * 原本二十個首領只差在血量與名字，打法完全一樣：血厚、砸門、時限。
+ * 每一種招式都配一個**玩家本來就會做的對策**（搬符、合成、選符），
+ * 讓關底換的是打法，不是單純變硬——所以每一種也都自帶血量折扣（hpRatio）。
+ */
+export type BossSkillKind =
+  | 'summon'
+  | 'shield'
+  | 'seal'
+  | 'charge'
+  | 'regen'
+  | 'rage'
+  | 'mirror'
+  | 'devour';
+
+/**
+ * 一種招式的參數。欄位是共用的一組，各招式只讀自己用得到的那幾個（其餘填 0）：
+ *
+ * - intervalMs：多久施展一次；0 表示不是定時招（rage、mirror 看血量門檻）
+ * - count：召喚／分身的數量、封幾格、吃幾張
+ * - amount：召喚物血量（以本關最後一波妖魔的血量為 1）、護盾與回血（佔最大血量）、
+ *   狂暴後的砸門間隔倍率
+ * - durationMs：封印與衝鋒持續多久
+ * - speedMultiplier：衝鋒／狂暴的速度倍率、召喚物相對一般妖魔的速度
+ * - threshold：血量低於這個比例時觸發（rage、mirror）
+ */
+export interface BossSkillDef {
+  kind: BossSkillKind;
+  /** 一句話說明招式。首領登場時顯示。 */
+  desc: string;
+  /** 對策，一句話。 */
+  counter: string;
+  /** 有這一招的首領血量要打幾折。 */
+  hpRatio: number;
+  intervalMs: number;
+  count: number;
+  amount: number;
+  durationMs: number;
+  speedMultiplier: number;
+  threshold: number;
 }
 
 /**

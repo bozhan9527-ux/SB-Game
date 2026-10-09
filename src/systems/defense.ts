@@ -8,8 +8,15 @@
  * 天雷符一擊 40 點打在 20 血的小妖身上會浪費一半，風刃符則幾乎不浪費——
  * 四種符的取捨因此是從規則長出來的，不是寫死在說明文字裡。
  */
-import { BALANCE, ENEMIES } from "../data";
-import type { BossArt, BossDef, MobArt, MobTrait } from "../data/types";
+import { BALANCE, ENEMIES, bossSkill } from "../data";
+import type {
+  BossArt,
+  BossDef,
+  BossSkillDef,
+  BossSkillKind,
+  MobArt,
+  MobTrait,
+} from "../data/types";
 import type { Card } from "./deck";
 import {
   cardDamage,
@@ -51,6 +58,21 @@ export interface ActiveEnemy {
   trait: MobTrait;
   /** 已經是分裂出來的小妖：牠死掉不會再裂，否則一隻會炸成無限多隻。 */
   spawnedBySplit: boolean;
+  /** 首領招式的狀態。一般妖魔（含首領叫出來的護衛）為 null。 */
+  skill: BossSkillState | null;
+}
+
+/** 首領身上那一招的即時狀態。 */
+export interface BossSkillState {
+  def: BossSkillDef;
+  /** 距離下一次施展還有多久；只有定時招會倒數。 */
+  timerMs: number;
+  /** 護體罡氣還剩多少，先於血量被扣。 */
+  shield: number;
+  /** 衝鋒到這個時間點為止。 */
+  chargeUntilMs: number;
+  /** 血量門檻招（狂暴、分身）已經觸發過了。 */
+  triggered: boolean;
 }
 
 interface SpawnEntry {
@@ -95,6 +117,12 @@ export interface DefenseState {
   field: (Card | null)[];
   /** 每個場上格位的出手倒數（ms）。 */
   cooldowns: number[];
+  /**
+   * 每個場上格位被首領封印到什麼時候（elapsedMs）。
+   *
+   * 封的是**格位**不是符：把符搬到別格就脫困，這正是這一招的對策。
+   */
+  sealedUntil: number[];
   /**
    * 每個格位「連續出手」累積的傷害倍率（太乙符）。
    *
@@ -184,6 +212,12 @@ export interface TickReport {
   /** 手牌滿導致抽到的符流失。 */
   drawLost: boolean;
   bossSpawned: boolean;
+  /** 這一拍首領施展了招式；沒有為 null。 */
+  bossSkill: BossSkillKind | null;
+  /** 這一拍被封住的格位。 */
+  sealed: number[];
+  /** 這一拍被吃掉的手牌格位。 */
+  devoured: number[];
 }
 
 const EMPTY_REPORT = (): TickReport => ({
@@ -194,6 +228,9 @@ const EMPTY_REPORT = (): TickReport => ({
   drawnSlot: null,
   drawLost: false,
   bossSpawned: false,
+  bossSkill: null,
+  sealed: [],
+  devoured: [],
 });
 
 // ---------------------------------------------------------------- 關卡編成
@@ -331,7 +368,8 @@ export function buildSpawnQueue(
     art: "demon",
     bossArt: boss.art,
     boss: true,
-    hp: bossHp(stage),
+    // 帶招式的首領血量打折：招式換的是打法，不是單純加難度（見 BossSkillDef.hpRatio）。
+    hp: bossHp(stage) * bossSkill(boss.skill).hpRatio,
     speed: BALANCE.boss.speed,
     // 首領不帶習性：牠已經有厚血、砸門與時限三件事，再加一層只會變得看不懂。
     trait: "none",
@@ -410,6 +448,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     hand,
     field: slots,
     cooldowns: new Array<number>(loadout.fieldSlots).fill(0),
+    sealedUntil: new Array<number>(loadout.fieldSlots).fill(0),
     ramps: new Array<number>(loadout.fieldSlots).fill(0),
     enemies: [],
     queue,
@@ -708,6 +747,13 @@ function fireOnce(
       );
     }
 
+    // 護體罡氣：先扣護盾，扣光了才打到血。被護盾吃掉的那一截不記在符的戰績上。
+    if (target.skill !== null && target.skill.shield > 0) {
+      const absorbed = Math.min(target.skill.shield, damage);
+      target.skill.shield -= absorbed;
+      damage -= absorbed;
+    }
+
     target.hp -= damage;
 
     // 玄冥符：殘血直接收走。首領免疫——否則關底會變成一發定生死。
@@ -888,6 +934,7 @@ export function tickCombat(
       burnSource: null,
       trait: next.trait,
       spawnedBySplit: false,
+      skill: next.boss ? newSkillState(state.bossDef) : null,
     };
     state.nextId += 1;
     state.enemies.push(enemy);
@@ -907,12 +954,17 @@ export function tickCombat(
     if (enemy.burnSource !== null) creditDamage(state, enemy.burnSource, tick);
   }
 
+  // 3b. 首領招式。放在開火之前：這一拍罩上的護盾、封住的格位，這一拍就生效。
+  tickBossSkill(state, deltaMs, rng, report);
+
   // 4. 法寶開火。陣法與光環每一拍重算一次——玩家隨時可能把符搬到別格。
   const bonuses = boardBonuses(state.field);
   recordFormation(state, bonuses, deltaMs);
   for (let slot = 0; slot < state.field.length; slot += 1) {
     const card = state.field[slot];
     if (card === undefined || card === null) continue;
+    // 被封的格位不出手，冷卻也停住——解封後接著原本的節奏，不會一口氣補射。
+    if ((state.sealedUntil[slot] ?? 0) > state.elapsedMs) continue;
     const bonus = bonuses[slot] ?? NO_SLOT_BONUS;
     const interval = cardInterval(card, state.loadout) / bonus.fireRate;
     const cooling = state.cooldowns[slot] ?? 0;
@@ -978,6 +1030,7 @@ export function tickCombat(
           burnSource: null,
           trait: "split",
           spawnedBySplit: true,
+          skill: null,
         };
         state.nextId += 1;
         survivors.push(child);
@@ -995,7 +1048,7 @@ export function tickCombat(
     // 減速只影響推進，不影響血量或砸門節奏——寒冰符買的是時間，不是傷害。
     const slowed =
       enemy.slowUntilMs > state.elapsedMs ? 1 - enemy.slowPercent : 1;
-    enemy.y += enemy.speed * slowed * step;
+    enemy.y += enemy.speed * slowed * skillSpeed(state, enemy) * step;
     if (enemy.y < waveCfg.trackPx) {
       stillOnTrack.push(enemy);
       continue;
@@ -1044,11 +1097,14 @@ export function tickCombat(
   if (state.bossAtGate) {
     state.bossGateAccum += deltaMs;
     const boss = state.enemies.find((enemy) => enemy.boss);
-    while (
-      state.bossGateAccum >= BALANCE.boss.gateHitIntervalMs &&
-      boss !== undefined
-    ) {
-      state.bossGateAccum -= BALANCE.boss.gateHitIntervalMs;
+    // 狂暴之後砸門更兇：間隔乘上 amount。
+    const raged =
+      boss?.skill?.def.kind === "rage" && boss.skill.triggered
+        ? boss.skill.def.amount
+        : 1;
+    const interval = BALANCE.boss.gateHitIntervalMs * raged;
+    while (state.bossGateAccum >= interval && boss !== undefined) {
+      state.bossGateAccum -= interval;
       state.leaks += 1;
       const loss = leakCost(state.threat, true);
       state.disciples = Math.max(0, state.disciples - loss);
@@ -1129,6 +1185,179 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
   state.bossKilled = false;
   state.bossSpawnedAtMs = null;
   state.bossGateAccum = 0;
+  state.sealedUntil.fill(0);
+}
+
+// ---------------------------------------------------------------- 首領招式
+
+function newSkillState(boss: BossDef): BossSkillState {
+  return skillStateFor(boss.skill);
+}
+
+/** 某一種招式的初始狀態。測試與首領出場共用。 */
+export function skillStateFor(kind: BossSkillKind): BossSkillState {
+  const def = bossSkill(kind);
+  return {
+    def,
+    // 第一招不在出場當下放：登場演出還沒結束，玩家看不到發生了什麼。
+    timerMs: def.intervalMs,
+    shield: 0,
+    chargeUntilMs: 0,
+    triggered: false,
+  };
+}
+
+/** 衝鋒與狂暴帶來的推進速度倍率。 */
+function skillSpeed(state: DefenseState, enemy: ActiveEnemy): number {
+  const skill = enemy.skill;
+  if (skill === null) return 1;
+  if (skill.def.kind === "charge" && skill.chargeUntilMs > state.elapsedMs) {
+    return skill.def.speedMultiplier;
+  }
+  if (skill.def.kind === "rage" && skill.triggered) return skill.def.speedMultiplier;
+  return 1;
+}
+
+/**
+ * 首領招式每一拍的結算。
+ *
+ * 定時招以毫秒累積（掉幀時節奏不變）；血量門檻招只觸發一次。
+ * 凡是要擲骰的（封哪一格、召喚物走哪一路）都走同一條 rng——重播才對得上。
+ */
+function tickBossSkill(
+  state: DefenseState,
+  deltaMs: number,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const boss = state.enemies.find((enemy) => enemy.boss && enemy.hp > 0);
+  const skill = boss?.skill ?? null;
+  if (boss === undefined || skill === null) return;
+  const def = skill.def;
+
+  if (def.intervalMs > 0) {
+    skill.timerMs -= deltaMs;
+    while (skill.timerMs <= 0) {
+      skill.timerMs += def.intervalMs;
+      castSkill(state, boss, skill, rng, report);
+    }
+    return;
+  }
+
+  if (!skill.triggered && boss.hp <= boss.maxHp * def.threshold) {
+    skill.triggered = true;
+    castSkill(state, boss, skill, rng, report);
+  }
+}
+
+function castSkill(
+  state: DefenseState,
+  boss: ActiveEnemy,
+  skill: BossSkillState,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const def = skill.def;
+  switch (def.kind) {
+    case "summon":
+    case "mirror":
+      spawnMinions(state, boss, def, rng, report);
+      break;
+    case "shield":
+      // 不疊加：重新罩上就是補滿到這一層，免得放著不打越疊越厚。
+      skill.shield = Math.max(skill.shield, boss.maxHp * def.amount);
+      break;
+    case "seal": {
+      // 只封有符的格位——封一格空格等於這一招沒放。
+      const loaded: number[] = [];
+      for (let i = 0; i < state.field.length; i += 1) {
+        if (state.field[i] != null && (state.sealedUntil[i] ?? 0) <= state.elapsedMs) {
+          loaded.push(i);
+        }
+      }
+      for (let n = 0; n < def.count && loaded.length > 0; n += 1) {
+        const pick = loaded.splice(rng.int(0, loaded.length - 1), 1)[0];
+        if (pick === undefined) break;
+        state.sealedUntil[pick] = state.elapsedMs + def.durationMs;
+        report.sealed.push(pick);
+      }
+      break;
+    }
+    case "charge":
+      skill.chargeUntilMs = state.elapsedMs + def.durationMs;
+      break;
+    case "regen":
+      boss.hp = Math.min(boss.maxHp, boss.hp + boss.maxHp * def.amount);
+      break;
+    case "rage":
+      // 狀態旗標已經在觸發時立起來，速度與砸門間隔各自去讀它。
+      break;
+    case "devour":
+      for (let n = 0; n < def.count; n += 1) {
+        let lowest = -1;
+        for (let i = 0; i < state.hand.length; i += 1) {
+          const card = state.hand[i];
+          if (card == null) continue;
+          const current = lowest < 0 ? null : state.hand[lowest];
+          if (current == null || card.tier < current.tier) lowest = i;
+        }
+        if (lowest < 0) break;
+        state.hand[lowest] = null;
+        report.devoured.push(lowest);
+      }
+      break;
+  }
+  report.bossSkill = def.kind;
+}
+
+/**
+ * 召喚護衛／分出幻身。
+ *
+ * 召喚物是一般妖魔：會漏、會被打、不帶招式。血量以「本關最後一波」的妖魔為準，
+ * 而不是首領血量的比例——首領的血是小妖的幾十倍，照比例算出來的護衛會比一整波還硬。
+ */
+function spawnMinions(
+  state: DefenseState,
+  boss: ActiveEnemy,
+  def: BossSkillDef,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const realm = realmForStage(state.threat);
+  const mobs = ENEMIES.mobs.filter((mob) => mob.realm === realm.id);
+  const mob = mobs[rng.int(0, Math.max(0, mobs.length - 1))];
+  const hp = Math.max(
+    1,
+    waveHp(state.threat, BALANCE.wave.wavesPerStage) * def.amount,
+  );
+  for (let i = 0; i < def.count; i += 1) {
+    // 從首領兩側往外排，不和首領疊在同一路。
+    const side = i % 2 === 0 ? -1 : 1;
+    const offset = side * (Math.floor(i / 2) + 1);
+    const minion: ActiveEnemy = {
+      id: state.nextId,
+      name: def.kind === "mirror" ? `${boss.name}幻身` : mob?.name ?? "護衛",
+      art: mob?.art ?? "bandit",
+      bossArt: null,
+      boss: false,
+      hp,
+      maxHp: hp,
+      y: boss.y,
+      lane: Math.max(0, Math.min(LANES - 1, boss.lane + offset)),
+      speed: mobSpeed(state.threat) * def.speedMultiplier,
+      slowUntilMs: 0,
+      slowPercent: 0,
+      burnRemaining: 0,
+      burnPerMs: 0,
+      burnSource: null,
+      trait: "none",
+      spawnedBySplit: true,
+      skill: null,
+    };
+    state.nextId += 1;
+    state.enemies.push(minion);
+    report.spawned.push(minion);
+  }
 }
 
 /** 首領當前的血量比例，沒有首領在場時為 null。 */

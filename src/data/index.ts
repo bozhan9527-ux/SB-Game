@@ -16,6 +16,7 @@ import lessonsJson from '../../data/lessons.json';
 import karmaJson from '../../data/karma.json';
 import challengesJson from '../../data/challenges.json';
 import dungeonsJson from '../../data/dungeons.json';
+import bossSkillsJson from '../../data/boss-skills.json';
 
 import { ICON_NAMES } from './types';
 import type {
@@ -25,6 +26,8 @@ import type {
   Balance,
   BossArt,
   BossDef,
+  BossSkillDef,
+  BossSkillKind,
   CardDef,
   CardEffect,
   ChallengeDef,
@@ -69,6 +72,9 @@ import {
 export const TALISMAN_SLOTS = 4;
 
 const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
+const BOSS_SKILL_KINDS: readonly BossSkillKind[] = [
+  'summon', 'shield', 'seal', 'charge', 'regen', 'rage', 'mirror', 'devour',
+];
 const SCENERIES: readonly Scenery[] = [
   'peaks', 'forest', 'sea', 'volcano', 'voidrock', 'storm', 'palace', 'celestial',
 ];
@@ -425,13 +431,57 @@ export function parseEnemies(raw: unknown, path = 'enemies.json'): EnemyBook {
     name: str(item, 'name', p),
     taunt: str(item, 'taunt', p),
     art: oneOf(item, 'art', p, BOSS_ARTS),
+    skill: oneOf(item, 'skill', p, BOSS_SKILL_KINDS),
+    skillName: str(item, 'skillName', p),
   }));
   assertUniqueIds(mobs, `${path}.mobs`);
   assertUniqueIds(bosses, `${path}.bosses`);
   return { mobs, bosses };
 }
 
+export function parseBossSkills(raw: unknown, path = 'boss-skills.json'): BossSkillDef[] {
+  const skills = list(raw, path, (item, p) => ({
+    kind: oneOf(item, 'kind', p, BOSS_SKILL_KINDS),
+    desc: str(item, 'desc', p),
+    counter: str(item, 'counter', p),
+    hpRatio: num(item, 'hpRatio', p),
+    intervalMs: num(item, 'intervalMs', p),
+    count: num(item, 'count', p),
+    amount: num(item, 'amount', p),
+    durationMs: num(item, 'durationMs', p),
+    speedMultiplier: num(item, 'speedMultiplier', p),
+    threshold: num(item, 'threshold', p),
+  }));
+  // 每一種招式剛好一筆：少了一種，帶那招的首領會查不到參數；多一筆則不知道該用哪一筆。
+  for (const kind of BOSS_SKILL_KINDS) {
+    if (skills.filter((skill) => skill.kind === kind).length !== 1) {
+      throw new DataError(path, `招式 ${kind} 必須剛好有一筆`);
+    }
+  }
+  for (const skill of skills) {
+    if (skill.hpRatio <= 0 || skill.hpRatio > 1) {
+      throw new DataError(path, `招式 ${skill.kind} 的 hpRatio 必須在 (0, 1]`);
+    }
+    const timed = skill.kind !== 'rage' && skill.kind !== 'mirror';
+    if (timed && skill.intervalMs <= 0) {
+      throw new DataError(path, `招式 ${skill.kind} 是定時招，intervalMs 必須大於 0`);
+    }
+    if (!timed && (skill.threshold <= 0 || skill.threshold >= 1)) {
+      throw new DataError(path, `招式 ${skill.kind} 看血量門檻，threshold 必須在 (0, 1)`);
+    }
+  }
+  return skills;
+}
+
 export const BALANCE: Balance = parseBalance(balanceJson);
+export const BOSS_SKILLS: readonly BossSkillDef[] = parseBossSkills(bossSkillsJson);
+
+/** 查一種招式的參數。資料驗證保證每一種都有，查不到是程式錯誤。 */
+export function bossSkill(kind: BossSkillKind): BossSkillDef {
+  const skill = BOSS_SKILLS.find((item) => item.kind === kind);
+  if (skill === undefined) throw new Error(`沒有招式 ${kind} 的參數`);
+  return skill;
+}
 export const REALMS: readonly Realm[] = parseRealms(realmsJson);
 export const SECTS: readonly Sect[] = parseSects(sectsJson);
 export function parseLessons(raw: unknown, path = 'lessons.json'): LessonDef[] {

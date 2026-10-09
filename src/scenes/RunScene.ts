@@ -18,8 +18,8 @@ import {
   enemyWalkKey,
 } from "../art";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
-import { BALANCE, CARDS } from "../data";
-import type { MobTrait } from "../data/types";
+import { BALANCE, CARDS, ENEMIES, bossSkill } from "../data";
+import type { BossSkillKind, MobTrait } from "../data/types";
 import { persist, state } from "../state";
 import type { ReplayAction, ReplayActionInput } from "../systems/replay";
 import {
@@ -185,6 +185,19 @@ const FLASH_GAP_MS = 160;
  * 加上外圈的光暈，玩家幾乎看不到首領長什麼樣子。
  */
 const BOSS_FLASH_GAP_MS = 450;
+/** 封印的顏色。和首領的紫色光暈同一系，一看就知道是首領幹的。 */
+const SEAL_COLOR = "#b98cff";
+/** 施展招式時公告帶上的那半句後果。 */
+const SKILL_EFFECT: Record<BossSkillKind, string> = {
+  summon: "護衛衝向山門",
+  shield: "罩上護體罡氣",
+  seal: "一格陣位被封，把符搬開",
+  charge: "猛然往前衝",
+  regen: "回復了一截血",
+  rage: "狂暴了，走得更快",
+  mirror: "分出幻身",
+  devour: "吃掉一張手牌",
+};
 
 /** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
 const FREEZE_BOSS_HIT_MS = 28;
@@ -271,10 +284,15 @@ export class RunScene extends Phaser.Scene {
   private hudFormation!: Phaser.GameObjects.Text;
   /** 每個陣位右上角的倍率標籤，例如「×1.70」。 */
   private fieldBonusLabels: Phaser.GameObjects.Text[] = [];
+  /** 每一格的「被封」覆蓋層（首領的封符招式）。 */
+  private sealViews: Phaser.GameObjects.Container[] = [];
   private waveBar!: Phaser.GameObjects.Rectangle;
   private gateBar!: Phaser.GameObjects.Rectangle;
   private bossPanel: Phaser.GameObjects.Container | null = null;
   private bossBar: Phaser.GameObjects.Rectangle | null = null;
+  /** 血條上那一截金色：護體罡氣還剩多少。首領走進陣位時會被符牌蓋住，護盾得在這裡也看得到。 */
+  private bossShieldBar: Phaser.GameObjects.Rectangle | null = null;
+  private bossSkillTag: Phaser.GameObjects.Text | null = null;
   /** 開場的境界名與說明框。它和公告條佔同一塊位置，公告要出來時得知道它還在不在。 */
   private introParts: Phaser.GameObjects.GameObject[] = [];
   private introEndsAt = 0;
@@ -420,6 +438,7 @@ export class RunScene extends Phaser.Scene {
     this.seedRuns = save.world.runs;
     this.rng = createRng(runSeed(stage, this.seedRuns));
     this.run = createDefenseState(loadout, this.rng);
+    if (import.meta.env.DEV) applyDebugBoss(this.run);
     this.over = false;
     this.enemySprites.clear();
     // Phaser 重用 Scene 實例，這幾個單場狀態不清就會帶進下一關。
@@ -863,6 +882,7 @@ export class RunScene extends Phaser.Scene {
     this.fieldViews = [];
     this.fieldSlotY = [];
     this.fieldBonusLabels = [];
+    this.sealViews = [];
     this.fieldHighlights = [];
     for (let i = 0; i < count; i += 1) {
       const row = Math.floor(i / FIELD_COLUMNS);
@@ -889,6 +909,23 @@ export class RunScene extends Phaser.Scene {
           .setDepth(30)
           .setBackgroundColor("#12141c")
           .setPadding(4, 1, 4, 1)
+          .setVisible(false),
+      );
+
+      // 被封的格位：暗紫色罩子加一個「封」字。封的是格位不是符——
+      // 罩子留在原地，符一搬走就看得出「這一格不能用，搬開就好」。
+      this.sealViews.push(
+        this.add
+          .container(x, y, [
+            this.add
+              .rectangle(0, 0, CARD_WIDTH * 0.82, CARD_HEIGHT * 0.82, 0x24103a, 0.72)
+              .setStrokeStyle(3, hexToNumber(SEAL_COLOR)),
+            this.add
+              .text(0, 0, "封", textStyle({ size: 30, color: SEAL_COLOR, bold: true }))
+              .setOrigin(0.5)
+              .setStroke("#0b0f14", 6),
+          ])
+          .setDepth(29)
           .setVisible(false),
       );
 
@@ -1676,6 +1713,7 @@ export class RunScene extends Phaser.Scene {
 
     this.syncEnemies();
     this.animateCharge();
+    this.syncSeals();
     this.updateHud();
 
     if (this.run.outcome === "cleared") this.finish(true, null);
@@ -1697,6 +1735,14 @@ export class RunScene extends Phaser.Scene {
   private record(action: ReplayActionInput): void {
     if (this.actions.length >= MAX_REPLAY_ACTIONS) return;
     this.actions.push({ ...action, step: this.stepIndex });
+  }
+
+  /** 封印罩子跟著模擬走：到期就收掉。 */
+  private syncSeals(): void {
+    for (let i = 0; i < this.sealViews.length; i += 1) {
+      const sealed = (this.run.sealedUntil[i] ?? 0) > this.run.elapsedMs;
+      this.sealViews[i]?.setVisible(sealed);
+    }
   }
 
   /**
@@ -1837,6 +1883,7 @@ export class RunScene extends Phaser.Scene {
         "首領血厚，別讓它走到山門——它一撞就是六倍耐久",
       );
     }
+    if (report.bossSkill !== null) this.announceBossSkill(report);
     if (report.drawnSlot !== null) {
       this.refreshCards();
       this.pulseHand(report.drawnSlot);
@@ -1858,6 +1905,48 @@ export class RunScene extends Phaser.Scene {
         duration: 500,
       });
     }
+  }
+
+  /**
+   * 首領施展招式。
+   *
+   * 招式本身在模擬裡已經生效，這裡負責讓玩家**看得出發生了什麼、該怎麼應**：
+   * 招式名＋一句後果貼在公告帶，被封的格位與被吃掉的手牌各自在原地爆一下。
+   */
+  private announceBossSkill(report: TickReport): void {
+    const kind = report.bossSkill;
+    if (kind === null) return;
+    const boss = this.run.bossDef;
+    this.banner("notice", `${boss.skillName}！${SKILL_EFFECT[kind]}`, DANGER, 1300);
+    audio.play("bossAttack");
+    for (const slot of report.sealed) {
+      const view = this.sealViews[slot];
+      if (view === undefined) continue;
+      this.burst(view.x, view.y, SEAL_COLOR, 12, 1);
+    }
+    if (report.devoured.length > 0) {
+      for (const index of report.devoured) {
+        const view = this.handViews[index];
+        if (view === undefined) continue;
+        this.burst(view.container.x, view.container.y, DANGER, 14, 1.1);
+      }
+      this.refreshCards();
+    }
+    const bossView = this.bossView();
+    if (bossView !== null && (kind === "charge" || kind === "rage")) {
+      this.burst(bossView.x, bossView.y + 40, "#f0c95a", 10, 1);
+    }
+    if (kind === "rage") {
+      // 狂暴之後光暈轉紅、而且一直紅著：玩家要知道牠現在比剛才危險。
+      const glow = bossView?.getData("glow") as Phaser.FX.Glow | undefined;
+      if (glow !== undefined) glow.color = 0xff3a3a;
+    }
+  }
+
+  /** 場上那一隻首領的畫面物件。 */
+  private bossView(): Phaser.GameObjects.Container | null {
+    const boss = this.run.enemies.find((enemy) => enemy.boss);
+    return boss === undefined ? null : (this.enemySprites.get(boss.id) ?? null);
   }
 
   /**
@@ -1910,6 +1999,13 @@ export class RunScene extends Phaser.Scene {
       body.play(bossIdleKey(enemy.bossArt));
       // 首領發光：只有 WebGL 有 preFX，Canvas 後備時就是沒有光暈，其他照常。
       const glow = body.preFX?.addGlow(BOSS_GLOW, 3, 0, false, 0.1, 12);
+      if (glow !== undefined) container.setData("glow", glow);
+      // 護體罡氣：一圈金色方框，護盾越薄越淡。沒有它，玩家只會覺得「怎麼打不動」。
+      const shieldRing = this.add
+        .rectangle(0, 0, 138, 138, 0x000000, 0)
+        .setStrokeStyle(4, hexToNumber(GOLD), 1)
+        .setVisible(false);
+      container.setData("shieldRing", shieldRing);
       if (glow !== undefined) {
         this.tweens.add({
           targets: glow,
@@ -1945,7 +2041,7 @@ export class RunScene extends Phaser.Scene {
         .setVisible(false);
       flashCopy.play(bossIdleKey(enemy.bossArt));
       container.setData("flashCopy", flashCopy);
-      const hover = this.add.container(0, 0, [body, flashCopy]);
+      const hover = this.add.container(0, 0, [body, flashCopy, shieldRing]);
       container.add([aura, embers, hover]);
       // 由大縮小、一格一格現身，像從陣法裡壓下來。
       hover.setScale(1.6).setAlpha(0);
@@ -2059,7 +2155,17 @@ export class RunScene extends Phaser.Scene {
         (view.getData("body") as EnemyBody | undefined)?.clearTint();
         (view.getData("flashCopy") as Phaser.GameObjects.Sprite | undefined)?.setVisible(false);
       }
-      if (enemy.boss) this.refreshBossPanel(enemy);
+      if (enemy.boss) {
+        this.refreshBossPanel(enemy);
+        const ring = view.getData("shieldRing") as Phaser.GameObjects.Rectangle | undefined;
+        const skill = enemy.skill;
+        if (ring !== undefined && skill !== null) {
+          const full = enemy.maxHp * skill.def.amount;
+          const left = skill.shield;
+          ring.setVisible(left > 0);
+          if (left > 0 && full > 0) ring.setAlpha(0.35 + 0.65 * Math.min(1, left / full));
+        }
+      }
     }
   }
 
@@ -2090,8 +2196,17 @@ export class RunScene extends Phaser.Scene {
       .text(cx, 160 + shift, "", textStyle({ size: 15, color: INK, bold: true }))
       .setOrigin(0.5);
     this.siegeText.setY(196 + shift);
+    // 招式名掛在首領名字下面、血條上面：一眼就知道這一隻會什麼。
+    const skillTag = this.add
+      .text(cx + name.width / 2 + 10, 128 + shift, `〔${boss.skillName}〕`, textStyle({ size: 15, color: GOLD, bold: true }))
+      .setOrigin(0, 0.5)
+      .setStroke("#0b0f14", 5);
+    this.bossSkillTag = skillTag;
+    this.bossShieldBar = this.add
+      .rectangle(cx - width / 2, 160 + shift, 0, 18, hexToNumber(GOLD), 0.85)
+      .setOrigin(0, 0.5);
     this.bossPanel = this.add
-      .container(0, 0, [name, bg, this.bossBar, this.bossText])
+      .container(0, 0, [name, skillTag, bg, this.bossBar, this.bossShieldBar, this.bossText])
       .setDepth(48);
 
     // 登場演出。原本只有一行台詞加一聲鑼，關底最該有份量的那一刻反而最平——
@@ -2188,6 +2303,11 @@ export class RunScene extends Phaser.Scene {
     );
     this.cameras.main.shake(420, 0.011);
     audio.play("bossRoar");
+    // 招式與對策等登場演出收完再講：疊在大字上面，兩樣都讀不進去。
+    const skill = bossSkill(boss.skill);
+    this.time.delayedCall(1500, () =>
+      this.banner("hint", `「${boss.skillName}」${skill.desc}——${skill.counter}`, GOLD, 3600),
+    );
   }
 
   private refreshBossPanel(enemy: ActiveEnemy): void {
@@ -2196,9 +2316,17 @@ export class RunScene extends Phaser.Scene {
       Math.max(0, width * (enemy.hp / enemy.maxHp)),
       18,
     );
+    const skill = enemy.skill;
+    const shield = skill?.shield ?? 0;
+    // 護盾疊在血條上、從左邊長出來，寬度和血量用同一把尺：一眼看得出「還要先打掉多少」。
+    this.bossShieldBar?.setDisplaySize(Math.min(width, width * (shield / enemy.maxHp)), 18);
     this.bossText?.setText(
-      `${formatNumber(Math.max(0, enemy.hp))} / ${formatNumber(enemy.maxHp)}`,
+      `${formatNumber(Math.max(0, enemy.hp))} / ${formatNumber(enemy.maxHp)}` +
+        (shield > 0 ? `　護盾 ${formatNumber(shield)}` : ""),
     );
+    if (skill?.def.kind === "rage" && skill.triggered && this.bossSkillTag !== null) {
+      this.bossSkillTag.setText(`〔${this.run.bossDef.skillName}・狂暴〕`).setColor(DANGER);
+    }
   }
 
   // -------------------------------------------------------------- 演出
@@ -2831,4 +2959,21 @@ export class RunScene extends Phaser.Scene {
 
     fadeToScene(this, "Result", result);
   }
+}
+
+/**
+ * 開發用：`?debugBoss=seal` 直接叫出帶指定招式的首領，血量加厚十倍，好逐招看演出。
+ *
+ * 包在 import.meta.env.DEV 底下，正式版打包時整段被剔除；
+ * 這一場的紀錄當然也對不上伺服器，那不重要——它本來就不該上榜。
+ */
+function applyDebugBoss(run: DefenseState): void {
+  const kind = new URLSearchParams(window.location.search).get("debugBoss");
+  if (kind === null) return;
+  const sample = ENEMIES.bosses.find((boss) => boss.skill === kind);
+  if (sample === undefined) return;
+  run.bossDef = { ...run.bossDef, skill: sample.skill, skillName: sample.skillName };
+  run.queue = run.queue
+    .filter((entry) => entry.boss)
+    .map((entry) => ({ ...entry, atMs: 1500, hp: entry.hp * 10 }));
 }

@@ -147,140 +147,180 @@
       "realm": "qi",
       "name": "赤目狼王",
       "taunt": "凡人也敢入我山門？",
-      "art": "beast"
+      "art": "beast",
+      "skill": "summon",
+      "skillName": "嘯月召狼"
     },
     {
       "id": "b_qi_2",
       "realm": "qi",
       "name": "黑風老魈",
       "taunt": "煉氣小輩，也配擋路！",
-      "art": "demon"
+      "art": "demon",
+      "skill": "charge",
+      "skillName": "黑風撲擊"
     },
     {
       "id": "b_foundation_1",
       "realm": "foundation",
       "name": "屍傀將",
       "taunt": "此地之下，皆是我的屍兵。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "shield",
+      "skillName": "屍甲"
     },
     {
       "id": "b_foundation_2",
       "realm": "foundation",
       "name": "毒霧蟒君",
       "taunt": "築基而已，滄海一粟。",
-      "art": "beast"
+      "art": "beast",
+      "skill": "regen",
+      "skillName": "蛻皮回春"
     },
     {
       "id": "b_golden_1",
       "realm": "golden",
       "name": "血煞道人",
       "taunt": "你的金丹，我收下了。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "devour",
+      "skillName": "血煞噬符"
     },
     {
       "id": "b_golden_2",
       "realm": "golden",
       "name": "赤炎魔蠍",
       "taunt": "焚盡爾等血肉！",
-      "art": "beast"
+      "art": "beast",
+      "skill": "rage",
+      "skillName": "毒尾狂怒"
     },
     {
       "id": "b_nascent_1",
       "realm": "nascent",
       "name": "噬魂魔尊",
       "taunt": "元嬰？不過是一口靈食。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "seal",
+      "skillName": "噬魂封符"
     },
     {
       "id": "b_nascent_2",
       "realm": "nascent",
       "name": "萬鬼夜主",
       "taunt": "我身後有十萬冤魂。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "summon",
+      "skillName": "百鬼夜行"
     },
     {
       "id": "b_spirit_1",
       "realm": "spirit",
       "name": "化神老祖",
       "taunt": "言出法隨，你已死了。",
-      "art": "celestial"
+      "art": "celestial",
+      "skill": "shield",
+      "skillName": "元神護體"
     },
     {
       "id": "b_spirit_2",
       "realm": "spirit",
       "name": "無面神念",
       "taunt": "你所見的皆非真實。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "mirror",
+      "skillName": "千面幻身"
     },
     {
       "id": "b_void_1",
       "realm": "void",
       "name": "虛空吞天獸",
       "taunt": "此界，本座一口可吞。",
-      "art": "beast"
+      "art": "beast",
+      "skill": "devour",
+      "skillName": "吞天"
     },
     {
       "id": "b_void_2",
       "realm": "void",
       "name": "幽冥劍主",
       "taunt": "劍出，無人生還。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "seal",
+      "skillName": "幽冥劍鎖"
     },
     {
       "id": "b_unity_1",
       "realm": "unity",
       "name": "天魔真身",
       "taunt": "身魂合一，天地為敵。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "rage",
+      "skillName": "天魔解體"
     },
     {
       "id": "b_unity_2",
       "realm": "unity",
       "name": "合道妖皇",
       "taunt": "妖亦可成道，人何足懼。",
-      "art": "beast"
+      "art": "beast",
+      "skill": "summon",
+      "skillName": "萬妖朝宗"
     },
     {
       "id": "b_mahayana_1",
       "realm": "mahayana",
       "name": "大乘魔帝",
       "taunt": "此界之巔，只容一人。",
-      "art": "demon"
+      "art": "demon",
+      "skill": "shield",
+      "skillName": "魔帝金身"
     },
     {
       "id": "b_mahayana_2",
       "realm": "mahayana",
       "name": "萬劍歸墟",
       "taunt": "萬劍朝宗，皆為我用。",
-      "art": "celestial"
+      "art": "celestial",
+      "skill": "charge",
+      "skillName": "萬劍穿心"
     },
     {
       "id": "b_tribulation_1",
       "realm": "tribulation",
       "name": "九重天劫",
       "taunt": "天不許你飛升。",
-      "art": "storm"
+      "art": "storm",
+      "skill": "seal",
+      "skillName": "雷劫封脈"
     },
     {
       "id": "b_tribulation_2",
       "realm": "tribulation",
       "name": "渡劫魔君",
       "taunt": "我在此渡劫千年，只等你來。",
-      "art": "storm"
+      "art": "storm",
+      "skill": "regen",
+      "skillName": "劫火重生"
     },
     {
       "id": "b_ascension_1",
       "realm": "ascension",
       "name": "仙庭執法者",
       "taunt": "無詔飛升，當誅。",
-      "art": "celestial"
+      "art": "celestial",
+      "skill": "mirror",
+      "skillName": "天兵列陣"
     },
     {
       "id": "b_ascension_2",
       "realm": "ascension",
       "name": "墮仙・無咎",
       "taunt": "仙？也不過是更大的囚籠。",
-      "art": "celestial"
+      "art": "celestial",
+      "skill": "devour",
+      "skillName": "墮仙噬道"
     }
   ]
 }
