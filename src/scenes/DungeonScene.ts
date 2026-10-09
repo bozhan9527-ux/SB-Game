@@ -137,7 +137,7 @@ export class DungeonScene extends Phaser.Scene {
         textStyle({ size: 16, color: INK_DIM }),
       )
       .setOrigin(0, 0.5);
-    fitText(desc, width - 76 - 150);
+    fitText(desc, width - 76 - 164);
 
     const progress = dungeon.endless
       ? "無限波次 · 打到守不住為止"

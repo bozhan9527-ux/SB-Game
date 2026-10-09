@@ -25,6 +25,7 @@ import {
   wrapText,
 } from "../ui/theme";
 import { fadeIn, fadeToScene } from "../ui/transition";
+import { dragScroll } from "../ui/scroll";
 
 interface Section {
   title: string;
@@ -264,7 +265,7 @@ export class HelpScene extends Phaser.Scene {
     // 逐段量出實際高度再往下堆，段落行數不同也不會互相壓到。
     let y = 8;
     for (const section of this.sections()) {
-      const body = section.lines
+      const body = joinContinuations(section.lines)
         .map((line) => wrapText(line, width - 36, 16))
         .join("\n");
       const title = this.add.text(
@@ -292,14 +293,7 @@ export class HelpScene extends Phaser.Scene {
 
     // 內容比可視範圍高的那一段才是可捲動距離。
     const minY = viewTop + Math.min(0, viewHeight - y);
-    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.isDown) return;
-      list.y = Phaser.Math.Clamp(
-        list.y + pointer.velocity.y * 0.28,
-        minY,
-        viewTop,
-      );
-    });
+    dragScroll(this, list, minY, viewTop);
     if (minY < viewTop) {
       this.add
         .text(
@@ -330,4 +324,23 @@ export class HelpScene extends Phaser.Scene {
       onClick: () => fadeToScene(this, "Title"),
     });
   }
+}
+
+/**
+ * 資料裡一句話常被拆成兩行寫（上一行收在「，」或「——」）。像素字比較寬，
+ * 照原樣換行會在每段尾巴留下兩三個字的短行；先接回整句，再交給 wrapText 依寬度斷。
+ * 條列（・、１. 、◆）一律獨立成行，不往上接。
+ */
+function joinContinuations(lines: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const line of lines) {
+    const previous = out[out.length - 1];
+    const continues =
+      previous !== undefined &&
+      /(，|——|、)$/.test(previous) &&
+      !/^[・◆　\d０-９１-９]/.test(line);
+    if (continues) out[out.length - 1] = previous + line;
+    else out.push(line);
+  }
+  return out;
 }

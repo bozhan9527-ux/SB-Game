@@ -18,6 +18,7 @@ import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, GOLD, INK, INK_DIM, JADE, LINE, formatNumber, hexToNumber, textStyle } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
+import { dragScroll } from '../ui/scroll';
 
 /** 成就一覽。可上下拖曳捲動，因為條目比一頁多。 */
 export class AchievementScene extends Phaser.Scene {
@@ -108,10 +109,7 @@ export class AchievementScene extends Phaser.Scene {
     // 拖曳捲動：內容比可視範圍高的那一段才是可捲動距離。
     const contentHeight = ACHIEVEMENTS.length * rowHeight;
     const minY = viewTop + Math.min(0, viewHeight - contentHeight);
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.isDown) return;
-      list.y = Phaser.Math.Clamp(list.y + pointer.velocity.y * 0.28, minY, viewTop);
-    });
+    dragScroll(this, list, minY, viewTop);
 
     // 一次領完。十九條散在一個要捲動的清單裡，逐條點是在浪費玩家的時間——
     // 「有東西可領」該給的是期待感，不是勞動。
