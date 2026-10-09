@@ -2058,24 +2058,27 @@ export class RunScene extends Phaser.Scene {
     const boss = this.run.bossDef;
     const cx = GAME_WIDTH / 2;
     const width = GAME_WIDTH - 80;
+    // 副本在狀態列下面多一條橫幅（y 114～135），首領名字照原位會整個被它蓋掉。
+    const shift = this.dungeonBanner === null ? 0 : 24;
     const name = this.add
       .text(
         cx,
-        128,
+        128 + shift,
         boss.name,
         textStyle({ size: 26, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
       .setStroke("#0b0f14", 6);
     const bg = this.add
-      .rectangle(cx, 160, width, 22, 0x2a1216, 1)
+      .rectangle(cx, 160 + shift, width, 22, 0x2a1216, 1)
       .setStrokeStyle(3, LINE);
     this.bossBar = this.add
-      .rectangle(cx - width / 2, 160, width, 18, 0xc03a4a, 1)
+      .rectangle(cx - width / 2, 160 + shift, width, 18, 0xc03a4a, 1)
       .setOrigin(0, 0.5);
     this.bossText = this.add
-      .text(cx, 160, "", textStyle({ size: 15, color: INK, bold: true }))
+      .text(cx, 160 + shift, "", textStyle({ size: 15, color: INK, bold: true }))
       .setOrigin(0.5);
+    this.siegeText.setY(196 + shift);
     this.bossPanel = this.add
       .container(0, 0, [name, bg, this.bossBar, this.bossText])
       .setDepth(48);
