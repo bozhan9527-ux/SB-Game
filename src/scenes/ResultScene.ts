@@ -145,6 +145,7 @@ export class ResultScene extends Phaser.Scene {
         title,
         textStyle({ size: 64, color: titleColor, bold: true }),
       )
+      .setStroke("#0b0f14", 10)
       .setOrigin(0.5);
 
     this.add
@@ -154,6 +155,8 @@ export class ResultScene extends Phaser.Scene {
         wrapText(this.headline(result), GAME_WIDTH - 80, 22),
         textStyle({ size: 22, color: INK_DIM }),
       )
+      // 結算頁的副標題會疊在明月前面，沒有描邊的話月亮那一段字讀不出來。
+      .setStroke("#0b0f14", 6)
       .setOrigin(0.5)
       .setAlign("center");
 
@@ -216,14 +219,22 @@ export class ResultScene extends Phaser.Scene {
       ...beaten.map((item) => `${item.label} ${item.text}`),
     ];
     if (highlights.length > 0) {
+      // 項目之間可以換行、項目內部不拆（內部的空白換成不換行空白），最多兩行。
+      // 原本硬塞一行再縮，四項一起出現時字會縮到讀不出來；面板與「下一關」之間放得下兩行。
+      const text = wrapText(
+        highlights
+          .map((item, i) => item.replace(/ /g, "\u00a0") + (i < highlights.length - 1 ? "\u00a0·" : ""))
+          .join(" "),
+        GAME_WIDTH - 60,
+        16,
+      );
       const line = this.add
-        .text(
-          cx,
-          panelBottom + 18,
-          highlights.join("　"),
-          textStyle({ size: 16, color: JADE, bold: true }),
-        )
-        .setOrigin(0.5);
+        .text(cx, panelBottom + 10, text, textStyle({ size: 16, color: JADE, bold: true }))
+        .setOrigin(0.5, 0)
+        .setAlign("center")
+        .setLineSpacing(4);
+      const room = 724 - 14 - (panelBottom + 10);
+      if (line.height > room) line.setScale(room / line.height);
       fitText(line, GAME_WIDTH - 40);
     }
 

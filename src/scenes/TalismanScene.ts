@@ -251,8 +251,8 @@ export class TalismanScene extends Phaser.Scene {
         .rectangle(0, 0, TILE_W, CHOSEN_H, BG_PANEL, 0.92)
         .setStrokeStyle(3, LINE)
         .setInteractive({ useHandCursor: true });
-      const glyph = this.add.image(0, -10, glyphTexture('sword'));
-      const name = this.add.text(0, 20, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
+      const glyph = this.add.image(0, -8, glyphTexture('sword'));
+      const name = this.add.text(0, 22, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
       const container = this.add.container(x, CHOSEN_Y, [background, glyph, name]);
       container.setData('glyph', glyph);
       container.setData('name', name);
@@ -295,11 +295,11 @@ export class TalismanScene extends Phaser.Scene {
       // 靠形狀是掃過去就認得——而這一頁的工作正是「比較」。
       // 每張符的顏色也上到圖騰上，讓同一系的符在視覺上先聚成一群。
       const glyph = this.add
-        .image(x, y - 12, glyphTexture(def.art))
+        .image(x, y - 10, glyphTexture(def.art))
         .setAlpha(unlocked ? 1 : 0.22);
       if (unlocked) glyph.setTint(hexToNumber(def.color));
       const name = this.add
-        .text(x, y + 22, def.name, textStyle({ size: 14, color: unlocked ? def.color : INK_DIM }))
+        .text(x, y + 24, def.name, textStyle({ size: 14, color: unlocked ? def.color : INK_DIM }))
         .setOrigin(0.5);
       // 原本這裡還有一行「N 道 / 第 N 關」。拿掉是為了把空間讓給圖騰——
       // 那一行的資訊在下面的說明面板裡本來就有，而格子的工作是「認出是哪一張」，

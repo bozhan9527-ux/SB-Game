@@ -95,9 +95,13 @@ export function wrapText(text: string, widthPx: number, fontSize: number): strin
         line = candidate;
         continue;
       }
-      flush();
-      // 單一詞塊就超過一行（整句中文）時逐字硬斷。
-      let chunk = '';
+      // 短詞塊（「×0.95」「+25%」）整塊移到下一行，不從中間拆；
+      // 長詞塊是一整句中文，接在這一行後面逐字填滿再斷——先換行再填的話，
+      // 「…11 階（上限」這一行會只寫了一半，括號也被拆到兩行。
+      const long = textWidthInEm(token) > limit * 0.4;
+      let chunk = long && line.length > 0 ? `${line} ` : '';
+      if (!long || line.length === 0) flush();
+      else line = '';
       let broke = false;
       for (const char of token) {
         if (textWidthInEm(chunk + char) > limit) {

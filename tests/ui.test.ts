@@ -37,6 +37,13 @@ describe('文字排版', () => {
     }
   });
 
+  it('長句接在前一段後面填滿，不會留下半行空白', () => {
+    const text = '法寶只合到 11 階（上限 14）——與其鋪滿低階符，不如集中合成同一種';
+    const lines = wrapText(text, 488, 19).split('\n');
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toContain('（上限 14）');
+  });
+
   it('短字串不動它', () => {
     expect(wrapText('確定入門', 400, 20)).toBe('確定入門');
   });
