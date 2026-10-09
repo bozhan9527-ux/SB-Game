@@ -3,7 +3,7 @@
  */
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, fitText, textStyle } from './theme';
+import { BG_PANEL_ALT, INK, INK_DIM, LINE, MIN_TOUCH_SIZE, fitText, textStyle, hexToNumber, ACCENT_GLOW, JADE_GLOW } from './theme';
 
 export interface ButtonOptions {
   width: number;
@@ -39,11 +39,22 @@ export function createButton(
     .rectangle(0, 0, width, height, options.fillColor ?? BG_PANEL_ALT)
     .setStrokeStyle(2, options.strokeColor ?? LINE);
 
+  // 按鈕光暈效果：外層漸淡的邊框增加質感
+  const glowColor = options.fillColor === hexToNumber('#e8c46a') ? ACCENT_GLOW : JADE_GLOW;
+  const outerGlow = scene.add
+    .rectangle(0, 0, width + 6, height + 6, 0x000000, 0)
+    .setStrokeStyle(1, hexToNumber(glowColor), 0.3);
+
+  // 陰影效果：按鈕下方的深色投影
+  const shadowOffset = 3;
+  const shadow = scene.add
+    .rectangle(0, shadowOffset, width, height, 0x000000, 0.25);
+
   const text = scene.add
     .text(0, 0, options.label, textStyle({ size: options.fontSize ?? 26, color: options.textColor ?? INK }))
     .setOrigin(0.5);
 
-  const children: Phaser.GameObjects.GameObject[] = [background, text];
+  const children: Phaser.GameObjects.GameObject[] = [shadow, background, outerGlow, text];
 
   const hasIcon = options.icon !== undefined && scene.textures.exists(options.icon);
   const iconSize = hasIcon ? (options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15)) : 0;

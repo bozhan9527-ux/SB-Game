@@ -7,7 +7,7 @@ import Phaser from 'phaser';
 import { glyphTexture } from '../art';
 import { CARDS } from '../data';
 import type { Card } from '../systems/deck';
-import { INK, LINE, hexToNumber, textStyle } from './theme';
+import { INK, LINE, hexToNumber, textStyle, ACCENT_GLOW, JADE_GLOW } from './theme';
 
 export const CARD_WIDTH = 84;
 export const CARD_HEIGHT = 100;
@@ -28,13 +28,25 @@ function cardColor(type: string): string {
  * 重建 Container 會讓正在跑的 tween 與 hit area 一起失效。
  */
 export function createCardView(scene: Phaser.Scene, x: number, y: number): CardView {
+  // 空位槽：帶有光暈效果
   const slot = scene.add
     .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0x000000, 0.25)
     .setStrokeStyle(2, LINE, 0.9);
+  const slotGlow = scene.add
+    .rectangle(0, 0, CARD_WIDTH + 4, CARD_HEIGHT + 4, 0x000000, 0)
+    .setStrokeStyle(1, LINE, 0.4)
+    .setVisible(false);
+
   const body = scene.add.rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0xffffff, 1).setVisible(false);
   const inner = scene.add
     .rectangle(0, 0, CARD_WIDTH - 10, CARD_HEIGHT - 10, 0x11161c, 0.92)
     .setVisible(false);
+
+  // 卡片邊框光暈：根據卡牌顏色添加額外的光暈邊框
+  const cardGlow = scene.add
+    .rectangle(0, 0, CARD_WIDTH + 3, CARD_HEIGHT + 3, 0x000000, 0)
+    .setVisible(false);
+
   const glyph = scene.add.image(0, -22, glyphTexture('sword')).setDisplaySize(34, 42).setVisible(false);
   const tierText = scene.add
     .text(0, 26, '', textStyle({ size: 30, bold: true }))
@@ -42,13 +54,15 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     .setVisible(false);
   const pips = scene.add.container(0, 0);
 
-  const container = scene.add.container(x, y, [slot, body, inner, glyph, tierText, pips]);
+  const container = scene.add.container(x, y, [slot, slotGlow, body, cardGlow, inner, glyph, tierText, pips]);
 
   const refresh = (card: Card | null): void => {
     pips.removeAll(true);
     if (card === null) {
       slot.setVisible(true);
+      slotGlow.setVisible(true);
       body.setVisible(false);
+      cardGlow.setVisible(false);
       inner.setVisible(false);
       glyph.setVisible(false);
       tierText.setVisible(false);
@@ -56,7 +70,9 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     }
     const color = cardColor(card.type);
     slot.setVisible(false);
+    slotGlow.setVisible(false);
     body.setVisible(true).setFillStyle(hexToNumber(color), 1);
+    cardGlow.setVisible(true).setStrokeStyle(1.5, hexToNumber(color), 0.5);
     inner.setVisible(true);
     glyph.setVisible(true).setTexture(glyphTexture(card.type));
     tierText.setVisible(true).setText(`${card.tier}`).setColor(color);
