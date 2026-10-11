@@ -16,6 +16,7 @@ import backdrops
 import hd
 import hd_bosses
 import hd_mobs
+import keyart
 import ui
 from engine import Sprite, to_hex_grid
 import sprites as gen
@@ -679,6 +680,7 @@ if __name__ == "__main__":
     save("slash.svg", slash_svg())
     n += backdrops.build(ART)
     n += ui.build(ART)
+    n += keyart.build(ART)
     # 尺寸清單給遊戲讀：顯示倍數、血條位置都從這裡來，重畫角色不必再手改程式裡的數字。
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "data", "art-manifest.json")
     with open(out, "w") as fh:

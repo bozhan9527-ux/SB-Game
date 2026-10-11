@@ -19,6 +19,12 @@ export const ART = {
   gate: 'gate',
   cardPaper: 'card-paper',
   slot: 'slot',
+  titleKey: 'title-key',
+  titleLogo: 'title-logo',
+  titleHero: 'title-hero',
+  titleSword: 'title-sword',
+  titleCrane0: 'title-crane-0',
+  titleCrane1: 'title-crane-1',
 } as const;
 
 /**
@@ -177,6 +183,12 @@ const ASSETS: readonly ArtSpec[] = [
   { key: ART.gate, file: 'gate' },
   { key: ART.cardPaper, file: 'card-paper' },
   { key: ART.slot, file: 'slot' },
+  { key: ART.titleKey, file: 'title-key' },
+  { key: ART.titleLogo, file: 'title-logo' },
+  { key: ART.titleHero, file: 'title-hero' },
+  { key: ART.titleSword, file: 'title-sword' },
+  { key: ART.titleCrane0, file: 'title-crane-0' },
+  { key: ART.titleCrane1, file: 'title-crane-1' },
 ];
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */

@@ -5,7 +5,7 @@ import { pixelPanel } from '../ui/panel';
 import { libraryFloor } from '../systems/dungeons';
 import { audio } from '../audio';
 import type { IconName } from '../art';
-import { discipleTexture, glyphTexture, iconTexture } from '../art';
+import { ART, discipleTexture, glyphTexture, iconTexture } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { storageUnavailable } from '../save/storage';
@@ -50,9 +50,12 @@ export class TitleScene extends Phaser.Scene {
     const sect = sectById(save.player.sectId);
     audio.applySettings(save.settings);
     audio.playMusic(realmIndexForStage(save.world.stage));
-    drawBackdrop(this, realm);
+    // 主畫面有自己的一張主視覺（月夜仙山），不跟著境界換——這一頁是遊戲的門面。
+    // 貼圖沒載到時退回境界遠景。
+    if (this.textures.exists(ART.titleKey)) this.buildKeyArt();
+    else drawBackdrop(this, realm);
 
-    addTwinklingStars(this, 10, realm.color);
+    addTwinklingStars(this, 10, GOLD);
 
     const cx = GAME_WIDTH / 2;
     const hasSect = sect !== null;
@@ -64,16 +67,16 @@ export class TitleScene extends Phaser.Scene {
 
     this.buildTopBar(save);
 
-    // 招牌字：開場動畫講過一次，這裡再放一個小一號的。
-    // 上架的遊戲主畫面都有自己的招牌——沒有它，這一頁看起來像設定頁，不像一款遊戲的門面。
-    // 字級壓在 60：比開場小，讓出下方遠景，也不和中央的境界名搶第一眼。
-    addLogo(this, cx, 196, 60);
-    addSeal(this, cx + 176, 226);
-    this.add
-      .text(cx, 262, '拖符布陣 · 合成升階 · 鎮守山門', textStyle({ size: 17, color: INK }))
-      .setOrigin(0.5)
-      .setShadow(2, 2, '#000000', 0);
-    const infoBottom = this.buildIdentity(350, save, realm, sect);
+    // 招牌字：霞鶩文楷點陣化的書法金字（title-logo.png），沒有那張圖時退回點陣字。
+    if (this.textures.exists(ART.titleLogo)) {
+      this.add.image(cx, 118, ART.titleLogo).setScale(2);
+    } else {
+      addLogo(this, cx, 110, 60);
+    }
+    addSeal(this, cx + 222, 136);
+    // 副標題只留在開場動畫：這裡寫的話會壓到仙宮的塔尖。
+    // 中間那一大塊留給主視覺：仙山、明月、御劍的主角。資訊面板壓到下半部。
+    const infoBottom = this.buildIdentity(452, save, realm, sect);
 
     // 主行動只能有一個。改版前「開始挑戰」和另外兩顆長得一模一樣，
     // 只靠位置在上面來表示它比較重要——那不夠，它得是畫面上最重的東西。
@@ -89,22 +92,21 @@ export class TitleScene extends Phaser.Scene {
       onClick: () => fadeToScene(this, hasSect ? 'Run' : 'Sect'),
     });
 
+    // 洞府與符籙譜並排：兩個都是「進場前整備」，同一層級，省下一整排給主視覺。
     y += 36 + 14 + 29;
-    createButton(this, cx, y, {
-      width: 356,
+    createButton(this, cx - 90, y, {
+      width: 172,
       height: 58,
       label: '洞府',
-      fontSize: 24,
+      fontSize: 23,
       icon: iconTexture('cave'),
       onClick: () => fadeToScene(this, 'Upgrade'),
     });
-
-    y += 66;
-    createButton(this, cx, y, {
-      width: 356,
+    createButton(this, cx + 90, y, {
+      width: 172,
       height: 58,
       label: '符籙譜',
-      fontSize: 24,
+      fontSize: 23,
       icon: iconTexture('scroll'),
       onClick: () => fadeToScene(this, 'Talisman'),
     });
@@ -143,6 +145,46 @@ export class TitleScene extends Phaser.Scene {
   }
 
   /**
+   * 主視覺：月夜仙山（靜態一張），再疊上會動的東西——
+   * 御劍的主角上下浮動、拖一道劍光；仙鶴從月前飛過；兩朵祥雲慢慢橫移。
+   * 靜態的一張圖撐不起「入口」，會動的那幾樣才是讓人停下來看的理由。
+   */
+  private buildKeyArt(): void {
+    this.add.image(0, 0, ART.titleKey).setOrigin(0, 0).setScale(2).setDepth(-100);
+
+    // 祥雲：白、半透明，從左往右飄，在仙山前面
+    for (const [y, scale, alpha, duration] of [[300, 4, 0.16, 52000], [372, 2, 0.2, 38000]] as const) {
+      const cloud = this.add.image(-160, y, ART.cloud).setScale(scale).setAlpha(alpha).setDepth(-90);
+      this.tweens.add({ targets: cloud, x: GAME_WIDTH + 160, duration, delay: Phaser.Math.Between(0, 9000), repeat: -1 });
+    }
+
+    // 御劍的主角：劍與人一起浮動，劍光往後拖
+    const hero = this.add.container(392, 336).setDepth(-80);
+    const sword = this.add.image(0, 0, ART.titleSword).setScale(2).setOrigin(0.5, 1);
+    const body = this.add.image(-22, -10, ART.titleHero).setScale(2).setOrigin(0.5, 1);
+    const trail = this.add.graphics();
+    trail.fillStyle(0xd8e8ff, 0.5);
+    for (let i = 0; i < 18; i += 1) {
+      if (i % 2 === 0) trail.fillRect(60 + i * 6, -12, 6, 2);
+    }
+    trail.fillStyle(0xffffff, 0.75);
+    trail.fillRect(60, -12, 34, 2);
+    hero.add([trail, sword, body]);
+    this.tweens.add({ targets: hero, y: 326, duration: 1400, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+
+    // 仙鶴：兩幀拍翅，從右往左飛過月前，飛出畫面再從右邊回來
+    if (!this.anims.exists('title-crane')) {
+      this.anims.create({ key: 'title-crane', frames: [{ key: ART.titleCrane0 }, { key: ART.titleCrane1 }], frameRate: 4, repeat: -1 });
+    }
+    [[0, 238], [26, 230], [48, 244]].forEach(([dx, y], index) => {
+      const crane = this.add.sprite(GAME_WIDTH + 40 + (dx ?? 0), y ?? 240, ART.titleCrane0).setScale(2).setDepth(-85);
+      crane.play('title-crane');
+      crane.anims.setProgress(index * 0.4);
+      this.tweens.add({ targets: crane, x: -60 + (dx ?? 0), duration: 26000, delay: 2000, repeat: -1, repeatDelay: 6000 });
+    });
+  }
+
+  /**
    * 頂列：左邊輪迴，右邊選單。
    *
    * 右上角原本是「音效 開／關」那顆按鈕，而它正好和明月搶同一個角落。
@@ -155,9 +197,9 @@ export class TitleScene extends Phaser.Scene {
     // 提前露出只會讓還在第 5 關的新玩家困惑——他離那件事還有八十關。
     const showRebirth = canRebirth(save) || karma.rebirths > 0;
     if (showRebirth) {
-      createButton(this, 84, 54, {
-        width: 140,
-        height: 48,
+      createButton(this, 76, 36, {
+        width: 124,
+        height: 44,
         label: karma.rebirths > 0 ? `輪迴 · 第 ${karma.rebirths + 1} 世` : '輪迴',
         fontSize: 16,
         textColor: GOLD,
@@ -172,15 +214,15 @@ export class TitleScene extends Phaser.Scene {
     // 搬上來之後中央區少一行，而且它就在「洞府」要花它的地方附近。
     this.add
       .text(
-        showRebirth ? 168 : 24,
-        54,
+        showRebirth ? 150 : 24,
+        36,
         `金幣 ${formatNumber(save.player.wallet.gold)}`,
         textStyle({ size: 18, color: GOLD }),
       )
       .setOrigin(0, 0.5);
 
     const x = GAME_WIDTH - 46;
-    const y = 54;
+    const y = 36;
     // 三條線自己畫，不做成一張圖：它就是三條線，而多一個要預載的貼圖
     // 就多一個開場會失敗的地方。
     for (let i = 0; i < 3; i += 1) {
@@ -223,14 +265,14 @@ export class TitleScene extends Phaser.Scene {
     sect: ReturnType<typeof sectById>,
   ): number {
     const cx = GAME_WIDTH / 2;
-    const height = 210;
-    pixelPanel(this, cx, top + height / 2, GAME_WIDTH - 48, height, { alpha: 0.88 });
+    const height = 176;
+    pixelPanel(this, cx, top + height / 2, GAME_WIDTH - 48, height, { alpha: 0.9 });
 
     this.add
-      .text(cx, top + 44, realmTitle(save.world.stage), textStyle({ size: 44, color: realm.color, bold: true }))
+      .text(cx, top + 38, realmTitle(save.world.stage), textStyle({ size: 40, color: realm.color, bold: true }))
       .setOrigin(0.5);
     this.add
-      .text(cx, top + 86, `第 ${save.world.stage} 關 · ${realm.subtitle}`, textStyle({ size: 18, color: INK_DIM }))
+      .text(cx, top + 76, `第 ${save.world.stage} 關 · ${realm.subtitle}`, textStyle({ size: 18, color: INK_DIM }))
       .setOrigin(0.5);
     // 距離突破還有幾關，是修仙題材最直接的推進動機。
     const toBreak = realm.stageTo - save.world.stage + 1;
@@ -245,7 +287,7 @@ export class TitleScene extends Phaser.Scene {
     const line = this.add
       .text(
         cx,
-        top + 116,
+        top + 102,
         omen !== null && tribulations.length > 0
           ? `奇遇「${omen.name}」・天劫：${tribulationNames(tribulations)}`
           : omen !== null
@@ -260,7 +302,7 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
     fitText(line, GAME_WIDTH - 80);
 
-    this.buildIcons(top + 166, save, sect);
+    this.buildIcons(top + 140, save, sect);
     return top + height;
   }
 
@@ -283,10 +325,11 @@ export class TitleScene extends Phaser.Scene {
       .rectangle(x, y, cell - 6, cell - 6, BG_PANEL_ALT, 0.9)
       .setStrokeStyle(3, hexToNumber(sect.color));
     // 原寸、只裁頭與上半身：格子只有 44 點，整個人縮進去會掉格子變形。
+    // 只裁頭與上半身：格子只有 44 點。
     this.add
       .image(x, y, discipleTexture(sect.art, 0, 0))
-      .setCrop(0, 2, 40, 42)
-      .setOrigin(0.5, 23 / 56);
+      .setCrop(0, 0, 32, 34)
+      .setOrigin(0.5, 17 / 44);
     x += cell / 2 + 13;
 
     // 一條細線分開「我是誰」和「我帶什麼」——五個等距的方格會讓人以為是同一類東西。
