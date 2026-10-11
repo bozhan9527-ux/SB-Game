@@ -15,6 +15,13 @@
       "trait": "none"
     },
     {
+      "id": "m_qi_3",
+      "realm": "qi",
+      "name": "赤尾妖狐",
+      "art": "fox",
+      "trait": "none"
+    },
+    {
       "id": "m_foundation_1",
       "realm": "foundation",
       "name": "黑風寨馬賊",
@@ -27,6 +34,13 @@
       "name": "屍傀陣列",
       "art": "undead",
       "trait": "armor"
+    },
+    {
+      "id": "m_foundation_3",
+      "realm": "foundation",
+      "name": "毒沼蟾蜍",
+      "art": "toad",
+      "trait": "split"
     },
     {
       "id": "m_golden_1",
@@ -50,6 +64,13 @@
       "trait": "regen"
     },
     {
+      "id": "m_golden_4",
+      "realm": "golden",
+      "name": "嗜血蝠群",
+      "art": "bat",
+      "trait": "swift"
+    },
+    {
       "id": "m_nascent_1",
       "realm": "nascent",
       "name": "魔宗傀儡軍",
@@ -71,6 +92,13 @@
       "trait": "phase"
     },
     {
+      "id": "m_nascent_4",
+      "realm": "nascent",
+      "name": "白骨刀兵",
+      "art": "skeleton",
+      "trait": "armor"
+    },
+    {
       "id": "m_spirit_1",
       "realm": "spirit",
       "name": "神念傀儡",
@@ -83,6 +111,13 @@
       "name": "噬魂蜈蚣",
       "art": "centipede",
       "trait": "split"
+    },
+    {
+      "id": "m_spirit_3",
+      "realm": "spirit",
+      "name": "偃師傀儡",
+      "art": "puppet",
+      "trait": "armor"
     },
     {
       "id": "m_void_1",
@@ -106,6 +141,13 @@
       "trait": "ward"
     },
     {
+      "id": "m_void_4",
+      "realm": "void",
+      "name": "噬星幼蛛",
+      "art": "spider",
+      "trait": "split"
+    },
+    {
       "id": "m_unity_1",
       "realm": "unity",
       "name": "太古妖熊",
@@ -127,6 +169,13 @@
       "trait": "regen"
     },
     {
+      "id": "m_unity_4",
+      "realm": "unity",
+      "name": "火鬃狻猊",
+      "art": "lion",
+      "trait": "armor"
+    },
+    {
       "id": "m_mahayana_1",
       "realm": "mahayana",
       "name": "大乘魔軍",
@@ -139,6 +188,13 @@
       "name": "仙門叛徒",
       "art": "celestial",
       "trait": "none"
+    },
+    {
+      "id": "m_mahayana_3",
+      "realm": "mahayana",
+      "name": "白羽鶴妖",
+      "art": "crane",
+      "trait": "swift"
     },
     {
       "id": "m_tribulation_1",
@@ -162,6 +218,13 @@
       "trait": "phase"
     },
     {
+      "id": "m_tribulation_4",
+      "realm": "tribulation",
+      "name": "奔雷獸",
+      "art": "raiju",
+      "trait": "none"
+    },
+    {
       "id": "m_ascension_1",
       "realm": "ascension",
       "name": "仙庭天兵",
@@ -181,6 +244,13 @@
       "name": "天庭金剛",
       "art": "golem",
       "trait": "ward"
+    },
+    {
+      "id": "m_ascension_4",
+      "realm": "ascension",
+      "name": "玉甲神將",
+      "art": "jadeguard",
+      "trait": "ward"
     }
   ],
   "bosses": [
@@ -198,7 +268,7 @@
       "realm": "qi",
       "name": "黑風老魈",
       "taunt": "煉氣小輩，也配擋路！",
-      "art": "demon",
+      "art": "ape",
       "skill": "charge",
       "skillName": "黑風撲擊"
     },
@@ -207,7 +277,7 @@
       "realm": "foundation",
       "name": "屍傀將",
       "taunt": "此地之下，皆是我的屍兵。",
-      "art": "demon",
+      "art": "corpse",
       "skill": "shield",
       "skillName": "屍甲"
     },
@@ -216,7 +286,7 @@
       "realm": "foundation",
       "name": "毒霧蟒君",
       "taunt": "築基而已，滄海一粟。",
-      "art": "beast",
+      "art": "python",
       "skill": "regen",
       "skillName": "蛻皮回春"
     },
@@ -225,7 +295,7 @@
       "realm": "golden",
       "name": "血煞道人",
       "taunt": "你的金丹，我收下了。",
-      "art": "demon",
+      "art": "bloodtao",
       "skill": "devour",
       "skillName": "血煞噬符"
     },
@@ -234,7 +304,7 @@
       "realm": "golden",
       "name": "赤炎魔蠍",
       "taunt": "焚盡爾等血肉！",
-      "art": "beast",
+      "art": "scorpking",
       "skill": "rage",
       "skillName": "毒尾狂怒"
     },
@@ -243,7 +313,7 @@
       "realm": "nascent",
       "name": "噬魂魔尊",
       "taunt": "元嬰？不過是一口靈食。",
-      "art": "demon",
+      "art": "soullord",
       "skill": "seal",
       "skillName": "噬魂封符"
     },
@@ -252,7 +322,7 @@
       "realm": "nascent",
       "name": "萬鬼夜主",
       "taunt": "我身後有十萬冤魂。",
-      "art": "demon",
+      "art": "ghostking",
       "skill": "summon",
       "skillName": "百鬼夜行"
     },
@@ -261,7 +331,7 @@
       "realm": "spirit",
       "name": "化神老祖",
       "taunt": "言出法隨，你已死了。",
-      "art": "celestial",
+      "art": "elder",
       "skill": "shield",
       "skillName": "元神護體"
     },
@@ -270,7 +340,7 @@
       "realm": "spirit",
       "name": "無面神念",
       "taunt": "你所見的皆非真實。",
-      "art": "demon",
+      "art": "faceless",
       "skill": "mirror",
       "skillName": "千面幻身"
     },
@@ -279,7 +349,7 @@
       "realm": "void",
       "name": "虛空吞天獸",
       "taunt": "此界，本座一口可吞。",
-      "art": "beast",
+      "art": "devourer",
       "skill": "devour",
       "skillName": "吞天"
     },
@@ -288,7 +358,7 @@
       "realm": "void",
       "name": "幽冥劍主",
       "taunt": "劍出，無人生還。",
-      "art": "demon",
+      "art": "swordlord",
       "skill": "seal",
       "skillName": "幽冥劍鎖"
     },
@@ -297,7 +367,7 @@
       "realm": "unity",
       "name": "天魔真身",
       "taunt": "身魂合一，天地為敵。",
-      "art": "demon",
+      "art": "heavendemon",
       "skill": "rage",
       "skillName": "天魔解體"
     },
@@ -306,7 +376,7 @@
       "realm": "unity",
       "name": "合道妖皇",
       "taunt": "妖亦可成道，人何足懼。",
-      "art": "beast",
+      "art": "beastemperor",
       "skill": "summon",
       "skillName": "萬妖朝宗"
     },
@@ -315,7 +385,7 @@
       "realm": "mahayana",
       "name": "大乘魔帝",
       "taunt": "此界之巔，只容一人。",
-      "art": "demon",
+      "art": "demonemperor",
       "skill": "shield",
       "skillName": "魔帝金身"
     },
@@ -324,7 +394,7 @@
       "realm": "mahayana",
       "name": "萬劍歸墟",
       "taunt": "萬劍朝宗，皆為我用。",
-      "art": "celestial",
+      "art": "swordsea",
       "skill": "charge",
       "skillName": "萬劍穿心"
     },
@@ -342,7 +412,7 @@
       "realm": "tribulation",
       "name": "渡劫魔君",
       "taunt": "我在此渡劫千年，只等你來。",
-      "art": "storm",
+      "art": "tribulord",
       "skill": "regen",
       "skillName": "劫火重生"
     },
@@ -360,9 +430,99 @@
       "realm": "ascension",
       "name": "墮仙・無咎",
       "taunt": "仙？也不過是更大的囚籠。",
-      "art": "celestial",
+      "art": "fallen",
       "skill": "devour",
       "skillName": "墮仙噬道"
+    },
+    {
+      "id": "b_qi_3",
+      "realm": "qi",
+      "name": "三尾妖狐",
+      "taunt": "小道士，來陪姐姐玩玩？",
+      "art": "fox",
+      "skill": "haste",
+      "skillName": "狐火號令"
+    },
+    {
+      "id": "b_foundation_3",
+      "realm": "foundation",
+      "name": "鐵背蠻牛",
+      "taunt": "哞——撞碎你的山門！",
+      "art": "bull",
+      "skill": "harden",
+      "skillName": "銅皮鐵骨"
+    },
+    {
+      "id": "b_golden_3",
+      "realm": "golden",
+      "name": "吞金蟾王",
+      "taunt": "呱，你的金丹聞起來很香。",
+      "art": "toad",
+      "skill": "confuse",
+      "skillName": "金蟾吐霧"
+    },
+    {
+      "id": "b_nascent_3",
+      "realm": "nascent",
+      "name": "白骨夫人",
+      "taunt": "好俊的元嬰，留下來陪我吧。",
+      "art": "bonelady",
+      "skill": "curse",
+      "skillName": "白骨蝕魂"
+    },
+    {
+      "id": "b_spirit_3",
+      "realm": "spirit",
+      "name": "千絲偃師",
+      "taunt": "你的陣，現在是我的了。",
+      "art": "puppeteer",
+      "skill": "swap",
+      "skillName": "牽絲換位"
+    },
+    {
+      "id": "b_void_3",
+      "realm": "void",
+      "name": "噬星蛛后",
+      "taunt": "再強的法寶，也會碎成星屑。",
+      "art": "spider",
+      "skill": "shatter",
+      "skillName": "噬星碎符"
+    },
+    {
+      "id": "b_unity_3",
+      "realm": "unity",
+      "name": "九首相柳",
+      "taunt": "九顆頭，九張嘴，都餓了。",
+      "art": "hydra",
+      "skill": "haste",
+      "skillName": "九首齊嘯"
+    },
+    {
+      "id": "b_mahayana_3",
+      "realm": "mahayana",
+      "name": "墮落羅漢",
+      "taunt": "金剛之身，萬法不侵。",
+      "art": "arhat",
+      "skill": "harden",
+      "skillName": "金剛不壞"
+    },
+    {
+      "id": "b_tribulation_3",
+      "realm": "tribulation",
+      "name": "九天雷鵬",
+      "taunt": "雷音一響，你連符都拿不穩。",
+      "art": "thunderbird",
+      "skill": "curse",
+      "skillName": "雷殛蝕脈"
+    },
+    {
+      "id": "b_ascension_3",
+      "realm": "ascension",
+      "name": "天機星君",
+      "taunt": "星移斗轉，命數由我。",
+      "art": "starlord",
+      "skill": "swap",
+      "skillName": "星移斗轉"
     }
   ]
 }

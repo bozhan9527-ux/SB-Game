@@ -585,7 +585,17 @@ export type MobArt =
   | 'celestial'
   | 'treant'
   | 'wisp'
-  | 'golem';
+  | 'golem'
+  | 'fox'
+  | 'toad'
+  | 'bat'
+  | 'skeleton'
+  | 'puppet'
+  | 'spider'
+  | 'lion'
+  | 'crane'
+  | 'raiju'
+  | 'jadeguard';
 
 /**
  * 妖魔的習性。
@@ -612,7 +622,40 @@ export interface MobDef {
 }
 
 /** 首領的造型，對應 public/art/boss-*.svg。 */
-export type BossArt = 'beast' | 'demon' | 'storm' | 'celestial';
+/** 首領造型：一隻首領一種，不共用。 */
+export const BOSS_ART_NAMES = [
+  'beast',
+  'ape',
+  'fox',
+  'corpse',
+  'python',
+  'bull',
+  'bloodtao',
+  'scorpking',
+  'toad',
+  'soullord',
+  'ghostking',
+  'bonelady',
+  'elder',
+  'faceless',
+  'puppeteer',
+  'devourer',
+  'swordlord',
+  'spider',
+  'heavendemon',
+  'beastemperor',
+  'hydra',
+  'demonemperor',
+  'swordsea',
+  'arhat',
+  'storm',
+  'tribulord',
+  'thunderbird',
+  'celestial',
+  'fallen',
+  'starlord',
+] as const;
+export type BossArt = (typeof BOSS_ART_NAMES)[number];
 
 export interface BossDef {
   id: string;
@@ -629,7 +672,7 @@ export interface BossDef {
 /**
  * 首領招式。
  *
- * 原本二十個首領只差在血量與名字，打法完全一樣：血厚、砸門、時限。
+ * 原本的首領只差在血量與名字，打法完全一樣：血厚、砸門、時限。
  * 每一種招式都配一個**玩家本來就會做的對策**（搬符、合成、選符），
  * 讓關底換的是打法，不是單純變硬——所以每一種也都自帶血量折扣（hpRatio）。
  */
@@ -641,7 +684,13 @@ export type BossSkillKind =
   | 'regen'
   | 'rage'
   | 'mirror'
-  | 'devour';
+  | 'devour'
+  | 'haste'
+  | 'curse'
+  | 'confuse'
+  | 'harden'
+  | 'swap'
+  | 'shatter';
 
 /**
  * 一種招式的參數。欄位是共用的一組，各招式只讀自己用得到的那幾個（其餘填 0）：

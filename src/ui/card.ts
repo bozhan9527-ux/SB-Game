@@ -32,7 +32,8 @@ function cardColor(type: string): string {
 export function createCardView(scene: Phaser.Scene, x: number, y: number): CardView {
   // 空位：刻了八卦紋的石板。貼圖沒載到時退回虛框。
   const slot: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle = scene.textures.exists(ART.slot)
-    ? scene.add.image(0, 0, ART.slot).setScale(2)
+    // 半透明：首領走到陣位區時要看得到牠，不能被空格的石板蓋住。
+    ? scene.add.image(0, 0, ART.slot).setScale(2).setAlpha(0.5)
     : scene.add.rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, 0x000000, 0.3).setStrokeStyle(3, LINE, 0.9);
 
   // 升階那一刻外圍閃三下光框：合成上去要感覺「變強了」。

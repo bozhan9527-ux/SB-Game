@@ -1,0 +1,350 @@
+{
+ "boss": {
+  "ape": {
+   "h": 96,
+   "scale": 2,
+   "top": 3,
+   "w": 100
+  },
+  "arhat": {
+   "h": 96,
+   "scale": 2,
+   "top": 5,
+   "w": 100
+  },
+  "beast": {
+   "h": 96,
+   "scale": 2,
+   "top": 4,
+   "w": 100
+  },
+  "beastemperor": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "bloodtao": {
+   "h": 96,
+   "scale": 2,
+   "top": 8,
+   "w": 100
+  },
+  "bonelady": {
+   "h": 96,
+   "scale": 2,
+   "top": 3,
+   "w": 100
+  },
+  "bull": {
+   "h": 96,
+   "scale": 2,
+   "top": 1,
+   "w": 100
+  },
+  "celestial": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "corpse": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "demonemperor": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "devourer": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "elder": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "faceless": {
+   "h": 96,
+   "scale": 2,
+   "top": 7,
+   "w": 100
+  },
+  "fallen": {
+   "h": 96,
+   "scale": 2,
+   "top": 3,
+   "w": 100
+  },
+  "fox": {
+   "h": 96,
+   "scale": 2,
+   "top": 6,
+   "w": 100
+  },
+  "ghostking": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "heavendemon": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "hydra": {
+   "h": 96,
+   "scale": 2,
+   "top": 3,
+   "w": 100
+  },
+  "puppeteer": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "python": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "scorpking": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "soullord": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "spider": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "starlord": {
+   "h": 96,
+   "scale": 2,
+   "top": 9,
+   "w": 100
+  },
+  "storm": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "swordlord": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  },
+  "swordsea": {
+   "h": 96,
+   "scale": 2,
+   "top": 6,
+   "w": 100
+  },
+  "thunderbird": {
+   "h": 96,
+   "scale": 2,
+   "top": 10,
+   "w": 100
+  },
+  "toad": {
+   "h": 96,
+   "scale": 2,
+   "top": 19,
+   "w": 100
+  },
+  "tribulord": {
+   "h": 96,
+   "scale": 2,
+   "top": 0,
+   "w": 100
+  }
+ },
+ "disciple": {
+  "alchemy": {
+   "h": 44,
+   "scale": 2,
+   "top": 0,
+   "w": 32
+  },
+  "body": {
+   "h": 44,
+   "scale": 2,
+   "top": 0,
+   "w": 32
+  },
+  "sword": {
+   "h": 44,
+   "scale": 2,
+   "top": 0,
+   "w": 32
+  },
+  "talisman": {
+   "h": 44,
+   "scale": 2,
+   "top": 0,
+   "w": 32
+  }
+ },
+ "enemy": {
+  "bandit": {
+   "h": 42,
+   "scale": 2,
+   "top": 0,
+   "w": 34
+  },
+  "bat": {
+   "h": 30,
+   "scale": 2,
+   "top": 3,
+   "w": 42
+  },
+  "bear": {
+   "h": 37,
+   "scale": 2,
+   "top": 0,
+   "w": 45
+  },
+  "celestial": {
+   "h": 44,
+   "scale": 2,
+   "top": 0,
+   "w": 35
+  },
+  "centipede": {
+   "h": 28,
+   "scale": 2,
+   "top": 4,
+   "w": 47
+  },
+  "crane": {
+   "h": 45,
+   "scale": 2,
+   "top": 0,
+   "w": 34
+  },
+  "demon": {
+   "h": 42,
+   "scale": 2,
+   "top": 0,
+   "w": 33
+  },
+  "fox": {
+   "h": 33,
+   "scale": 2,
+   "top": 0,
+   "w": 42
+  },
+  "golem": {
+   "h": 42,
+   "scale": 2,
+   "top": 6,
+   "w": 40
+  },
+  "jadeguard": {
+   "h": 45,
+   "scale": 2,
+   "top": 0,
+   "w": 37
+  },
+  "lion": {
+   "h": 35,
+   "scale": 2,
+   "top": 1,
+   "w": 45
+  },
+  "puppet": {
+   "h": 44,
+   "scale": 2,
+   "top": 0,
+   "w": 31
+  },
+  "raiju": {
+   "h": 34,
+   "scale": 2,
+   "top": 2,
+   "w": 44
+  },
+  "scorpion": {
+   "h": 34,
+   "scale": 2,
+   "top": 0,
+   "w": 44
+  },
+  "serpent": {
+   "h": 40,
+   "scale": 2,
+   "top": 0,
+   "w": 40
+  },
+  "skeleton": {
+   "h": 42,
+   "scale": 2,
+   "top": 0,
+   "w": 31
+  },
+  "spider": {
+   "h": 30,
+   "scale": 2,
+   "top": 7,
+   "w": 40
+  },
+  "toad": {
+   "h": 30,
+   "scale": 2,
+   "top": 5,
+   "w": 35
+  },
+  "treant": {
+   "h": 42,
+   "scale": 2,
+   "top": 0,
+   "w": 40
+  },
+  "undead": {
+   "h": 41,
+   "scale": 2,
+   "top": 0,
+   "w": 28
+  },
+  "wisp": {
+   "h": 37,
+   "scale": 2,
+   "top": 0,
+   "w": 31
+  },
+  "wolf": {
+   "h": 34,
+   "scale": 2,
+   "top": 0,
+   "w": 45
+  },
+  "yeti": {
+   "h": 41,
+   "scale": 2,
+   "top": 5,
+   "w": 37
+  }
+ }
+}

@@ -94,5 +94,77 @@
     "durationMs": 0,
     "speedMultiplier": 1,
     "threshold": 0
+  },
+  {
+    "kind": "haste",
+    "desc": "號令全場妖魔，一起加快腳步",
+    "counter": "寒冰、鎮魔減速，小妖先清乾淨",
+    "hpRatio": 0.85,
+    "intervalMs": 8000,
+    "count": 0,
+    "amount": 0,
+    "durationMs": 3500,
+    "speedMultiplier": 1.8,
+    "threshold": 0
+  },
+  {
+    "kind": "curse",
+    "desc": "蝕弱一整排符的傷害",
+    "counter": "強符別擠在同一排，斜著擺",
+    "hpRatio": 0.8,
+    "intervalMs": 7500,
+    "count": 0,
+    "amount": 0.5,
+    "durationMs": 4500,
+    "speedMultiplier": 1,
+    "threshold": 0
+  },
+  {
+    "kind": "confuse",
+    "desc": "擾亂心神，抽符變慢",
+    "counter": "手上留一兩張，別把手牌打空",
+    "hpRatio": 0.95,
+    "intervalMs": 8000,
+    "count": 0,
+    "amount": 0,
+    "durationMs": 4000,
+    "speedMultiplier": 0.4,
+    "threshold": 0
+  },
+  {
+    "kind": "harden",
+    "desc": "定期刀槍不入，直擊打不進去",
+    "counter": "烈焰、焚天的灼燒照樣燒得進去",
+    "hpRatio": 0.8,
+    "intervalMs": 7000,
+    "count": 0,
+    "amount": 0.6,
+    "durationMs": 2500,
+    "speedMultiplier": 1,
+    "threshold": 0
+  },
+  {
+    "kind": "swap",
+    "desc": "把兩張符對調位置，打亂陣法",
+    "counter": "換回來就好；同種成排的陣不怕亂",
+    "hpRatio": 0.9,
+    "intervalMs": 6500,
+    "count": 0,
+    "amount": 0,
+    "durationMs": 0,
+    "speedMultiplier": 1,
+    "threshold": 0
+  },
+  {
+    "kind": "shatter",
+    "desc": "打碎場上最強的符，降一階",
+    "counter": "同階的符分開放，或趕快再合一次",
+    "hpRatio": 0.9,
+    "intervalMs": 9000,
+    "count": 1,
+    "amount": 0,
+    "durationMs": 0,
+    "speedMultiplier": 1,
+    "threshold": 0
   }
 ]

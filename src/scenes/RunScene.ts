@@ -3,11 +3,9 @@ import { drawPanelFrame, pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import {
   ART,
-  ENEMY_ART_TOP,
-  ENEMY_DISPLAY_HEIGHT,
-  ENEMY_SOURCE_HEIGHT,
-  DISCIPLE_DISPLAY_HEIGHT,
-  DISCIPLE_SOURCE_HEIGHT,
+  bossArtSize,
+  discipleArtSize,
+  enemyArtSize,
   bossIdleKey,
   bossTexture,
   createWalkAnimations,
@@ -203,7 +201,15 @@ const SKILL_EFFECT: Record<BossSkillKind, string> = {
   rage: "狂暴了，走得更快",
   mirror: "分出幻身",
   devour: "吃掉一張手牌",
+  haste: "妖魔全都加快腳步",
+  curse: "一整排符的傷害被蝕弱",
+  confuse: "抽符變慢了",
+  harden: "刀槍不入，只有灼燒打得進去",
+  swap: "兩張符被對調了位置",
+  shatter: "最強的那張符掉了一階",
 };
+/** 蝕靈咒的顏色：暗綠，和封印的紫分得開。 */
+const CURSE_COLOR = "#7adf8a";
 
 /** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
 const FREEZE_BOSS_HIT_MS = 28;
@@ -295,6 +301,7 @@ export class RunScene extends Phaser.Scene {
   private fieldBonusLabels: Phaser.GameObjects.Text[] = [];
   /** 每一格的「被封」覆蓋層（首領的封符招式）。 */
   private sealViews: Phaser.GameObjects.Container[] = [];
+  private curseViews: Phaser.GameObjects.Container[] = [];
   private waveBar!: Phaser.GameObjects.Rectangle;
   private gateBar!: Phaser.GameObjects.Rectangle;
   private bossPanel: Phaser.GameObjects.Container | null = null;
@@ -641,16 +648,17 @@ export class RunScene extends Phaser.Scene {
     // 守門的門人：門派造型，隨境界換裝。
     const art = this.run.loadout.sect.art;
     const tier = discipleTierForRealm(realmIndexForStage(this.run.stage));
+    const guardScale = discipleArtSize(art).scale;
     const guard = this.add
-      .sprite(GAME_WIDTH / 2 - 150, GATE_Y + 34, discipleTexture(art, tier, 0))
-      .setOrigin(0.5, 0.5)
-      .setScale(DISCIPLE_DISPLAY_HEIGHT / DISCIPLE_SOURCE_HEIGHT)
+      .sprite(58, 802, discipleTexture(art, tier, 0))
+      .setOrigin(0.5, 1)
+      .setScale(guardScale)
       .setDepth(29);
     guard.play(discipleWalkKey(art, tier));
     const guard2 = this.add
-      .sprite(GAME_WIDTH / 2 + 150, GATE_Y + 34, discipleTexture(art, tier, 0))
-      .setOrigin(0.5, 0.5)
-      .setScale(DISCIPLE_DISPLAY_HEIGHT / DISCIPLE_SOURCE_HEIGHT)
+      .sprite(482, 802, discipleTexture(art, tier, 0))
+      .setOrigin(0.5, 1)
+      .setScale(guardScale)
       .setDepth(29);
     guard2.play(discipleWalkKey(art, tier));
     guard2.anims.setProgress(0.5);
@@ -921,6 +929,7 @@ export class RunScene extends Phaser.Scene {
     this.fieldSlotY = [];
     this.fieldBonusLabels = [];
     this.sealViews = [];
+    this.curseViews = [];
     this.fieldHighlights = [];
     for (let i = 0; i < count; i += 1) {
       const row = Math.floor(i / FIELD_COLUMNS);
@@ -962,6 +971,22 @@ export class RunScene extends Phaser.Scene {
               .text(0, 0, "封", textStyle({ size: 30, color: SEAL_COLOR, bold: true }))
               .setOrigin(0.5)
               .setStroke("#0b0f14", 6),
+          ])
+          .setDepth(29)
+          .setVisible(false),
+      );
+
+      // 被蝕的格位：暗綠半透明罩子加一個「蝕」字。符照樣出手，所以罩子要比封印淡。
+      this.curseViews.push(
+        this.add
+          .container(x, y, [
+            this.add
+              .rectangle(0, 0, CARD_WIDTH * 0.82, CARD_HEIGHT * 0.82, 0x0e2a14, 0.45)
+              .setStrokeStyle(3, hexToNumber(CURSE_COLOR)),
+            this.add
+              .text(CARD_WIDTH * 0.26, -CARD_HEIGHT * 0.26, "蝕", textStyle({ size: 20, color: CURSE_COLOR, bold: true }))
+              .setOrigin(0.5)
+              .setStroke("#0b0f14", 5),
           ])
           .setDepth(29)
           .setVisible(false),
@@ -1780,6 +1805,8 @@ export class RunScene extends Phaser.Scene {
     for (let i = 0; i < this.sealViews.length; i += 1) {
       const sealed = (this.run.sealedUntil[i] ?? 0) > this.run.elapsedMs;
       this.sealViews[i]?.setVisible(sealed);
+      const cursed = (this.run.cursedUntil[i] ?? 0) > this.run.elapsedMs;
+      this.curseViews[i]?.setVisible(cursed && !sealed);
     }
   }
 
@@ -1971,6 +1998,34 @@ export class RunScene extends Phaser.Scene {
       }
       this.refreshCards();
     }
+    for (const slot of report.cursed) {
+      const view = this.curseViews[slot];
+      if (view !== undefined) this.burst(view.x, view.y, CURSE_COLOR, 10, 0.9);
+    }
+    // 對調與碎符改的是場上的符本身，畫面上的牌要立刻跟著換，玩家才看得出是哪兩格。
+    if (report.swapped !== null || report.shattered !== null) {
+      const slots = [...(report.swapped ?? []), ...(report.shattered === null ? [] : [report.shattered])];
+      for (const slot of slots) {
+        const view = this.fieldViews[slot];
+        if (view === undefined) continue;
+        this.burst(view.container.x, view.container.y, kind === "shatter" ? DANGER : SEAL_COLOR, 12, 1);
+      }
+      this.refreshCards();
+    }
+    if (kind === "confuse") {
+      // 亂神的時間裡手牌區暗一點：抽符慢了，畫面要說得出來。
+      for (const view of this.handViews) {
+        view.container.setAlpha(0.6);
+        this.tweens.add({ targets: view.container, alpha: 1, delay: bossSkill("confuse").durationMs / this.speed, duration: 300 });
+      }
+    }
+    if (kind === "haste") {
+      for (const enemy of this.run.enemies) {
+        if (enemy.boss) continue;
+        const view = this.enemySprites.get(enemy.id);
+        if (view !== undefined) this.burst(view.x, view.y + 10, "#ffb86a", 5, 0.6);
+      }
+    }
     // 幻身染成首領光暈的紫、半透明：它們用的是一般妖魔的造型，
     // 不這樣做就只是「突然多了三隻怪」，看不出是首領分出來的。
     if (kind === "mirror" || kind === "summon") {
@@ -2101,17 +2156,20 @@ export class RunScene extends Phaser.Scene {
       .setDepth(enemy.boss ? 24 : 20);
 
     if (enemy.boss && enemy.bossArt !== null) {
-      const aura = this.add.circle(0, 0, 62, hexToNumber(DANGER), 0.16);
+      const size = bossArtSize(enemy.bossArt);
+      const bossW = size.w * size.scale;
+      const bossH = size.h * size.scale;
+      const aura = this.add.circle(0, 0, Math.max(bossW, bossH) * 0.42, hexToNumber(DANGER), 0.16);
       const body = this.add
         .sprite(0, 0, bossTexture(enemy.bossArt, 0))
-        .setDisplaySize(150, 150);
+        .setDisplaySize(bossW, bossH);
       body.play(bossIdleKey(enemy.bossArt));
       // 首領發光：只有 WebGL 有 preFX，Canvas 後備時就是沒有光暈，其他照常。
       const glow = body.preFX?.addGlow(BOSS_GLOW, 3, 0, false, 0.1, 12);
       if (glow !== undefined) container.setData("glow", glow);
       // 護體罡氣：一圈金色方框，護盾越薄越淡。沒有它，玩家只會覺得「怎麼打不動」。
       const shieldRing = this.add
-        .rectangle(0, 0, 138, 138, 0x000000, 0)
+        .rectangle(0, 0, bossW * 0.92, bossH * 0.92, 0x000000, 0)
         .setStrokeStyle(4, hexToNumber(GOLD), 1)
         .setVisible(false);
       container.setData("shieldRing", shieldRing);
@@ -2144,7 +2202,7 @@ export class RunScene extends Phaser.Scene {
       // 也把造型細節整個吃掉。疊一層半透明的白，同一支動畫同時開始，幀永遠對得上。
       const flashCopy = this.add
         .sprite(0, 0, bossTexture(enemy.bossArt, 0))
-        .setDisplaySize(150, 150)
+        .setDisplaySize(bossW, bossH)
         .setTintFill(0xffffff)
         .setAlpha(0.55)
         .setVisible(false);
@@ -2181,7 +2239,7 @@ export class RunScene extends Phaser.Scene {
         repeat: -1,
       });
     } else {
-      const scale = ENEMY_DISPLAY_HEIGHT / ENEMY_SOURCE_HEIGHT;
+      const scale = enemyArtSize(enemy.art).scale;
       const sprite = this.add
         .sprite(0, 0, enemyTexture(enemy.art, 0))
         .setOrigin(0.5, 0.6)
@@ -2204,10 +2262,10 @@ export class RunScene extends Phaser.Scene {
     // 一般妖魔各有一條小血條：沒有它就看不出「打不動」和「快死了」的差別。
     // 首領不畫，它的血量已經在畫面頂端有一條大的，畫兩條只是干擾。
     // 血條貼著身體實際的上緣，不貼貼圖的上緣（見 ENEMY_ART_TOP）。
-    const enemyScale = ENEMY_DISPLAY_HEIGHT / ENEMY_SOURCE_HEIGHT;
+    const art = enemyArtSize(enemy.art);
     const barY = enemy.boss
       ? -56
-      : Math.round(-0.6 * ENEMY_DISPLAY_HEIGHT + ENEMY_ART_TOP[enemy.art] * enemyScale - 8);
+      : Math.round(-0.6 * art.h * art.scale + art.top * art.scale - 8);
     if (!enemy.boss) {
       const barBg = this.add.rectangle(0, barY, 46, 6, 0x000000, 0.7).setStrokeStyle(3, EDGE);
       // 會回血的血條用綠色：血條自己慢慢變長時，玩家要一眼看得出那是回血，不是看錯。
@@ -2282,10 +2340,16 @@ export class RunScene extends Phaser.Scene {
         const ring = view.getData("shieldRing") as Phaser.GameObjects.Rectangle | undefined;
         const skill = enemy.skill;
         if (ring !== undefined && skill !== null) {
-          const full = enemy.maxHp * skill.def.amount;
-          const left = skill.shield;
-          ring.setVisible(left > 0);
-          if (left > 0 && full > 0) ring.setAlpha(0.35 + 0.65 * Math.min(1, left / full));
+          if (skill.def.kind === "harden") {
+            // 金剛不壞：一圈灰白石色的框，罩著的時候就是「現在打牠很虧」。
+            const on = skill.hardenUntilMs > this.run.elapsedMs;
+            ring.setVisible(on).setStrokeStyle(5, 0xd8d0c0, 1).setAlpha(0.9);
+          } else {
+            const full = enemy.maxHp * skill.def.amount;
+            const left = skill.shield;
+            ring.setVisible(left > 0);
+            if (left > 0 && full > 0) ring.setAlpha(0.35 + 0.65 * Math.min(1, left / full));
+          }
         }
       }
     }
@@ -3108,10 +3172,17 @@ function applyDebugBoss(run: DefenseState): void {
   // 血量倍率可調：看狂暴、分身這種半血才觸發的招式時要打得到半血。
   const hpScale = Number(params.get("debugBossHp") ?? "10") || 10;
   if (kind === null) return;
-  const sample = ENEMIES.bosses.find((boss) => boss.skill === kind);
+  // 也可以直接給首領 id（`?debugBoss=b_void_3`）：連造型一起換，好逐隻看新畫的首領。
+  const sample = ENEMIES.bosses.find((boss) => boss.id === kind) ?? ENEMIES.bosses.find((boss) => boss.skill === kind);
   if (sample === undefined) return;
-  run.bossDef = { ...run.bossDef, skill: sample.skill, skillName: sample.skillName };
+  const byId = sample.id === kind;
+  run.bossDef = byId ? sample : { ...run.bossDef, skill: sample.skill, skillName: sample.skillName };
   run.queue = run.queue
     .filter((entry) => entry.boss)
-    .map((entry) => ({ ...entry, atMs: 1500, hp: entry.hp * hpScale }));
+    .map((entry) => ({
+      ...entry,
+      atMs: 1500,
+      hp: entry.hp * hpScale,
+      ...(byId ? { bossArt: sample.art, name: sample.name } : {}),
+    }));
 }

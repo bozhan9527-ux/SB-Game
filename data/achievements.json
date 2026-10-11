@@ -258,10 +258,18 @@
   {
     "id": "skills_8",
     "name": "萬法皆通",
-    "desc": "八種招式的首領全部斬過",
+    "desc": "斬殺八種招式的首領",
     "kind": "bossSkills",
     "value": 8,
     "reward": 2000000
+  },
+  {
+    "id": "skills_14",
+    "name": "一法通萬法",
+    "desc": "十四種招式的首領全部斬過",
+    "kind": "bossSkills",
+    "value": 14,
+    "reward": 20000000
   },
   {
     "id": "trib_1",

@@ -20,7 +20,7 @@ import bossSkillsJson from '../../data/boss-skills.json';
 import omensJson from '../../data/omens.json';
 import tribulationsJson from '../../data/tribulations.json';
 
-import { ICON_NAMES } from './types';
+import { BOSS_ART_NAMES, ICON_NAMES } from './types';
 import type {
   Achievement,
   Scenery,
@@ -75,9 +75,10 @@ import {
  */
 export const TALISMAN_SLOTS = 4;
 
-const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
+const BOSS_ARTS: readonly BossArt[] = BOSS_ART_NAMES;
 const BOSS_SKILL_KINDS: readonly BossSkillKind[] = [
   'summon', 'shield', 'seal', 'charge', 'regen', 'rage', 'mirror', 'devour',
+  'haste', 'curse', 'confuse', 'harden', 'swap', 'shatter',
 ];
 const SCENERIES: readonly Scenery[] = [
   'peaks', 'forest', 'sea', 'volcano', 'voidrock', 'storm', 'palace', 'celestial',
@@ -98,6 +99,7 @@ const ACHIEVEMENT_KINDS: readonly AchievementKind[] = [
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial', 'treant', 'wisp', 'golem',
+  'fox', 'toad', 'bat', 'skeleton', 'puppet', 'spider', 'lion', 'crane', 'raiju', 'jadeguard',
 ];
 const MOB_TRAITS: readonly MobTrait[] = ['none', 'armor', 'swift', 'split', 'regen', 'phase', 'ward'];
 

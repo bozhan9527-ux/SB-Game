@@ -73,6 +73,8 @@ export interface BossSkillState {
   shield: number;
   /** 衝鋒到這個時間點為止。 */
   chargeUntilMs: number;
+  /** 金剛不壞：到這個時間點為止，直擊的傷害打折（灼燒不受影響）。 */
+  hardenUntilMs: number;
   /** 血量門檻招（狂暴、分身）已經觸發過了。 */
   triggered: boolean;
 }
@@ -128,6 +130,19 @@ export interface DefenseState {
   sealedUntil: number[];
   /** 每一條天劫距離下一次發作還有多久（只有定時的那幾條會用到）。 */
   tribulationTimers: number[];
+  /**
+   * 每個格位被蝕靈咒侵蝕到什麼時候。被蝕的格位照常出手，只是傷害打折——
+   * 咒的是一整「排」，所以把強符分散在不同排就是對策。
+   */
+  cursedUntil: number[];
+  /** 蝕靈咒的傷害折扣（被蝕的格位只剩這個比例以外的部分）。 */
+  curseAmount: number;
+  /** 亂神咒：到這個時間點為止，抽符速度乘上 confuseMultiplier。 */
+  confusedUntil: number;
+  confuseMultiplier: number;
+  /** 萬妖號令：到這個時間點為止，首領以外的妖魔推進速度乘上 hasteMultiplier。 */
+  hasteUntil: number;
+  hasteMultiplier: number;
   /**
    * 每個格位「連續出手」累積的傷害倍率（太乙符）。
    *
@@ -223,6 +238,12 @@ export interface TickReport {
   sealed: number[];
   /** 這一拍被吃掉的手牌格位。 */
   devoured: number[];
+  /** 這一拍被蝕靈咒侵蝕的格位。 */
+  cursed: number[];
+  /** 這一拍被移形換位對調的兩格。 */
+  swapped: [number, number] | null;
+  /** 這一拍被碎符降階的格位。 */
+  shattered: number | null;
   /** 這一拍發作的天劫 id。 */
   tribulation: string | null;
 }
@@ -238,6 +259,9 @@ const EMPTY_REPORT = (): TickReport => ({
   bossSkill: null,
   sealed: [],
   devoured: [],
+  cursed: [],
+  swapped: null,
+  shattered: null,
   tribulation: null,
 });
 
@@ -473,6 +497,12 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     field: slots,
     cooldowns: new Array<number>(loadout.fieldSlots).fill(0),
     sealedUntil: new Array<number>(loadout.fieldSlots).fill(0),
+    cursedUntil: new Array<number>(loadout.fieldSlots).fill(0),
+    curseAmount: 0,
+    confusedUntil: 0,
+    confuseMultiplier: 1,
+    hasteUntil: 0,
+    hasteMultiplier: 1,
     tribulationTimers: loadout.tribulations.map((item) => item.intervalMs),
     ramps: new Array<number>(loadout.fieldSlots).fill(0),
     enemies: [],
@@ -738,7 +768,9 @@ function fireOnce(
 ): void {
   const def = cardDef(card.type);
   const { effect } = def;
-  const base = cardDamage(card, state.loadout) * damageBonus;
+  // 蝕靈咒：被蝕的格位照常出手，只是每一發都打折。
+  const cursed = (state.cursedUntil[slot] ?? 0) > state.elapsedMs;
+  const base = cardDamage(card, state.loadout) * damageBonus * (cursed ? 1 - state.curseAmount : 1);
 
   // 太乙符：這一次出手用的是「出手前」累積到的倍率，累積本身在出手後才 +1。
   let ramp = 1;
@@ -782,6 +814,9 @@ function fireOnce(
       if (ratio >= 0.8) damage *= effect.freshMultiplier;
       if (effect.critChance > 0 && rng.next() < effect.critChance)
         damage *= effect.critMultiplier;
+      // 金剛不壞：直擊打折。灼燒是另一條路徑（見 tickCombat 第 3 步），不受影響——那正是對策。
+      if (target.skill !== null && target.skill.hardenUntilMs > state.elapsedMs)
+        damage *= 1 - target.skill.def.amount;
     }
     damage += carried;
     carried = 0;
@@ -952,7 +987,9 @@ export function tickCombat(
   // 在場被動每一拍重算：玩家隨時可能把招財符或疾風符搬下場。
   const passives = fieldPassives(state.field);
   const drawSpeed =
-    state.loadout.drawSpeedMultiplier * passives.drawSpeedMultiplier;
+    state.loadout.drawSpeedMultiplier *
+    passives.drawSpeedMultiplier *
+    (state.confusedUntil > state.elapsedMs ? state.confuseMultiplier : 1);
   state.drawTimer -= deltaMs;
   while (state.drawTimer <= 0) {
     state.drawTimer += fieldCfg.drawIntervalMs / drawSpeed;
@@ -1259,6 +1296,9 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
   state.bossSpawnedAtMs = null;
   state.bossGateAccum = 0;
   state.sealedUntil.fill(0);
+  state.cursedUntil.fill(0);
+  state.confusedUntil = 0;
+  state.hasteUntil = 0;
 }
 
 // ---------------------------------------------------------------- 首領招式
@@ -1276,6 +1316,7 @@ export function skillStateFor(kind: BossSkillKind): BossSkillState {
     timerMs: def.intervalMs,
     shield: 0,
     chargeUntilMs: 0,
+    hardenUntilMs: 0,
     triggered: false,
   };
 }
@@ -1283,6 +1324,7 @@ export function skillStateFor(kind: BossSkillKind): BossSkillState {
 /** 衝鋒與狂暴帶來的推進速度倍率。 */
 function skillSpeed(state: DefenseState, enemy: ActiveEnemy): number {
   const skill = enemy.skill;
+  if (!enemy.boss && state.hasteUntil > state.elapsedMs) return state.hasteMultiplier;
   if (skill === null) return 1;
   if (skill.def.kind === "charge" && skill.chargeUntilMs > state.elapsedMs) {
     return skill.def.speedMultiplier;
@@ -1355,6 +1397,26 @@ function castSkill(
     case "devour":
       devourHand(state, def.count, report);
       break;
+    case "haste":
+      state.hasteUntil = state.elapsedMs + def.durationMs;
+      state.hasteMultiplier = def.speedMultiplier;
+      break;
+    case "curse":
+      curseRow(state, def.amount, def.durationMs, rng, report);
+      break;
+    case "confuse":
+      state.confusedUntil = state.elapsedMs + def.durationMs;
+      state.confuseMultiplier = def.speedMultiplier;
+      break;
+    case "harden":
+      skill.hardenUntilMs = state.elapsedMs + def.durationMs;
+      break;
+    case "swap":
+      swapField(state, rng, report);
+      break;
+    case "shatter":
+      shatterTop(state, def.count, report);
+      break;
   }
   report.bossSkill = def.kind;
 }
@@ -1395,6 +1457,80 @@ function devourHand(state: DefenseState, count: number, report: TickReport): voi
     state.hand[lowest] = null;
     report.devoured.push(lowest);
   }
+}
+
+/**
+ * 蝕靈咒：挑一排有符的，整排傷害打折一陣子。
+ * 「排」是陣位的橫列（三格一排）；咒整排而不是單格，玩家的對策才是「強符別擠在同一排」。
+ */
+function curseRow(
+  state: DefenseState,
+  amount: number,
+  durationMs: number,
+  rng: Rng,
+  report: TickReport,
+): void {
+  const columns = BALANCE.formation.columns;
+  const rows: number[] = [];
+  for (let row = 0; row * columns < state.field.length; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      if (state.field[row * columns + col] != null) {
+        rows.push(row);
+        break;
+      }
+    }
+  }
+  if (rows.length === 0) return;
+  const row = rows[rng.int(0, rows.length - 1)] ?? 0;
+  state.curseAmount = amount;
+  for (let col = 0; col < columns; col += 1) {
+    const slot = row * columns + col;
+    if (slot >= state.field.length) break;
+    state.cursedUntil[slot] = state.elapsedMs + durationMs;
+    report.cursed.push(slot);
+  }
+}
+
+/**
+ * 移形換位：把場上兩張不同種的符對調位置，打亂陣法。
+ * 冷卻與連射累積跟著符走——換位置不該順便清掉玩家攢的東西。
+ */
+function swapField(state: DefenseState, rng: Rng, report: TickReport): void {
+  const loaded: number[] = [];
+  for (let i = 0; i < state.field.length; i += 1) if (state.field[i] != null) loaded.push(i);
+  if (loaded.length < 2) return;
+  const a = loaded.splice(rng.int(0, loaded.length - 1), 1)[0] ?? 0;
+  const typeA = state.field[a]?.type;
+  const others = loaded.filter((i) => state.field[i]?.type !== typeA);
+  const pool = others.length > 0 ? others : loaded;
+  const b = pool[rng.int(0, pool.length - 1)] ?? 0;
+  const swap = <T>(list: T[]): void => {
+    const t = list[a] as T;
+    list[a] = list[b] as T;
+    list[b] = t;
+  };
+  swap(state.field);
+  swap(state.cooldowns);
+  swap(state.ramps);
+  report.swapped = [a, b];
+}
+
+/**
+ * 碎符：場上階數最高的那張降 count 階（最低降到 1）。同階的有好幾張時挑最前面那格。
+ * 把所有資源押在一張符上的人最痛——對策是同階的符分散在幾格，或趕快再合一次。
+ */
+function shatterTop(state: DefenseState, count: number, report: TickReport): void {
+  let best = -1;
+  for (let i = 0; i < state.field.length; i += 1) {
+    const card = state.field[i];
+    if (card == null) continue;
+    const current = best < 0 ? null : state.field[best];
+    if (current == null || card.tier > current.tier) best = i;
+  }
+  const card = best < 0 ? null : state.field[best];
+  if (card == null || card.tier <= 1) return;
+  state.field[best] = { ...card, tier: Math.max(1, card.tier - count) };
+  report.shattered = best;
 }
 
 /**

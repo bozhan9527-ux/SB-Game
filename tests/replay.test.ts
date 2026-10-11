@@ -118,7 +118,12 @@ describe('重播', () => {
       totalSteps: played.steps,
       actions: played.actions,
     });
-    expect(other.kills).not.toBe(played.state.kills);
+    // 只比斬殺數不夠：牌組夠強時每一波都清光，斬殺數就只是出怪數，換種子也可能剛好一樣。
+    // 種子決定的是出怪順序、縱列與首領，整場的結果組合不可能全部相同。
+    const summary = (r: { kills: number; leaks: number; disciples: number; peakTier: number; elapsedMs: number }) =>
+      [r.kills, r.leaks, r.disciples, r.peakTier, r.elapsedMs];
+    const original = replayRun(loadout, { stage, runs: 7, totalSteps: played.steps, actions: played.actions });
+    expect(summary(other)).not.toEqual(summary(original));
   });
 
   it('沒有任何操作的一場也重播得出來', () => {

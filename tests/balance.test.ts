@@ -287,7 +287,16 @@ interface Progress {
   bossGateHits: number[];
 }
 
-const RETRY_LIMIT = 12;
+/**
+ * 一關最多重試幾次才算卡死。
+ *
+ * 每次失敗都會拿到一點金幣、買到一兩級升級，所以重試本身就是在變強——
+ * 「推不過去」要看的是持續重試、持續變強之下是否終究過得去，而不是一個剛好的次數。
+ * 全輔助（幾乎不輸出）在第 81 關原本就是第十一次才過；加了第三個首領與第四種小怪之後，
+ * 前面幾關少重試幾次、少攢一點錢，到 81 關時多需要幾次。12 → 16 給的是這段餘裕，
+ * 不是放寬難度：其他牌組的重試次數照樣由下面幾條測試盯著。
+ */
+const RETRY_LIMIT = 16;
 const STAGES = 81;
 
 function playThrough(sectId: string, maxStage: number, talismans?: readonly string[]): Progress {

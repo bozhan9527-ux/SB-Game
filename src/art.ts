@@ -7,6 +7,7 @@
  * 遊戲開了 pixelArt，放大時取最近點；顯示倍數盡量取整數，每一格才會一樣大。
  */
 import { CARDS, REALMS } from './data';
+import artManifest from './data/art-manifest.json';
 import type { BossArt, MobArt, SectArt } from './data/types';
 
 export const ART = {
@@ -27,7 +28,7 @@ export const ART = {
  * 陌生的詞——文字要讀完才知道是什麼，圖示是先看到形狀再對上詞。
  * 兩個一起放，第二次之後就只靠圖示認得出來了。
  */
-import { ICON_NAMES } from './data/types';
+import { BOSS_ART_NAMES, ICON_NAMES } from './data/types';
 import type { IconName } from './data/types';
 
 export { ICON_NAMES };
@@ -50,34 +51,44 @@ export function glyphTexture(art: string): string {
  */
 const GLYPH_ARTS: readonly string[] = [...new Set(CARDS.map((card) => card.art))];
 
-/** 門人與妖物的貼圖都是 56 格高；門人原寸顯示，妖物放大 1.5 倍。 */
-export const DISCIPLE_SOURCE_HEIGHT = 56;
-export const DISCIPLE_DISPLAY_HEIGHT = 56;
-export const ENEMY_SOURCE_HEIGHT = 56;
-export const ENEMY_DISPLAY_HEIGHT = 84;
-
 /**
- * 每種妖物貼圖裡實際有畫的最上一列（四幀取最高的那幀），單位是原圖像素。
+ * 每種角色貼圖的尺寸、實際有畫的最上一列、顯示倍數。
  *
- * 貼圖一律 56 格高，但蜈蚣、熊這種矮胖的身體只畫在下半部——血條要是固定掛在
- * 貼圖頂端，就會浮在身體上方四五十像素，看起來像沒人的血條。
- * 數字是量 public/art/enemy-*.png 的不透明範圍得來的；重畫妖物時要跟著重量。
+ * 由 scripts/pixel-art/build.py 量好寫進 art-manifest.json——重畫角色之後跑一次產生器，
+ * 這裡就跟著對，不必再手改程式裡的數字。原生解析度重畫的角色顯示兩倍（一格 = 兩點，
+ * 和背景同一個格子），還沒重畫的舊圖維持原本的倍數。
  */
-export const ENEMY_ART_TOP: Readonly<Record<MobArt, number>> = {
-  bandit: 2,
-  bear: 22,
-  celestial: 0,
-  centipede: 24,
-  demon: 0,
-  scorpion: 12,
-  serpent: 12,
-  undead: 0,
-  wolf: 14,
-  yeti: 8,
-  treant: 12,
-  wisp: 12,
-  golem: 12,
+export interface ArtSize {
+  w: number;
+  h: number;
+  /** 實際有畫的最上一列（四幀取最高），血條掛在這裡，不掛在貼圖頂端。 */
+  top: number;
+  scale: number;
+}
+
+const MANIFEST = artManifest as {
+  enemy: Record<string, ArtSize>;
+  boss: Record<string, ArtSize>;
+  disciple: Record<string, ArtSize>;
 };
+const FALLBACK: ArtSize = { w: 56, h: 56, top: 0, scale: 1.5 };
+
+export function enemyArtSize(art: MobArt): ArtSize {
+  return MANIFEST.enemy[art] ?? FALLBACK;
+}
+
+export function bossArtSize(art: BossArt): ArtSize {
+  return MANIFEST.boss[art] ?? { w: 100, h: 100, top: 0, scale: 1.5 };
+}
+
+export function discipleArtSize(art: SectArt): ArtSize {
+  return MANIFEST.disciple[art] ?? { w: 40, h: 56, top: 0, scale: 1 };
+}
+
+/** 各妖物貼圖實際的上緣（測試拿來和 PNG 對照）。 */
+export const ENEMY_ART_TOP: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(MANIFEST.enemy).map(([art, size]) => [art, size.top]),
+);
 
 /** 境界遠景（scripts/pixel-art/backdrops.py 產生，270×480，遊戲裡放大兩倍）。 */
 export function backdropTexture(realmId: string): string {
@@ -135,11 +146,12 @@ interface ArtSpec {
 }
 
 const SECT_ARTS: readonly SectArt[] = ['body', 'sword', 'talisman', 'alchemy'];
-const BOSS_ARTS: readonly BossArt[] = ['beast', 'demon', 'storm', 'celestial'];
+const BOSS_ARTS: readonly BossArt[] = BOSS_ART_NAMES;
 const MOB_ARTS: readonly MobArt[] = [
   'wolf', 'bear', 'yeti', 'centipede', 'scorpion', 'serpent',
   'bandit', 'undead', 'demon', 'celestial',
   'treant', 'wisp', 'golem',
+  'fox', 'toad', 'bat', 'skeleton', 'puppet', 'spider', 'lion', 'crane', 'raiju', 'jadeguard',
 ];
 
 const ASSETS: readonly ArtSpec[] = [

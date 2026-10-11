@@ -1,15 +1,23 @@
-"""產生全部像素美術到 public/art/。
+"""產生全部像素美術到 public/art/，並寫出 src/data/art-manifest.json。
 
 用法：python3 scripts/pixel-art/build.py
-改圖請改這裡或 sprites.py 再重跑，不要手改輸出的 SVG。
+- 角色（門人、小妖、首領）：hd.py、hd_mobs.py、hd_bosses.py（原生解析度，engine.py 打光）
+- 境界遠景：backdrops.py；戰場、山門、符紙、陣位：ui.py
+- 符牌圖騰與介面圖示：這個檔案與 sprites.py（格子圖 → refine.py 精修）
+改圖請改產生器再重跑，不要手改輸出的 PNG。
 """
+import json
 import math
 import os
 import random
 import sys
 
 import backdrops
+import hd
+import hd_bosses
+import hd_mobs
 import ui
+from engine import Sprite, to_hex_grid
 import sprites as gen
 from refine import plain, refine, write_png
 from sprites import blank, paint, put, outline, to_svg, check, GOLD, OUTLINE
@@ -27,588 +35,48 @@ def save(name, text):
     write_png(grid, os.path.join(ART, name.replace(".svg", ".png")))
 
 
-def lift(grid):
-    """整張往上抬一格：插在兩個邁步姿勢之間，走起來才會一彈一彈。"""
-    return grid[1:] + [[None] * len(grid[0])]
-
-
-def save_cycle(prefix, frames):
-    """兩個關鍵姿勢 → 四幀循環：姿勢 A、A 上抬、姿勢 B、B 上抬。"""
-    a, b = (refine(t) for t in frames)
-    for i, grid in enumerate((a, lift(a), b, lift(b))):
+def save_hd(prefix, fn, k=1.0, **kw):
+    """原生解析度角色（hd.py）：四幀各算一次。k 是整體縮放（見 engine.Sprite）。"""
+    Sprite.default_k = k
+    try:
+        grids = [to_hex_grid(fn(f, **kw).render()) for f in range(4)]
+    finally:
+        Sprite.default_k = 1.0
+    for i, grid in enumerate(grids):
         write_png(grid, os.path.join(ART, f"{prefix}-{i}.png"))
+    return grids
+
+
+def measure(grids, scale):
+    """貼圖尺寸與實際有畫的最上一列（四幀取最高），遊戲用來掛血條、決定顯示倍數。"""
+    h, w = len(grids[0]), len(grids[0][0])
+    top = min(next((y for y, row in enumerate(g) if any(c is not None for c in row)), h) for g in grids)
+    return {"w": w, "h": h, "top": top, "scale": scale}
+
+
+# 角色全部用原生解析度重畫（hd.py、hd_mobs.py、hd_bosses.py）。
+HD_MOBS = {
+    "wolf": hd.wolf, "bandit": hd.bandit, "wisp": hd.ghost,
+    "bear": hd_mobs.bear, "yeti": hd_mobs.yeti, "centipede": hd_mobs.centipede, "scorpion": hd_mobs.scorpion,
+    "serpent": hd_mobs.serpent, "undead": hd_mobs.undead, "demon": hd_mobs.demon, "celestial": hd_mobs.celestial,
+    "treant": hd_mobs.treant, "golem": hd_mobs.golem,
+    "fox": hd_mobs.fox, "toad": hd_mobs.toad, "bat": hd_mobs.bat, "skeleton": hd_mobs.skeleton, "puppet": hd_mobs.puppet,
+    "spider": hd_mobs.spider, "lion": hd_mobs.lion, "crane": hd_mobs.crane, "raiju": hd_mobs.raiju, "jadeguard": hd_mobs.jadeguard,
+}
+# 小妖用 0.7 倍畫：一條路 99 點寬，原尺寸的狻猊一隻就 128 點，畫面會擠成一團。
+MOB_K = 0.7
+# 門人站在山門兩側的石階上，那一段只有六十幾點高。
+DISCIPLE_K = 0.8
+HD_BOSSES = [
+    "beast", "ape", "fox", "corpse", "python", "bull", "bloodtao", "scorpking", "toad", "soullord", "ghostking", "bonelady",
+    "elder", "faceless", "puppeteer", "devourer", "swordlord", "spider", "heavendemon", "beastemperor", "hydra",
+    "demonemperor", "swordsea", "arhat", "storm", "tribulord", "thunderbird", "celestial", "fallen", "starlord",
+]
+HD_SCALE = 2
 
 
 def inner(svg_text):
     return svg_text.split("\n", 1)[1].rsplit("</svg>", 1)[0]
-
-
-def bottom(rows, w, h=28):
-    rows = check(rows, w)
-    return ["." * w] * (h - len(rows)) + rows
-
-
-def sprite(rows, pal, w, vw, vh=56, under_fn=None):
-    c = blank(w, len(rows))
-    paint(c, rows, pal)
-    c = outline(c)
-    under = inner(under_fn(c)) if under_fn else None
-    return to_svg(c, vw, vh, under=under)
-
-
-def shadow_fn(w, h, x0, x1, vw):
-    def fn(c):
-        s = blank(w, h)
-        for x in range(x0, x1):
-            if c[h - 1][x] is None:
-                s[h - 1][x] = "#000000@0.35"
-        return to_svg(s, vw, 56)
-    return fn
-
-
-# =============== 妖物（28 列；寬度依原 viewBox） ===============
-HUMAN_TOP = gen.HUMAN[:25]
-HUMAN_LEGS = [gen.HUMAN[25], gen.HUMAN[26], gen.HUMAN[27]]
-HUMAN_LEGS_ALT = check([
-    "........PP..PP.........",
-    "........PP..PP.........",
-    ".......FFF..FFF........",
-], 23)
-
-
-def human_frames(pal, decorate, hop=False):
-    out = []
-    for f in (0, 1):
-        rows = HUMAN_TOP + (HUMAN_LEGS if f == 0 else HUMAN_LEGS_ALT)
-        if hop and f == 1:
-            rows = rows[1:] + ["." * 23]
-        c = blank(23, 28)
-        paint(c, rows, pal)
-        decorate(c, f, -1 if (hop and f == 1) else 0)
-        c = outline(c)
-        out.append(to_svg(c, 46, 56))
-    return out
-
-
-SKIN = dict(S="#f6d3a3", s="#d9a877", e="#1d1f2b")
-
-
-def bandit_frames():
-    pal = dict(SKIN, H="#2a2018", A="#d8c4a0", B="#8f6a48", C="#5e4430", D="#3a2a1c", P="#4a3a2a", F="#1e1712")
-
-    def deco(c, f, dy):
-        hat, hat_d = "#c9a86a", "#8a6a38"
-        put(c, [(x, 4) for x in range(7, 16)], hat)
-        put(c, [(x, 5) for x in range(5, 18)], hat)
-        put(c, [(x, 6) for x in range(4, 19)], hat_d)
-        put(c, [(9, 3), (10, 3), (11, 3), (12, 3), (10, 2), (11, 2)], hat)
-        put(c, [(9, 2), (12, 2)], None)
-        for y in (11, 12):
-            put(c, [(x, y) for x in range(7, 15)], "#5a2a24")
-        put(c, [(x, 13) for x in range(8, 14)], "#5a2a24")
-        put(c, [(8, 9), (13, 9)], "#e04040")
-        lift = -1 if f == 1 else 0
-        blade = [(2, 6), (2, 7), (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (2, 14), (2, 15), (2, 16), (3, 17), (3, 18)]
-        put(c, [(x, y + lift) for x, y in blade], "#e4ecf2")
-        put(c, [(2, y + lift) for y in range(8, 14)], "#a8b8c6")
-        put(c, [(x, 19 + lift) for x in range(2, 6)], "#8a6a38")
-        put(c, [(4, 20 + lift), (4, 21 + lift)], "#3a2a1c")
-    return human_frames(pal, deco)
-
-
-def undead_frames():
-    pal = dict(S="#a9c2a8", s="#7f9a80", e="#e04040", H="#2a2a30", A="#c0b890", B="#6f6e5a", C="#4a4a3a",
-               D="#2e2e26", P="#3a3a30", F="#1a1a16")
-
-    def deco(c, f, dy):
-        put(c, [(9, 2 + dy), (10, 2 + dy), (11, 2 + dy), (12, 2 + dy), (9, 3 + dy), (12, 3 + dy)], None)
-        put(c, [(10, 2 + dy), (11, 2 + dy)], "#c43a3a")
-        put(c, [(x, 3 + dy) for x in range(8, 15)], "#2a2a30")
-        put(c, [(x, 4 + dy) for x in range(6, 17)], "#2a2a30")
-        put(c, [(x, 5 + dy) for x in range(5, 18)], "#4a4a56")
-        for y in range(6, 12):
-            put(c, [(10, y + dy), (11, y + dy)], "#f3df8a")
-        flap = 1 if f == 1 else 0
-        put(c, [(10, 7 + dy), (11, 8 + dy), (10, 9 + dy), (11, 10 + dy)], "#c43a3a")
-        if flap:
-            put(c, [(10, 12 + dy), (11, 12 + dy)], "#f3df8a")
-        put(c, [(4, 21 + dy), (5, 21 + dy), (17, 21 + dy), (18, 21 + dy)], None)
-        for x in list(range(0, 4)) + list(range(18, 23)):
-            put(c, [(x, 16 + dy), (x, 17 + dy)], "#6f6e5a")
-        put(c, [(0, 16 + dy), (0, 17 + dy), (22, 16 + dy), (22, 17 + dy)], "#a9c2a8")
-        put(c, [(1, 17 + dy), (21, 17 + dy)], "#4a4a3a")
-    return human_frames(pal, deco, hop=True)
-
-
-def demon_frames():
-    pal = dict(S="#3a1f4a", s="#2a1438", e="#ff5a7a", H="#2a1438", A="#c9a0e8", B="#7a4aa0", C="#4f2f70",
-               D="#2a1840", P="#3a2458", F="#1a0f2a")
-
-    def deco(c, f, dy):
-        horn = "#e8dcc8"
-        put(c, [(5, 2), (5, 3), (4, 1), (4, 0), (6, 4), (17, 2), (17, 3), (18, 1), (18, 0), (16, 4)], horn)
-        put(c, [(8, 9), (13, 9)], "#ff5a7a" if f == 0 else "#ffb0c0")
-        put(c, [(8, 10), (13, 10)], "#3a1f4a")
-        spikes = "#c9a0e8"
-        up = 1 if f == 1 else 0
-        put(c, [(3, 14 - up), (2, 13 - up), (19, 14 - up), (20, 13 - up), (3, 15), (19, 15)], spikes)
-        put(c, [(1, 12 - up), (21, 12 - up)], spikes)
-        put(c, [(x, 20) for x in range(7, 16)], "#c43a6a")
-        claw = "#e8dcc8"
-        put(c, [(4, 22), (17, 22), (5, 22), (18, 22)], claw)
-    return human_frames(pal, deco)
-
-
-def celestial_frames():
-    pal = dict(SKIN, H="#e8dcc0", A="#fff6d8", B="#e8ecf4", C="#9aa8c0", D="#f0c95a", P="#7a88a8", F="#4a5470")
-
-    def deco(c, f, dy):
-        helm = "#f0c95a"
-        for x in range(7, 15):
-            put(c, [(x, 3), (x, 4)], helm)
-        put(c, [(x, 5) for x in range(6, 16)], "#c8a040")
-        put(c, [(x, 6) for x in range(6, 16)], "#e8ecf4")
-        put(c, [(10, 2), (11, 2), (10, 1), (11, 1)], "#d0453f")
-        wing = "#ffffff"
-        w = 1 if f == 1 else 0
-        put(c, [(5, 4), (4, 3), (3, 2 - w), (4, 2), (5, 3), (16, 4), (17, 3), (18, 2 - w), (17, 2), (16, 3)], wing)
-        put(c, [(x, 15) for x in range(6, 16)], "#f0c95a")
-        put(c, [(10, 16), (11, 16), (10, 17), (11, 17)], "#f0c95a")
-        lift = -1 if f == 1 else 0
-        for y in range(4, 26):
-            put(c, [(20, y + lift)], "#c8b080")
-        put(c, [(20, 1 + lift), (20, 2 + lift), (20, 3 + lift), (19, 3 + lift), (21, 3 + lift)], "#e8f4ff")
-        put(c, [(19, 5 + lift), (21, 5 + lift), (19, 4 + lift), (21, 4 + lift)], "#d0453f")
-        put(c, [(18, 21), (19, 21)], "#f6d3a3")
-    return human_frames(pal, deco)
-
-
-def yeti_frames():
-    top = [
-        "......wwwwwwwwww.......",
-        ".....wWWWWWWWWWWw......",
-        "....wWWWWWWWWWWWWw.....",
-        "....WWWbbbbbbbbWWW.....",
-        "....WWbbebbbbebbWW.....",
-        "....WWbbebbbbebbWW.....",
-        "....WWbbbbbbbbbbWW.....",
-        "....WWbbTbMMbTbbWW.....",
-        "...wWWWbbbbbbbbWWWw....",
-        "..wWWWWWWWWWWWWWWWWw...",
-        ".wWWWWWWWWWWWWWWWWWWw..",
-        ".WWWwWWWWWWWWWWWWwWWW..",
-        "wWWWwWWWWWWWWWWWWwWWWw.",
-        "wWWWwWWWWWWWWWWWWwWWWw.",
-        "wWWwwWWWWWWWWWWWWwwWWw.",
-        "bbbwwWWWWWWWWWWWWwwbbb.",
-        "bbb.wWWWWWWWWWWWWw.bbb.",
-        "....wWWWWWWWWWWWWw.....",
-        "....wWWWWWWWWWWWWw.....",
-        "....wwWWWWwwWWWWww.....",
-    ]
-    legs0 = ["....wWWWW..WWWWw......", "....wWWWW..WWWWw......", "....bbbbb..bbbbb......"]
-    legs1 = [".....wWWW..WWWw.......", ".....wWWW..WWWw.......", ".....bbbb..bbbb.......", ]
-    # 毛色刻意壓成藍灰：純白的雪怪在戰場上和受擊閃白分不出來，遠看只是一團白塊。
-    pal = dict(w="#5f7898", W="#a6bad3", b="#4a7099", e="#1d2a40", T="#ffffff", M="#2a3a5a")
-    out = []
-    for f in (0, 1):
-        rows = bottom(top + (legs0 if f == 0 else legs1), 23)
-        if f == 1:
-            rows = rows[1:] + ["." * 23]
-            rows = bottom([r for r in top] + legs1, 23)
-        out.append(sprite(rows, pal, 23, 46, under_fn=shadow_fn(23, 28, 3, 18, 46)))
-    return out
-
-
-def wolf_frames():
-    return [gen.wolf(0), gen.wolf(1)]
-
-
-def bear_frames():
-    body = [
-        "..bb..bb...............",
-        ".bBBbbBBb..............",
-        ".BBBBBBBBb...bbbbbbb...",
-        "BBeBBBBBBBbbbBBBBBBBbb.",
-        "BBBBBBBBBBBBBBBBBBBBBBb",
-        "mMBBBBBBBBBBBBBBBBBBBBb",
-        "MMMBBBBBBBBBBBBBBBBBBBb",
-        ".MMBBBBBBBBBBBBBBBBBBBb",
-        "..BBBBBBLLLLLLLLLBBBBBb",
-        "...BBBBLLLLLLLLLLLBBBb.",
-        "...bBBBBLLLLLLLLLBBBb..",
-    ]
-    legs0 = [
-        "...bBBb.bbbb....bbbbBBb",
-        "...bBBb.bbbb....bbbbBBb",
-        "...bBBb.bbbb....bbbbBBb",
-        "...bBBb.bbbb....bbbbBBb",
-        "...cccc.cccc....ccccccc",
-    ]
-    legs1 = [
-        "....bBBbbbb....bbbbBBb.",
-        "....bBBbbbb....bbbbBBb.",
-        ".....bBBbb......bbBBb..",
-        ".....bBBbb......bbBBb..",
-        ".....ccccc......ccccc..",
-    ]
-    pal = dict(B="#9a6a3c", b="#6a4424", L="#c89a68", M="#d8b48a", m="#1d1410", e="#ffd24a", c="#2a1a10")
-    out = []
-    for f in (0, 1):
-        rows = bottom(body + (legs0 if f == 0 else legs1), 23)
-        c = blank(23, 28)
-        paint(c, rows, pal)
-        put(c, [(0, 18)], "#1d1410")
-        c = outline(c)
-        out.append(to_svg(c, 46, 56))
-    return out
-
-
-def centipede_frames():
-    W = 29
-    out = []
-    for f in (0, 1):
-        c = blank(W, 28)
-        seg_x = list(range(3, 27, 4))
-        for i, sx in enumerate(seg_x):
-            wob = 1 if (i + f) % 2 else 0
-            cy = 21 - wob
-            for dx in range(-2, 3):
-                for dy in range(-2, 3):
-                    if abs(dx) + abs(dy) <= 3:
-                        c[cy + dy][sx + dx] = "#6fae4a" if dy < 1 else "#4a8a34"
-            c[cy - 2][sx] = "#a8e07a"
-            leg = "#c8a040"
-            k = (i + f) % 2
-            put(c, [(sx - 1 + k, cy + 3), (sx - 2 + k, cy + 4), (sx + 1 - k, cy + 3), (sx + 2 - k, cy + 4)], leg)
-            put(c, [(sx - 2 + k, cy + 5), (sx + 2 - k, cy + 5)], leg)
-        hx, hy = 2, 20
-        for dx in range(-2, 3):
-            for dy in range(-3, 3):
-                if abs(dx) + abs(dy) <= 3:
-                    c[hy + dy][hx + dx] = "#c0453a"
-        put(c, [(1, 19), (3, 19)], "#ffd24a")
-        put(c, [(0, 22), (1, 23), (3, 23), (4, 22)], "#f3eee2")
-        put(c, [(1, 16), (0, 15), (0, 14), (3, 16), (4, 15), (5, 14 - f)], "#c8a040")
-        c = outline(c)
-        out.append(to_svg(c, 58, 56))
-    return out
-
-
-def scorpion_frames():
-    W = 25
-    body = [
-        "....................ttt..",
-        "...................tTTTt.",
-        "..................tTsTt..",
-        "..................tTt....",
-        "..................tRt....",
-        ".................tRRt....",
-        "................tRRt.....",
-        "...............tRRRt.....",
-        "..............tRRRt......",
-        "cc...........tRRRt.......",
-        "cCc.......rrrrRRrr.......",
-        "cCCcc..rrRRRRRRRRRr......",
-        ".cCCCrrRRRRRRRRRRRRr.....",
-        "..ccRRReRRRRRRRRRRRr.....",
-        "cc..rRRRRRRRRRRRRRr......",
-        "cCcccRRRrrrrrrrrrr.......",
-        "cCCCcrrr.................",
-        ".cc......................",
-    ]
-    legs0 = [
-        "......l.l..l.l..l.l......",
-        ".....l..l.l..l.l..l......",
-        ".....l...l...l....l......",
-    ]
-    legs1 = [
-        ".......l.l..l..l.l.......",
-        "......l...l..l.l...l.....",
-        "......l...l..l.....l.....",
-    ]
-    pal = dict(R="#d0503a", r="#8a2a20", C="#e07050", c="#a83a28", t="#8a2a20", T="#d0503a", s="#ffd24a",
-               e="#ffd24a", l="#6a2018")
-    out = []
-    for f in (0, 1):
-        b = list(body)
-        if f == 1:
-            b[0] = "...................ttt..."
-            b[1] = "..................tTTTt.."
-            b[2] = ".................tTsTt..."
-            b[3] = ".................tTt....."
-            b[4] = "..................tRt...."
-        rows = bottom(b + (legs0 if f == 0 else legs1), W)
-        c = blank(W, 28)
-        paint(c, rows, pal)
-        c = outline(c)
-        out.append(to_svg(c, 50, 56))
-    return out
-
-
-def serpent_frames():
-    out = []
-    pal = dict(G="#4fae8a", g="#2f7a5e", Y="#d8e8a0", e="#ffd24a", r="#d0453f", k="#1d2a20")
-    heads = [
-        [
-            "...gGGg................",
-            "..gGGGGg...............",
-            ".gGeGGGGg..............",
-            "rgGGGGGGg..............",
-            ".kGGGGGg...............",
-            "..gGGGg................",
-        ],
-        [
-            "....gGGg...............",
-            "...gGGGGg..............",
-            "..gGeGGGGg.............",
-            "rrgGGGGGGg.............",
-            "..kGGGGGg..............",
-            "...gGGGg...............",
-        ],
-    ]
-    for f in (0, 1):
-        c = blank(23, 28)
-        paint(c, bottom(heads[f], 23, 13), pal)
-        # S 形身體：一串圓，隨幀位移
-        pts = []
-        for i in range(60):
-            t = i / 59
-            x = 6 + t * 13 + 4 * math.sin(t * 6.3 + f * 0.8) * (1 - t * 0.3)
-            y = 12 + t * 13
-            pts.append((x, y))
-        for i, (x, y) in enumerate(pts):
-            r = 2.6 - i / 59 * 1.2
-            for yy in range(int(y - r), int(y + r) + 1):
-                for xx in range(int(x - r), int(x + r) + 1):
-                    if 0 <= xx < 23 and 0 <= yy < 28 and (xx - x) ** 2 + (yy - y) ** 2 <= r * r:
-                        c[yy][xx] = "#4fae8a" if xx < x + 0.5 else "#2f7a5e"
-        for i, (x, y) in enumerate(pts[::6]):
-            xi, yi = int(x - 1), int(y)
-            if 0 <= xi < 23 and 0 <= yi < 28 and c[yi][xi]:
-                c[yi][xi] = "#d8e8a0"
-        c = outline(c)
-        out.append(to_svg(c, 46, 56))
-    return out
-
-
-# =============== BOSS（50×50，viewBox 200×200） ===============
-def inside(poly, x, y):
-    return gen.inside(poly, x, y)
-
-
-def flames(c, centers, palette, seed):
-    rnd = random.Random(seed)
-    fl = blank(50, 50)
-    for y in range(50):
-        for x in range(50):
-            if c[y][x] is not None:
-                continue
-            for (fx, fy, r) in centers:
-                d = math.hypot(x - fx, (y - fy) * 0.7)
-                if d < r and rnd.random() > 0.2:
-                    fl[y][x] = palette[0] if d < r * 0.5 else palette[1]
-    return inner(to_svg(fl, 200, 200))
-
-
-def boss_demon_frames():
-    out = []
-    for f in (0, 1):
-        c = blank(50, 50)
-        lift = f
-        hood = [(25, 2 + lift), (32, 4 + lift), (36, 10 + lift), (37, 17 + lift), (35, 23), (41, 30), (45, 40), (46, 49), (4, 49), (5, 40), (9, 30), (15, 23), (13, 17 + lift), (14, 10 + lift), (18, 4 + lift)]
-        for y in range(50):
-            for x in range(50):
-                if inside(hood, x + 0.5, y + 0.5):
-                    c[y][x] = "#6a4488"
-                    if x > 29 + (y - 10) * 0.25:
-                        c[y][x] = "#4a2f63"
-                    if x < 20 - (y - 20) * 0.2 and y > 20:
-                        c[y][x] = "#8a62a8"
-        for y in range(28, 49):
-            for x in (18 - (y - 28) // 3, 25, 32 + (y - 28) // 3):
-                if c[y][x] is not None:
-                    c[y][x] = "#3a2450"
-        for y in range(50):
-            for x in range(50):
-                if ((x - 25) / 7.5) ** 2 + ((y - 15 - lift) / 8.5) ** 2 < 1:
-                    c[y][x] = "#160c22"
-        eye = "#ff5a7a" if f == 0 else "#ff8aa0"
-        for x, y in [(21, 15), (22, 15), (23, 16), (27, 16), (28, 15), (29, 15)]:
-            c[y + lift][x] = eye
-        for x, y in [(22, 16), (28, 16)]:
-            c[y + lift][x] = "#ffffff" if f else "#ffd0da"
-        for x in range(14, 37):
-            y = 27 + int(2 * math.sin((x - 14) / 22 * math.pi))
-            if c[y][x] is not None:
-                c[y][x] = GOLD
-        for x, y in [(25, 29), (24, 30), (25, 30), (26, 30), (25, 31)]:
-            c[y][x] = "#c43a3a"
-        for (bx, by) in ((8, 36 - f), (40, 36 - f)):
-            for dx in range(-2, 3):
-                for dy in range(-1, 2):
-                    c[by + dy][bx + dx] = "#a8c0a8"
-            for k in (-2, 0, 2):
-                c[by - 2][bx + k] = "#d8e8d0"
-                c[by - 3][bx + k] = "#d8e8d0"
-        c = outline(c)
-        under = flames(c, ((5, 42, 6 + f), (45, 42, 6 + f), (25, 3, 4), (10, 26, 3 + f), (40, 26, 3 + f)), ("#b06aff@0.55", "#7a3ad0@0.35"), 11 + f)
-        out.append(to_svg(c, 200, 200, under=under))
-    return out
-
-
-def boss_beast_frames():
-    out = []
-    for f in (0, 1):
-        c = blank(50, 50)
-        for y in range(50):
-            for x in range(50):
-                dx, dy = (x - 25) / 16, (y - 25) / 16
-                if dx * dx + dy * dy < 1 and y < 42:
-                    c[y][x] = "#b8483a" if x < 30 else "#8a3028"
-                if y >= 30 and abs(x - 25) < 12 - (y - 30) * 0.9 and y < 44:
-                    c[y][x] = "#b8483a" if x < 28 else "#8a3028"
-        # 角
-        for i in range(14):
-            for side in (-1, 1):
-                x = 25 + side * (12 + i)
-                y = 14 - int(i * 0.9) + (i * i) // 22
-                for t in range(0, 3 - i // 6):
-                    yy = y + t
-                    if 0 <= x < 50 and 0 <= yy < 50:
-                        c[yy][x] = "#f0e6cc" if t == 0 else "#c8b890"
-        # 眉骨與眼
-        for x in range(13, 37):
-            c[18][x] = "#5a1a14"
-        glow = "#ffe066" if f == 0 else "#ffffff"
-        for (ex) in (18, 30):
-            for dx in range(0, 3):
-                c[21][ex + dx] = glow
-                c[20][ex + dx] = "#ffb030"
-        # 嘴
-        open_ = 2 + f * 2
-        for y in range(30, 31 + open_):
-            for x in range(17, 34):
-                c[y][x] = "#3a0c0a"
-        for x in (18, 22, 28, 32):
-            c[30][x] = "#f3eee2"
-            c[31][x] = "#f3eee2"
-        for x in (20, 30):
-            c[30 + open_][x] = "#f3eee2"
-            c[29 + open_][x] = "#f3eee2"
-        # 鼻
-        put(c, [(23, 25), (27, 25), (24, 26), (26, 26)], "#3a0c0a")
-        # 鬃毛
-        for y in range(8, 40):
-            for side in (-1, 1):
-                x = 25 + side * (17 + int(2 * math.sin(y * 0.8 + f)))
-                if 0 <= x < 50:
-                    c[y][x] = "#e07a2a" if y % 3 else "#f0c95a"
-        c = outline(c)
-        under = flames(c, ((25, 27, 24 + f),), ("#ff8a3a@0.22", "#ff5a2a@0.14"), 21 + f)
-        out.append(to_svg(c, 200, 200, under=under))
-    return out
-
-
-def boss_storm_frames():
-    out = []
-    for f in (0, 1):
-        c = blank(50, 50)
-        blobs = [(15, 20, 9), (25, 15, 11), (36, 20, 9), (20, 24, 9), (31, 24, 9)]
-        for y in range(50):
-            for x in range(50):
-                for (bx, by, r) in blobs:
-                    if math.hypot(x - bx, (y - by - f * 0.6) * 1.1) < r:
-                        c[y][x] = "#4a5a78" if y > 20 + f else "#6a7a98"
-                        if y < 10 + f:
-                            c[y][x] = "#8a9ab8"
-        for x in range(8, 43):
-            if c[30][x]:
-                c[30][x] = "#36405a"
-        eye = "#ffe066"
-        for x in range(18, 23):
-            c[21 + f][x] = eye
-        for x in range(28, 33):
-            c[21 + f][x] = eye
-        put(c, [(17, 20 + f), (33, 20 + f)], "#ffe066")
-        bolt = [(26, 31), (25, 32), (24, 33), (23, 34), (22, 35), (23, 36), (24, 36), (25, 36), (24, 37), (23, 38), (22, 39), (21, 40), (20, 41), (19, 42)]
-        bolt2 = [(15, 31), (14, 33), (13, 35), (14, 36), (13, 38), (12, 40)]
-        bolt3 = [(36, 31), (37, 33), (38, 35), (37, 36), (38, 38), (39, 40)]
-        bolts = bolt + (bolt3 if f == 0 else bolt2)
-        for x, y in bolts:
-            put(c, [(x, y), (x + 1, y)], "#fff07a")
-        for x, y in bolts[::3]:
-            put(c, [(x + 2, y)], "#ffffff")
-        c = outline(c)
-        rain = blank(50, 50)
-        rnd = random.Random(31 + f)
-        for _ in range(40):
-            x, y = rnd.randrange(4, 46), rnd.randrange(30, 50)
-            if c[y][x] is None:
-                rain[y][x] = "#9fc8ff@0.55"
-                if y + 1 < 50 and c[y + 1][x] is None:
-                    rain[y + 1][x] = "#9fc8ff@0.3"
-        under = inner(to_svg(rain, 200, 200)) + flames(c, ((25, 20, 22),), ("#8a9aff@0.18", "#6a7ad0@0.1"), 41)
-        out.append(to_svg(c, 200, 200, under=under))
-    return out
-
-
-def boss_celestial_frames():
-    out = []
-    for f in (0, 1):
-        c = blank(50, 50)
-        # 身軀：白金甲
-        body = [(25, 26), (36, 30), (40, 40), (42, 49), (8, 49), (10, 40), (14, 30)]
-        for y in range(50):
-            for x in range(50):
-                if inside(body, x + 0.5, y + 0.5):
-                    c[y][x] = "#e8ecf4" if x < 28 else "#b8c4d8"
-        for y in range(32, 49):
-            c[y][25] = "#f0c95a"
-        for x in range(13, 38):
-            if c[34][x]:
-                c[34][x] = "#f0c95a"
-        put(c, [(24, 36), (25, 36), (26, 36), (25, 37), (25, 35)], "#7fdba0")
-        # 肩甲
-        for (sx, d) in ((14, -1), (36, 1)):
-            for dx in range(0, 6):
-                for dy in range(0, 3):
-                    c[29 + dy][sx + d * dx] = "#f0c95a" if dy == 0 else "#c8a040"
-        # 頭盔與面具
-        for y in range(8, 27):
-            for x in range(50):
-                if ((x - 25) / 7) ** 2 + ((y - 18) / 9) ** 2 < 1:
-                    c[y][x] = "#d8dce8" if x < 27 else "#a8b0c4"
-        for y in range(15, 23):
-            for x in range(20, 31):
-                if ((x - 25) / 5) ** 2 + ((y - 19) / 4.5) ** 2 < 1:
-                    c[y][x] = "#2a3048"
-        eye = "#9fe8ff" if f == 0 else "#ffffff"
-        put(c, [(22, 19), (23, 19), (27, 19), (28, 19)], eye)
-        for i in range(5):
-            put(c, [(25 - i // 2, 8 - i), (25 + i // 2, 8 - i)], "#f0c95a")
-        put(c, [(25, 4), (25, 3)], "#d0453f")
-        for i in range(6):
-            put(c, [(17 - i, 12 - i // 2 - (f if i > 3 else 0)), (33 + i, 12 - i // 2 - (f if i > 3 else 0))], "#ffffff")
-        # 長槍
-        for y in range(2, 50):
-            put(c, [(45, y)], "#c8b080")
-        tip = [(45, 0), (44, 1), (45, 1), (46, 1), (44, 2), (45, 2), (46, 2), (45, 3)]
-        put(c, tip, "#e8f4ff")
-        put(c, [(44, 5), (46, 5), (44, 6), (46, 6)], "#d0453f")
-        put(c, [(42, 38), (43, 38), (44, 38), (42, 39), (43, 39)], "#f6d3a3")
-        c = outline(c)
-        halo = blank(50, 50)
-        for y in range(50):
-            for x in range(50):
-                d = math.hypot(x - 25, y - 17)
-                if c[y][x] is None:
-                    if 13.2 < d < 14.8:
-                        halo[y][x] = "#f0c95a" if (int(math.degrees(math.atan2(y - 17, x - 25))) // 15 + f) % 2 else "#fff2bf"
-                    elif d < 13 and (x + y + f) % 2 == 0:
-                        halo[y][x] = "#fff2bf@0.18"
-        out.append(to_svg(c, 200, 200, under=inner(to_svg(halo, 200, 200))))
-    return out
 
 
 # =============== 符牌圖騰（16×20） ===============
@@ -1185,134 +653,19 @@ def gate_post():
     return c
 
 
-
-def treant_frames():
-    """千年樹妖：樹幹身體、綠葉冠、黃眼、樹根當腳。習性「癒」——會自己長回來。"""
-    top = [
-        ".....gGGg..gGGg........",
-        "...gGGGGGggGGGGGg......",
-        "..gGGGLGGGGGGLGGGg.....",
-        ".gGGLGGGGGGGGGGLGGg....",
-        ".gGGGGGGGLGGGGGGGGg....",
-        "..gGGGGGGGGGGGGGGg.....",
-        "...ggGbbbbbbbbbGgg.....",
-        ".....bBBBBBBBBBb.......",
-        ".....BBeeBBBeeBB.......",
-        ".....BByyBBByyBB.......",
-        ".....BBBBBBBBBBB.......",
-        "...bbBBBdddddBBBbb.....",
-        "..bBBbBBBBBBBBBbBBb....",
-        ".bBb.BBBBkBBBBBB.bBb...",
-        ".gb..BBBBBBBkBBB..bg...",
-        ".g...BBkBBBBBBBB...g...",
-        ".....BBBBBBBBkBB.......",
-        ".....bBBBBBBBBBb.......",
-    ]
-    legs0 = [".....bBb.bBBb.bBb......", "....bBb...bb...bBb.....", "...bbb....bb....bbb...."]
-    legs1 = ["......bBbBBBbBb........", "......bBb.bb.bBb.......", ".....bbb..bb..bbb......"]
-    pal = dict(g="#2f7a3c", G="#4fae55", L="#9be07a", b="#4a2e1c", B="#7a5232", k="#5e3e26",
-               e="#2a1408", y="#ffe066", d="#3a2214")
-    return [sprite(bottom(top + legs, 23), pal, 23, 46, under_fn=shadow_fn(23, 28, 2, 20, 46))
-            for legs in (legs0, legs1)]
-
-
-def wisp_frames():
-    """游魂鬼火：浮在半空的青焰，沒有腳。習性「隱」——一陣一陣地淡掉。"""
-    flame0 = [
-        "..........c............",
-        ".........cC............",
-        "........cCCc...c.......",
-        ".......cCCCCc.cC.......",
-        "......cCCWWCCcCC.......",
-        "......CCWWWWCCCc.......",
-        ".....cCWWWWWWCCc.......",
-        ".....CCWWWWWWWCC.......",
-        ".....CWWeWWWeWWC.......",
-        ".....CWWeWWWeWWC.......",
-        ".....CWWWWWWWWWC.......",
-        ".....CCWWWmmWWCC.......",
-        ".....cCCWWWWWCCc.......",
-        "......cCCCCCCCc........",
-        ".......cCCCCCc.........",
-        "........cCcCc..........",
-        ".......cC.c.Cc.........",
-        "......c...c...c........",
-    ]
-    flame1 = [
-        "...........c...........",
-        "...c.......Cc..........",
-        "...Cc.....cCCc.........",
-        "...cCc...cCCCCc........",
-        "....CCc.cCCWWCCc.......",
-        "....cCCCCWWWWCCC.......",
-        ".....cCWWWWWWCCc.......",
-        ".....CCWWWWWWWCC.......",
-        ".....CWWeWWWeWWC.......",
-        ".....CWWeWWWeWWC.......",
-        ".....CWWWWWWWWWC.......",
-        ".....CCWWmmmWWCC.......",
-        ".....cCCWWWWWCCc.......",
-        "......cCCCCCCCc........",
-        ".......cCCCCCc.........",
-        "........cCcCc..........",
-        ".........cCc...........",
-        "........c.c.c..........",
-    ]
-    # 底下空三列：它是浮著的，不踩地。
-    pad = ["." * 23] * 3
-    # 芯不用接近白的顏色：會和受擊閃白混在一起（雪怪踩過同一個坑）。
-    pal = dict(c="#1a5f6a", C="#2fa8b0", W="#6fdcd2", e="#0e2a3a", m="#0e2a3a")
-    return [sprite(bottom(f + pad, 23), pal, 23, 46, under_fn=shadow_fn(23, 28, 7, 15, 46))
-            for f in (flame0, flame1)]
-
-
-def golem_frames():
-    """鎮山石傀：方塊石身、青色符文。習性「盾」——前幾下整發擋掉。"""
-    top = [
-        "......sSSSSSSSs........",
-        ".....sSSSSSSSSSs.......",
-        ".....SSrrSSSrrSS.......",
-        ".....SSrrSSSrrSS.......",
-        ".....sSSSSSSSSSs.......",
-        "......sSSdddSSs........",
-        "..ssssSSSSSSSSSssss....",
-        ".sSSSSSSSSSSSSSSSSSs...",
-        ".SSSSsSSSSrSSSSsSSSS...",
-        ".SSSSsSSSrrrSSSsSSSS...",
-        ".SSSSsSSSSrSSSSsSSSS...",
-        ".sSSssSSSSSSSSSssSSs...",
-        ".sSS.sSSSSSSSSSs.SSs...",
-        ".SSS.sSSSSSSSSSs.SSS...",
-        ".sss.sSSSdSSSSSs.sss...",
-        ".....sSSSSSSdSSs.......",
-        ".....sSSSSSSSSSs.......",
-        ".....ssSSSSSSSss.......",
-    ]
-    legs0 = [".....sSSS...SSSs.......", ".....sSSS...SSSs.......", "....sssss...sssss......"]
-    legs1 = ["......sSSS.SSSs........", "......sSSS.SSSs........", ".....sssss.sssss.......", ]
-    pal = dict(s="#5a6170", S="#8e97a6", d="#454b57", r="#5ff0e6")
-    return [sprite(bottom(top + legs, 23), pal, 23, 46, under_fn=shadow_fn(23, 28, 2, 20, 46))
-            for legs in (legs0, legs1)]
-
-MOBS = {
-    "wolf": wolf_frames, "bear": bear_frames, "yeti": yeti_frames, "centipede": centipede_frames,
-    "scorpion": scorpion_frames, "serpent": serpent_frames, "bandit": bandit_frames, "undead": undead_frames,
-    "demon": demon_frames, "celestial": celestial_frames,
-    "treant": treant_frames, "wisp": wisp_frames, "golem": golem_frames,
-}
-BOSSES = {"beast": boss_beast_frames, "demon": boss_demon_frames, "storm": boss_storm_frames, "celestial": boss_celestial_frames}
-
 if __name__ == "__main__":
     n = 0
+    manifest = {"enemy": {}, "boss": {}, "disciple": {}}
     for sect in gen.SECTS:
         for tier in (0, 1, 2):
-            save_cycle(f"disciple-{sect}-t{tier}", [gen.disciple(sect, tier, f) for f in (0, 1)])
+            grids = save_hd(f"disciple-{sect}-t{tier}", lambda f, sect=sect, tier=tier: hd.disciple(sect, tier, f), k=DISCIPLE_K)
+            manifest["disciple"][sect] = measure(grids, HD_SCALE)
             n += 4
-    for name, fn in MOBS.items():
-        save_cycle(f"enemy-{name}", fn())
+    for name, fn in HD_MOBS.items():
+        manifest["enemy"][name] = measure(save_hd(f"enemy-{name}", fn, k=MOB_K), HD_SCALE)
         n += 4
-    for name, fn in BOSSES.items():
-        save_cycle(f"boss-{name}", fn())
+    for name in HD_BOSSES:
+        manifest["boss"][name] = measure(save_hd(f"boss-{name}", getattr(hd_bosses, name)), HD_SCALE)
         n += 4
     for name in G:
         save(f"glyph-{name}.svg", glyph_svg(name))
@@ -1326,4 +679,9 @@ if __name__ == "__main__":
     save("slash.svg", slash_svg())
     n += backdrops.build(ART)
     n += ui.build(ART)
+    # 尺寸清單給遊戲讀：顯示倍數、血條位置都從這裡來，重畫角色不必再手改程式裡的數字。
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "data", "art-manifest.json")
+    with open(out, "w") as fh:
+        json.dump(manifest, fh, ensure_ascii=False, indent=1, sort_keys=True)
+        fh.write("\n")
     print("wrote", n + 2, "to", ART)

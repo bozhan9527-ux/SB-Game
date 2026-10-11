@@ -386,4 +386,10 @@ const SKILL_LABEL: Record<BossSkillKind, string> = {
   rage: "狂暴",
   mirror: "分身",
   devour: "噬符",
+  haste: "號令",
+  curse: "蝕靈",
+  confuse: "亂神",
+  harden: "金剛",
+  swap: "換位",
+  shatter: "碎符",
 };
