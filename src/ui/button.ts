@@ -3,7 +3,22 @@
  */
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { BG_PANEL_ALT, EDGE, GOLD, INK, INK_DIM, MIN_TOUCH_SIZE, fitText, textStyle } from './theme';
+import {
+  BG_PANEL_ALT,
+  EDGE,
+  GOLD,
+  GOLD_LO,
+  INK,
+  INK_DIM,
+  JADE,
+  LACQUER,
+  MIN_TOUCH_SIZE,
+  WOOD,
+  fitText,
+  hexToNumber,
+  shade,
+  textStyle,
+} from './theme';
 import { burstPixels } from './effects';
 
 export interface ButtonOptions {
@@ -36,23 +51,35 @@ export function createButton(
   const width = Math.max(MIN_TOUCH_SIZE, options.width);
   const height = Math.max(MIN_TOUCH_SIZE, options.height);
 
-  // 像素按鈕：實心投影＋深色描邊＋上亮下暗的一圈斜角，看起來是「凸出來可以按」的。
+  // 材質：主要按鈕是朱漆配亮金邊，一般按鈕是漆木配暗金邊。
+  // 呼叫端原本用「金底深字」表示主要按鈕、「玉底深字」表示可以出發——
+  // 在新材質下金底改成朱漆、玉底改成青玉漆，字一律淺色，對比才夠。
+  const requestedFill = options.fillColor ?? BG_PANEL_ALT;
+  const primary = requestedFill === hexToNumber(GOLD);
+  const jade = requestedFill === hexToNumber(JADE);
+  const fill = primary ? LACQUER : jade ? 0x2f8a6a : requestedFill === BG_PANEL_ALT ? WOOD : requestedFill;
+  const rim = primary || options.strokeColor === hexToNumber(GOLD) ? hexToNumber(GOLD) : jade ? 0x9cf0c0 : GOLD_LO;
+  const darkText = options.textColor !== undefined && /^#[0-2]/.test(options.textColor);
+  const textColor = darkText ? (primary ? '#fff6e0' : '#f2fff6') : (options.textColor ?? INK);
+
+  // 像素按鈕：實心投影＋深色描邊＋金邊＋上亮下暗的斜角，看起來是「凸出來可以按」的。
   const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.45);
-  const background = scene.add
-    .rectangle(0, 0, width, height, options.fillColor ?? BG_PANEL_ALT)
-    .setStrokeStyle(3, options.strokeColor ?? EDGE);
+  const background = scene.add.rectangle(0, 0, width, height, fill).setStrokeStyle(3, EDGE);
+  const rimLine = scene.add.rectangle(0, 0, width - 6, height - 6, 0x000000, 0).setStrokeStyle(2, rim);
   const bevelLight = scene.add
-    .rectangle(-width / 2 + 3, -height / 2 + 3, width - 6, 3, 0xffffff, 0.16)
+    .rectangle(-width / 2 + 5, -height / 2 + 5, width - 10, 3, shade(fill, 0.28), 1)
     .setOrigin(0, 0);
   const bevelDark = scene.add
-    .rectangle(-width / 2 + 3, height / 2 - 6, width - 6, 3, 0x000000, 0.28)
+    .rectangle(-width / 2 + 5, height / 2 - 8, width - 10, 3, shade(fill, -0.4), 1)
     .setOrigin(0, 0);
 
   const text = scene.add
-    .text(0, 0, options.label, textStyle({ size: options.fontSize ?? 26, color: options.textColor ?? INK }))
-    .setOrigin(0.5);
+    .text(0, 0, options.label, textStyle({ size: options.fontSize ?? 26, color: textColor }))
+    .setOrigin(0.5)
+    // 一格硬投影：字壓在有斜角的漆面上也讀得清楚
+    .setShadow(2, 2, 'rgba(0,0,0,0.55)', 0);
 
-  const children: Phaser.GameObjects.GameObject[] = [shadow, background, bevelLight, bevelDark, text];
+  const children: Phaser.GameObjects.GameObject[] = [shadow, background, rimLine, bevelLight, bevelDark, text];
 
   const hasIcon = options.icon !== undefined && scene.textures.exists(options.icon);
   // 圖示是 32 點見方的像素畫，顯示尺寸往上取到 16 的倍數：縮成 22 點的話，
@@ -106,7 +133,7 @@ export function createButton(
     if (pressed === down) return;
     pressed = down;
     const shift = down ? 3 : -3;
-    for (const child of [background, bevelLight, bevelDark, text, ...(icon === null ? [] : [icon])]) {
+    for (const child of [background, rimLine, bevelLight, bevelDark, text, ...(icon === null ? [] : [icon])]) {
       (child as Phaser.GameObjects.Components.Transform).x += shift;
       (child as Phaser.GameObjects.Components.Transform).y += shift;
     }
@@ -137,7 +164,7 @@ export function createButton(
     setEnabled(value: boolean) {
       enabled = value;
       container.setAlpha(value ? 1 : 0.45);
-      text.setColor(value ? (options.textColor ?? INK) : INK_DIM);
+      text.setColor(value ? textColor : INK_DIM);
     },
     get enabled() {
       return enabled;

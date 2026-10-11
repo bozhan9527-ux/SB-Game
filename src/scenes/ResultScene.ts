@@ -149,7 +149,7 @@ export class ResultScene extends Phaser.Scene {
 
     const cx = GAME_WIDTH / 2;
     audio.playMusic(realmIndexForStage(save.world.stage));
-    drawBackdrop(this, afterRealm.color, afterRealm.scenery);
+    drawBackdrop(this, afterRealm);
 
     // 無限模式一定是打到守不住為止，victory 永遠是 false——
     // 但那不是失敗，那就是這個模式的結局。寫「道消」會把玩家最好的一場罵成輸，

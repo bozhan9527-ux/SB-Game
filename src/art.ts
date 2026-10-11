@@ -6,7 +6,7 @@
  *
  * 遊戲開了 pixelArt，放大時取最近點；顯示倍數盡量取整數，每一格才會一樣大。
  */
-import { CARDS } from './data';
+import { CARDS, REALMS } from './data';
 import type { BossArt, MobArt, SectArt } from './data/types';
 
 export const ART = {
@@ -14,6 +14,10 @@ export const ART = {
   slash: 'slash',
   gateBeam: 'gate-beam',
   gatePost: 'gate-post',
+  arena: 'arena',
+  gate: 'gate',
+  cardPaper: 'card-paper',
+  slot: 'slot',
 } as const;
 
 /**
@@ -74,6 +78,11 @@ export const ENEMY_ART_TOP: Readonly<Record<MobArt, number>> = {
   wisp: 12,
   golem: 12,
 };
+
+/** 境界遠景（scripts/pixel-art/backdrops.py 產生，270×480，遊戲裡放大兩倍）。 */
+export function backdropTexture(realmId: string): string {
+  return `bg-${realmId}`;
+}
 
 export function bossTexture(art: BossArt, frame = 0): string {
   return `boss-${art}-${frame}`;
@@ -147,10 +156,15 @@ const ASSETS: readonly ArtSpec[] = [
   ),
   ...GLYPH_ARTS.map((art) => ({ key: glyphTexture(art), file: `glyph-${art}` })),
   ...ICON_NAMES.map((name) => ({ key: iconTexture(name), file: `icon-${name}` })),
+  ...REALMS.map((realm) => ({ key: backdropTexture(realm.id), file: `bg-${realm.id}` })),
   { key: ART.cloud, file: 'cloud' },
   { key: ART.slash, file: 'slash' },
   { key: ART.gateBeam, file: 'gate-beam' },
   { key: ART.gatePost, file: 'gate-post' },
+  { key: ART.arena, file: 'arena' },
+  { key: ART.gate, file: 'gate' },
+  { key: ART.cardPaper, file: 'card-paper' },
+  { key: ART.slot, file: 'slot' },
 ];
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */

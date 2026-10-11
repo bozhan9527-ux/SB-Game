@@ -19,6 +19,7 @@ import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '..
 import { createButton } from '../ui/button';
 import { openMenu } from '../ui/menu';
 import { drawBackdrop } from '../ui/backdrop';
+import { addLogo, addSeal } from '../ui/logo';
 import {
   BG_PANEL_ALT,
   DANGER,
@@ -49,7 +50,7 @@ export class TitleScene extends Phaser.Scene {
     const sect = sectById(save.player.sectId);
     audio.applySettings(save.settings);
     audio.playMusic(realmIndexForStage(save.world.stage));
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
 
     addTwinklingStars(this, 10, realm.color);
 
@@ -63,9 +64,15 @@ export class TitleScene extends Phaser.Scene {
 
     this.buildTopBar(save);
 
-    // 標題不再寫在這裡——開場動畫已經講過一次「問道飛升」了。
-    // 一個畫面把自己的名字寫在最顯眼的位置，是在對已經進來的人重複他知道的事，
-    // 而那塊地方讓給遠山與明月更值得。
+    // 招牌字：開場動畫講過一次，這裡再放一個小一號的。
+    // 上架的遊戲主畫面都有自己的招牌——沒有它，這一頁看起來像設定頁，不像一款遊戲的門面。
+    // 字級壓在 60：比開場小，讓出下方遠景，也不和中央的境界名搶第一眼。
+    addLogo(this, cx, 196, 60);
+    addSeal(this, cx + 176, 226);
+    this.add
+      .text(cx, 262, '拖符布陣 · 合成升階 · 鎮守山門', textStyle({ size: 17, color: INK }))
+      .setOrigin(0.5)
+      .setShadow(2, 2, '#000000', 0);
     const infoBottom = this.buildIdentity(350, save, realm, sect);
 
     // 主行動只能有一個。改版前「開始挑戰」和另外兩顆長得一模一樣，

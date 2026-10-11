@@ -49,7 +49,7 @@ export class AchievementScene extends Phaser.Scene {
     if (detectAchievements(save).length > 0) persist();
 
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
 
     const cx = GAME_WIDTH / 2;
     this.add.text(cx, 46, '仙途錄', textStyle({ size: 40, color: INK, bold: true })).setOrigin(0.5);

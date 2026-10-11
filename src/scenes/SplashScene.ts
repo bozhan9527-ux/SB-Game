@@ -3,8 +3,9 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { state } from '../state';
 import { realmForStage } from '../systems/realms';
 import { drawBackdrop } from '../ui/backdrop';
-import { GOLD, INK_DIM, hexToNumber, textStyle } from '../ui/theme';
+import { GOLD, INK, hexToNumber, textStyle } from '../ui/theme';
 import { fadeToScene } from '../ui/transition';
+import { applyGoldFace } from '../ui/logo';
 
 /**
  * 開場動畫。
@@ -36,7 +37,7 @@ export class SplashScene extends Phaser.Scene {
   create(): void {
     const save = state();
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
 
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT * 0.42;
@@ -44,11 +45,11 @@ export class SplashScene extends Phaser.Scene {
     const total = CHARS.length * CHAR_SIZE + (CHARS.length - 1) * CHAR_GAP;
     CHARS.forEach((char, index) => {
       const x = cx - total / 2 + CHAR_SIZE / 2 + index * (CHAR_SIZE + CHAR_GAP);
-      const text = this.add
-        .text(x, cy + 26, char, textStyle({ size: CHAR_SIZE, color: GOLD, bold: true }))
+      const text = applyGoldFace(
+        this.add.text(x, cy + 26, char, textStyle({ size: CHAR_SIZE, color: GOLD, bold: true })),
+      )
         // 招牌字：深色描邊加一層往下的實心影，不模糊——像素遊戲的標題都是這樣做出厚度。
-        .setStroke('#12141c', 8)
-        .setShadow(0, 7, '#5a3a10', 0, true, true)
+        .setPadding(6, 6, 6, 12)
         .setOrigin(0.5)
         .setAlpha(0)
         .setScale(1.14);
@@ -83,7 +84,8 @@ export class SplashScene extends Phaser.Scene {
     });
 
     const subtitle = this.add
-      .text(cx, cy + 100, '拖符布陣 · 合成升階 · 鎮守山門', textStyle({ size: 21, color: INK_DIM }))
+      .text(cx, cy + 100, '拖符布陣 · 合成升階 · 鎮守山門', textStyle({ size: 21, color: INK }))
+      .setStroke('#140b10', 6)
       .setOrigin(0.5)
       .setAlpha(0);
     this.tweens.add({
@@ -94,7 +96,8 @@ export class SplashScene extends Phaser.Scene {
     });
 
     const skip = this.add
-      .text(cx, GAME_HEIGHT - 70, '點一下繼續', textStyle({ size: 16, color: INK_DIM }))
+      .text(cx, GAME_HEIGHT - 70, '點一下繼續', textStyle({ size: 18, color: INK }))
+      .setStroke('#140b10', 5)
       .setOrigin(0.5)
       .setAlpha(0);
     this.tweens.add({ targets: skip, alpha: 0.75, duration: 400, delay: 900 });

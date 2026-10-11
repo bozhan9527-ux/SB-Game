@@ -8,6 +8,8 @@ import os
 import random
 import sys
 
+import backdrops
+import ui
 import sprites as gen
 from refine import plain, refine, write_png
 from sprites import blank, paint, put, outline, to_svg, check, GOLD, OUTLINE
@@ -1322,4 +1324,6 @@ if __name__ == "__main__":
     write_png(gate_post(), os.path.join(ART, "gate-post.png"))
     save("cloud.svg", cloud_svg())
     save("slash.svg", slash_svg())
+    n += backdrops.build(ART)
+    n += ui.build(ART)
     print("wrote", n + 2, "to", ART)

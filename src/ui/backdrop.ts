@@ -1,8 +1,11 @@
 /**
- * 像素風背景：遠山、明月、飄浮靈光。全部以程式繪製，不需美術素材。
+ * 像素風背景：每個境界一張手繪遠景（public/art/bg-*.png），上面再疊祥雲與飄浮靈光。
+ *
+ * 遠景貼圖沒載到時（例如單元測試、或某張圖 404），退回以程式繪製的舊版夜空，
+ * 畫面不會變成一片黑。
  */
 import Phaser from 'phaser';
-import { ART } from '../art';
+import { ART, backdropTexture } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import type { Scenery } from '../data/types';
 import { hexToNumber } from './theme';
@@ -286,33 +289,20 @@ function drawMoon(g: G): void {
   g.fillCircle(x - 12, y + 12, 6);
 }
 
-/** 依境界色調畫一層背景。回傳的容器已置於最底層。 */
-export function drawBackdrop(
-  scene: Phaser.Scene,
-  accentHex: string,
-  scenery: Scenery = 'peaks',
-): Phaser.GameObjects.Container {
-  const accent = hexToNumber(accentHex);
-  const layer = scene.add.container(0, 0);
-  const g = scene.add.graphics();
+/** 背景需要知道的境界資料：哪張遠景、什麼色調。 */
+export interface BackdropRealm {
+  id: string;
+  color: string;
+  scenery: Scenery;
+}
 
-  drawSky(g, accent, scenery);
-
-  // 明月放在頂列與資訊面板之間那一段空白裡：那裡本來就沒有東西，
-  // 而月亮不該和任何一個要點的東西搶地方。雷劫的天空滿是劫雲，不該有月亮。
-  if (scenery !== 'storm') drawMoon(g);
-  drawScenery(g, scenery, accent);
-  drawGround(g, accent);
-
-  // 由下而上的暗幕。
-  //
-  // 沒有它的話，遠山會一路頂到按鈕底下，而按鈕是半透明的——結果按鈕看起來像
-  // 浮在山上，而不是一層介面。壓暗下半部之後，UI 自然就「浮」起來了。
+/** 由下而上的暗幕：遠山不會一路頂到按鈕底下，UI 才「浮」得起來。 */
+function drawScrim(g: G, strength: number): void {
   const scrimTop = GAME_HEIGHT * 0.42;
   const bands = 10;
   for (let i = 0; i < bands; i += 1) {
     const t = (i + 1) / bands;
-    g.fillStyle(0x070a14, 0.5 * t * t);
+    g.fillStyle(0x070a14, strength * t * t);
     g.fillRect(
       0,
       scrimTop + ((GAME_HEIGHT - scrimTop) * i) / bands,
@@ -320,24 +310,47 @@ export function drawBackdrop(
       (GAME_HEIGHT - scrimTop) / bands + 1,
     );
   }
+}
 
-  // 像素化：整張先畫進三分之一大小的貼圖，再放大三倍。
-  // 地貌的程式完全不用改，斜邊與圓弧自然變成一格一格的階梯。
-  g.setScale(1 / PIXEL);
-  const sky = scene.add
-    .renderTexture(0, 0, GAME_WIDTH / PIXEL, GAME_HEIGHT / PIXEL)
-    .setOrigin(0, 0)
-    .setScale(PIXEL);
-  sky.draw(g);
-  g.destroy();
-  layer.add(sky);
+/** 依境界畫一層背景。回傳的容器已置於最底層。 */
+export function drawBackdrop(scene: Phaser.Scene, realm: BackdropRealm): Phaser.GameObjects.Container {
+  const accent = hexToNumber(realm.color);
+  const scenery = realm.scenery;
+  const layer = scene.add.container(0, 0);
+  const painted = backdropTexture(realm.id);
+
+  if (scene.textures.exists(painted)) {
+    // 遠景一格 = 兩個遊戲座標點，整數倍放大，每一格一樣大。
+    layer.add(scene.add.image(0, 0, painted).setOrigin(0, 0).setScale(2));
+    const g = scene.add.graphics();
+    drawScrim(g, 0.55);
+    layer.add(g);
+  } else {
+    const g = scene.add.graphics();
+    drawSky(g, accent, scenery);
+    // 雷劫的天空滿是劫雲，不該有月亮。
+    if (scenery !== 'storm') drawMoon(g);
+    drawScenery(g, scenery, accent);
+    drawGround(g, accent);
+    drawScrim(g, 0.5);
+
+    // 像素化：整張先畫進三分之一大小的貼圖，再放大三倍。
+    g.setScale(1 / PIXEL);
+    const sky = scene.add
+      .renderTexture(0, 0, GAME_WIDTH / PIXEL, GAME_HEIGHT / PIXEL)
+      .setOrigin(0, 0)
+      .setScale(PIXEL);
+    sky.draw(g);
+    g.destroy();
+    layer.add(sky);
+  }
 
   // 祥雲：三層緩慢橫移，讓遠景不是一張死圖。雲的貼圖一格一點，
   // 縮放取 3 與 6，雲上的一格才會剛好是背景的一格或兩格。
   const clouds: { y: number; scale: number; alpha: number; duration: number }[] = [
-    { y: GAME_HEIGHT * 0.13, scale: 6, alpha: 0.12, duration: 46000 },
-    { y: GAME_HEIGHT * 0.24, scale: 3, alpha: 0.1, duration: 62000 },
-    { y: GAME_HEIGHT * 0.34, scale: 6, alpha: 0.07, duration: 78000 },
+    { y: GAME_HEIGHT * 0.13, scale: 4, alpha: 0.1, duration: 46000 },
+    { y: GAME_HEIGHT * 0.24, scale: 2, alpha: 0.12, duration: 62000 },
+    { y: GAME_HEIGHT * 0.36, scale: 4, alpha: 0.08, duration: 78000 },
   ];
   for (const spec of clouds) {
     if (!scene.textures.exists(ART.cloud)) break;
@@ -358,7 +371,7 @@ export function drawBackdrop(
 
   // 飄浮靈光：緩慢上升的小方塊，讓靜態畫面有呼吸感。
   for (let i = 0; i < 18; i += 1) {
-    const size = PIXEL * Phaser.Math.Between(1, 2);
+    const size = 2 * Phaser.Math.Between(1, 2);
     const mote = scene.add.rectangle(
       Phaser.Math.Between(20, GAME_WIDTH - 20),
       Phaser.Math.Between(80, GAME_HEIGHT - 80),

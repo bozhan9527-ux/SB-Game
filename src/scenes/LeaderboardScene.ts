@@ -95,7 +95,7 @@ export class LeaderboardScene extends Phaser.Scene {
     fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
     this.rows = [];
 
     const cx = GAME_WIDTH / 2;

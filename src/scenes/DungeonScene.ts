@@ -55,7 +55,7 @@ export class DungeonScene extends Phaser.Scene {
     fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
 
     const cx = GAME_WIDTH / 2;
     this.add

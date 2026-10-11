@@ -56,7 +56,7 @@ export class RebirthScene extends Phaser.Scene {
     this.rows = [];
     this.rebirthButton = undefined;
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
 
     const cx = GAME_WIDTH / 2;
     this.add.text(cx, 44, '輪　迴', textStyle({ size: 40, color: INK, bold: true })).setOrigin(0.5);

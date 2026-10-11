@@ -4,20 +4,41 @@
  * 這裡放的是「呈現」層級的設定（顏色、字級），不是玩法數值，
  * 因此不受 TECH_SPEC 第 3 節「數值不得寫在 src/」的限制。
  */
-export const INK = '#e9e2cf';
-export const INK_DIM = '#9a917c';
-export const GOLD = '#e8c46a';
-export const DANGER = '#e0616a';
+export const INK = '#f5ead4';
+// 次要文字。原本 #9a917c 在深底上對比只有 5:1 左右，手機上縮小之後讀不太到；提亮一階。
+export const INK_DIM = '#c2b096';
+export const GOLD = '#f0c75e';
+export const DANGER = '#e8616a';
 export const JADE = '#7fdba0';
 
-// 帶一點藍紫的深色，和像素夜空背景同一個色系。
-export const BG_DEEP = 0x0f1328;
-export const BG_PANEL = 0x181d38;
-export const BG_PANEL_ALT = 0x232a52;
-export const LINE = 0x3a427a;
+// 介面材質：朱漆木框、金線、深色漆底。整套 UI 一個材質，背景交給各境界的遠景去換色。
+export const BG_DEEP = 0x140b10;
+export const BG_PANEL = 0x1f1218;
+export const BG_PANEL_ALT = 0x3b1d17;
+/** 面板與列表的分隔線：古銅色。 */
+export const LINE = 0x7a4a2c;
 
 /** 像素描邊：所有面板、按鈕、符牌的最外圈。 */
-export const EDGE = 0x12141c;
+export const EDGE = 0x0e0606;
+
+/** 漆木框的三個色階與金線的暗面。 */
+export const WOOD = 0x4a2218;
+export const WOOD_HI = 0x7a3a24;
+export const WOOD_LO = 0x24100c;
+export const GOLD_LO = 0xa7742a;
+/** 主要按鈕的朱漆。 */
+export const LACQUER = 0xb3302a;
+
+/** 把顏色往白（amount > 0）或往黑（amount < 0）推。斜角的亮面與暗面都從底色算出來。 */
+export function shade(color: number, amount: number): number {
+  const target = amount > 0 ? 255 : 0;
+  const t = Math.abs(amount);
+  const ch = (shift: number): number => {
+    const v = (color >> shift) & 0xff;
+    return Math.round(v + (target - v) * t);
+  };
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
 
 /** 觸控熱區下限（TECH_SPEC 第 6 節）。 */
 export const MIN_TOUCH_SIZE = 44;

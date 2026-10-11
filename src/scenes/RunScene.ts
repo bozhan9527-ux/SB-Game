@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { pixelPanel } from "../ui/panel";
+import { drawPanelFrame, pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import {
   ART,
@@ -95,6 +95,8 @@ import {
   INK_DIM,
   JADE,
   LINE,
+  WOOD,
+  WOOD_HI,
   fitText,
   formatNumber,
   wrapText,
@@ -486,7 +488,7 @@ export class RunScene extends Phaser.Scene {
     createWalkAnimations(this);
     this.ensureSparkTexture();
     audio.playMusic(realmIndexForStage(stage));
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
 
     // 教學要換掉起手牌，必須在建立牌位之前決定，否則陣位數會對不上。
     // 副本裡不跑教學：教學會改寫起手牌，而副本的規則（例如獨門一符）
@@ -577,49 +579,39 @@ export class RunScene extends Phaser.Scene {
 
   private drawArena(accentHex: string): void {
     const accent = hexToNumber(accentHex);
-    const g = this.add.graphics().setDepth(-50);
-    g.fillStyle(0x000000, 0.3);
-    g.fillRect(
-      ARENA_LEFT,
-      ARENA_TOP,
-      ARENA_RIGHT - ARENA_LEFT,
-      GATE_Y - ARENA_TOP,
-    );
-    // 雙層硬邊外框加四角金飾。
     const w = ARENA_RIGHT - ARENA_LEFT;
     const h = GATE_Y - ARENA_TOP;
-    g.lineStyle(3, EDGE, 0.9);
-    g.strokeRect(ARENA_LEFT, ARENA_TOP, w, h);
-    g.lineStyle(3, accent, 0.25);
-    g.strokeRect(ARENA_LEFT + 3, ARENA_TOP + 3, w - 6, h - 6);
-    g.fillStyle(hexToNumber(GOLD), 0.85);
-    g.fillRect(ARENA_LEFT - 3, ARENA_TOP - 3, 12, 3);
-    g.fillRect(ARENA_LEFT - 3, ARENA_TOP - 3, 3, 12);
-    g.fillRect(ARENA_RIGHT - 9, ARENA_TOP - 3, 12, 3);
-    g.fillRect(ARENA_RIGHT, ARENA_TOP - 3, 3, 12);
+    // 石板道：遠處淡、近處實（透明度烤在貼圖裡），兩側石欄。
+    if (this.textures.exists(ART.arena)) {
+      this.add
+        .image(ARENA_LEFT, ARENA_TOP, ART.arena)
+        .setOrigin(0, 0)
+        .setDisplaySize(w, h)
+        .setDepth(-50);
+    }
+    const g = this.add.graphics().setDepth(-49);
     // 五條縱列的分隔線：妖魔沿著列走，玩家才看得出哪一列擠了。
-    // 畫成三點一格的虛線，和像素背景同一個格子。
-    g.fillStyle(accent, 0.14);
+    // 畫成兩點一格的虛線，和石板同一個格子。
+    g.fillStyle(accent, 0.16);
     for (let i = 1; i < LANES; i += 1) {
-      const x = Math.round((ARENA_LEFT + LANE_WIDTH * i) / 3) * 3 - 1;
-      for (let y = ARENA_TOP + 6; y < GATE_Y - 6; y += 12) g.fillRect(x, y, 3, 6);
+      const x = Math.round((ARENA_LEFT + LANE_WIDTH * i) / 2) * 2 - 1;
+      for (let y = ARENA_TOP + 6; y < GATE_Y - 6; y += 12) g.fillRect(x, y, 2, 6);
     }
 
-    // 山門：妖魔碰到這條線就算攻進來。牌坊橫梁一格三點、橫跨整個畫面，
-    // 兩側立紅柱；梁下那一條細光是結界，顏色跟著耐久變（見 refreshGateDamage）。
-    this.add
-      .image(GAME_WIDTH / 2, GATE_Y + 6, ART.gateBeam)
-      .setScale(3)
-      .setDepth(27);
-    for (const x of [12, GAME_WIDTH - 12]) {
+    // 山門：朱欄橫跨整個畫面、兩側角樓、中央匾額，底下一段石階通到手牌托盤。
+    // 妖魔碰到朱欄就算攻進來；欄下那一條細光是結界，顏色跟著耐久變（見 refreshGateDamage）。
+    // 貼圖的朱欄上緣在第 36 列（半解析），放大兩倍後要對齊 GATE_Y。
+    if (this.textures.exists(ART.gate)) {
       this.add
-        .image(x, GATE_Y + 6, ART.gatePost)
-        .setOrigin(0.5, 0.7)
-        .setScale(3)
+        .image(GAME_WIDTH / 2, GATE_Y - 72, ART.gate)
+        .setOrigin(0.5, 0)
+        .setScale(2)
         .setDepth(27);
+    } else {
+      this.add.image(GAME_WIDTH / 2, GATE_Y + 6, ART.gateBeam).setScale(3).setDepth(27);
     }
     this.gateBase = this.add
-      .rectangle(GAME_WIDTH / 2, GATE_Y + 22, GAME_WIDTH, 3, accent, 0.5)
+      .rectangle(GAME_WIDTH / 2, GATE_Y + 16, GAME_WIDTH - 44, 2, accent, 0.5)
       .setDepth(28);
     this.gateBar = this.add
       .rectangle(
@@ -639,7 +631,7 @@ export class RunScene extends Phaser.Scene {
     this.gateLabel = this.add
       .text(
         GAME_WIDTH / 2,
-        GATE_Y + 9,
+        GATE_Y + 7,
         "山　門",
         textStyle({ size: 17, color: GOLD }),
       )
@@ -663,24 +655,17 @@ export class RunScene extends Phaser.Scene {
     guard2.play(discipleWalkKey(art, tier));
     guard2.anims.setProgress(0.5);
 
-    // 手牌區的底板，和戰場明確分開。
-    this.add
-      .rectangle(GAME_WIDTH / 2, 880, GAME_WIDTH, 160, BG_PANEL, 1)
-      .setDepth(40);
-    this.add
-      .rectangle(GAME_WIDTH / 2, 801.5, GAME_WIDTH, 3, EDGE, 1)
-      .setDepth(40);
-    this.add
-      .rectangle(GAME_WIDTH / 2, 804.5, GAME_WIDTH, 3, hexToNumber(GOLD), 0.75)
-      .setDepth(40);
+    // 手牌區的托盤：和面板同一套漆木金邊，和戰場明確分開。
+    const tray = this.add.graphics({ x: GAME_WIDTH / 2, y: 882 }).setDepth(40);
+    drawPanelFrame(tray, GAME_WIDTH, 164, { alpha: 1, corners: true });
     this.discardZone = this.add
-      .rectangle(GAME_WIDTH / 2, 946, GAME_WIDTH, 28, hexToNumber(DANGER), 0.12)
+      .rectangle(GAME_WIDTH / 2, 940, GAME_WIDTH - 24, 22, hexToNumber(DANGER), 0.16)
       .setDepth(41)
       .setVisible(false);
     this.add
       .text(
         GAME_WIDTH / 2,
-        946,
+        940,
         "拖到這裡棄符",
         textStyle({ size: 15, color: INK_DIM }),
       )
@@ -723,13 +708,18 @@ export class RunScene extends Phaser.Scene {
    * 而原本那裡放的是「放棄」：被打斷時唯一能按的鍵是放棄整場，這是設計上的失誤。
    */
   private buildHud(accentHex: string): void {
-    this.add
-      .rectangle(GAME_WIDTH / 2, 55, GAME_WIDTH, 110, BG_PANEL, 1)
-      .setDepth(50);
-    // 底緣是波次進度條（見下方 waveBar），再往下壓一條深色硬邊收邊。
-    this.add
-      .rectangle(GAME_WIDTH / 2, 111.5, GAME_WIDTH, 3, EDGE, 1)
-      .setDepth(52);
+    // 頂列：深色漆底，底緣一道漆木＋金線收邊，和手牌托盤是同一套材質。
+    const hud = this.add.graphics().setDepth(50);
+    hud.fillStyle(BG_PANEL, 1);
+    hud.fillRect(0, 0, GAME_WIDTH, 110);
+    hud.fillStyle(WOOD_HI, 1);
+    hud.fillRect(0, 110, GAME_WIDTH, 2);
+    hud.fillStyle(WOOD, 1);
+    hud.fillRect(0, 112, GAME_WIDTH, 2);
+    hud.fillStyle(hexToNumber(GOLD), 1);
+    hud.fillRect(0, 114, GAME_WIDTH, 1);
+    hud.fillStyle(EDGE, 1);
+    hud.fillRect(0, 115, GAME_WIDTH, 2);
 
     this.add
       .text(

@@ -1,19 +1,79 @@
 /**
- * 像素面板：實心底、深色外框、亮色內框、四角金飾。
+ * 像素面板：漆木外框、金線、四角祥雲角飾，內底是半透明深色漆。
  *
  * 所有主要面板共用這一個畫法，不各自用 rectangle + setStrokeStyle 拼——
  * 各拼各的結果是框線粗細、透明度到處不一樣，像素畫一眼就看得出不齊。
  */
 import Phaser from 'phaser';
-import { BG_PANEL, EDGE, GOLD, LINE, hexToNumber } from './theme';
+import { BG_PANEL, EDGE, GOLD, GOLD_LO, WOOD, WOOD_HI, WOOD_LO, hexToNumber, shade } from './theme';
 
 export interface PixelPanelOptions {
-  /** 內框顏色，預設是一般的線色；重要的面板可以給金色或境界色。 */
+  /** 金線顏色，預設是暗金；重要的面板可以給亮金或境界色。 */
   accent?: number;
   fill?: number;
   alpha?: number;
-  /** 四角金飾。小面板關掉比較乾淨。 */
+  /** 四角祥雲角飾。小面板關掉比較乾淨。 */
   corners?: boolean;
+}
+
+/** 祥雲角飾：一格 = 3 點。G 是金、H 是亮金。左上角的樣子，其他三角鏡射。 */
+const CORNER = [
+  'GGGGGG.',
+  'GHHHHG.',
+  'GH..GGG',
+  'GH.G..G',
+  'GHG.GGG',
+  'GG..G..',
+  '..GGG..',
+];
+const CELL = 3;
+
+export function drawPanelFrame(
+  g: Phaser.GameObjects.Graphics,
+  width: number,
+  height: number,
+  options: PixelPanelOptions = {},
+): void {
+  const hw = width / 2;
+  const hh = height / 2;
+  const accent = options.accent ?? GOLD_LO;
+  const fill = options.fill ?? BG_PANEL;
+
+  // 內底，上緣一條亮帶讓面板有厚度
+  g.fillStyle(fill, options.alpha ?? 0.94);
+  g.fillRect(-hw, -hh, width, height);
+  g.fillStyle(shade(fill, 0.08), options.alpha ?? 0.94);
+  g.fillRect(-hw + 12, -hh + 12, width - 24, 3);
+
+  // 漆木框：外描邊 → 木（上左亮、下右暗）→ 金線
+  const band = (inset: number, size: number, top: number, bottom: number): void => {
+    g.fillStyle(top, 1);
+    g.fillRect(-hw + inset, -hh + inset, width - inset * 2, size);
+    g.fillRect(-hw + inset, -hh + inset, size, height - inset * 2);
+    g.fillStyle(bottom, 1);
+    g.fillRect(-hw + inset, hh - inset - size, width - inset * 2, size);
+    g.fillRect(hw - inset - size, -hh + inset, size, height - inset * 2);
+  };
+  band(0, 3, EDGE, EDGE);
+  band(3, 3, WOOD_HI, WOOD_LO);
+  band(6, 3, WOOD, WOOD_LO);
+  band(9, 2, shade(accent, 0.25), shade(accent, -0.3));
+
+  if (options.corners !== false && width >= 120 && height >= 80) {
+    const gold = hexToNumber(GOLD);
+    const light = 0xfff1b0;
+    for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]] as const) {
+      const ox = sx > 0 ? -hw : hw - CELL;
+      const oy = sy > 0 ? -hh : hh - CELL;
+      CORNER.forEach((row, j) => {
+        [...row].forEach((ch, i) => {
+          if (ch === '.') return;
+          g.fillStyle(ch === 'H' ? light : gold, 1);
+          g.fillRect(ox + sx * i * CELL, oy + sy * j * CELL, CELL, CELL);
+        });
+      });
+    }
+  }
 }
 
 export function pixelPanel(
@@ -24,28 +84,10 @@ export function pixelPanel(
   height: number,
   options: PixelPanelOptions = {},
 ): Phaser.GameObjects.Container {
-  const body = scene.add
-    .rectangle(0, 0, width, height, options.fill ?? BG_PANEL, options.alpha ?? 0.94)
-    .setStrokeStyle(3, EDGE);
-  const inset = scene.add
-    .rectangle(0, 0, width - 6, height - 6, 0x000000, 0)
-    .setStrokeStyle(3, options.accent ?? LINE);
-  const parts: Phaser.GameObjects.GameObject[] = [body, inset];
-
-  if (options.corners !== false) {
-    const g = scene.add.graphics();
-    g.fillStyle(hexToNumber(GOLD), 1);
-    const hw = width / 2;
-    const hh = height / 2;
-    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-      const x = sx * hw;
-      const y = sy * hh;
-      // 一個 L 形的角，往面板內側長
-      g.fillRect(sx < 0 ? x - 1 : x - 11, y - 1, 12, 3);
-      g.fillRect(x - 1, sy < 0 ? y - 1 : y - 11, 3, 12);
-    }
-    parts.push(g);
-  }
-
-  return scene.add.container(cx, cy, parts);
+  const g = scene.add.graphics();
+  drawPanelFrame(g, width, height, options);
+  return scene.add.container(cx, cy, [g]);
 }
+
+/** 亮金線的面板：結算、突破這類「重要」的面板用。 */
+export const GOLD_ACCENT = hexToNumber(GOLD);

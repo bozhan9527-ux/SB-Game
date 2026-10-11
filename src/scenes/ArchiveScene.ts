@@ -44,7 +44,7 @@ export class ArchiveScene extends Phaser.Scene {
     fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
     this.status = undefined;
     this.cloudStatus = undefined;
 
@@ -52,6 +52,12 @@ export class ArchiveScene extends Phaser.Scene {
     this.add.text(cx, 40, '存　檔', textStyle({ size: 36, color: INK, bold: true })).setOrigin(0.5);
 
     this.buildRecords(cx, RECORDS_TOP);
+    // 存檔碼、雲端存檔與匿名統計各自墊一塊面板：說明字直接寫在遠景上，
+    // 碰到亮的境界（天界雲海、金丹天光）就讀不到了。
+    const width = GAME_WIDTH - 44;
+    pixelPanel(this, cx, (CODE_TOP - 16 + CLOUD_TOP - 10) / 2, width, CLOUD_TOP - 10 - (CODE_TOP - 16), { corners: false });
+    const lowerTop = cloudEnabled() ? CLOUD_TOP - 14 : PRIVACY_Y - 46;
+    pixelPanel(this, cx, (lowerTop + PRIVACY_Y + 46) / 2, width, PRIVACY_Y + 46 - lowerTop, { corners: false });
     this.buildArchive(cx, CODE_TOP);
     if (cloudEnabled()) this.buildCloud(cx, CLOUD_TOP);
     this.buildPrivacy(cx, PRIVACY_Y);

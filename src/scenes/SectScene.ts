@@ -47,7 +47,7 @@ export class SectScene extends Phaser.Scene {
     fadeIn(this);
     const save = state();
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
     this.cards = [];
     this.selected = SECTS.find((sect) => sect.id === save.player.sectId) ?? null;
 

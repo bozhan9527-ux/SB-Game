@@ -9,6 +9,7 @@
  * 而玩家只是想調個音量。兩層之間切換只是換掉面板裡的內容。
  */
 import Phaser from 'phaser';
+import { drawPanelFrame } from './panel';
 import type { IconName } from '../art';
 import { iconTexture } from '../art';
 import { audio } from '../audio';
@@ -16,7 +17,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { createButton } from './button';
 import { createSlider } from './slider';
-import { BG_PANEL, EDGE, GOLD, INK, INK_DIM, LINE, hexToNumber, textStyle } from './theme';
+import { BG_PANEL, GOLD, INK, INK_DIM, hexToNumber, textStyle } from './theme';
 import { fadeToScene } from './transition';
 import { realmIndexForStage } from '../systems/realms';
 
@@ -67,12 +68,10 @@ export function openMenu(scene: Phaser.Scene, entries: readonly MenuEntry[]): vo
     // 整個選單就關掉了——手指偏一點就前功盡棄，而「點外面關閉」的外面
     // 指的是面板以外，不是面板上沒有按鈕的地方。
     const panel = scene.add
-      .rectangle(cx, top + height / 2, width, height, BG_PANEL, 0.98)
-      .setStrokeStyle(4, EDGE)
+      .rectangle(cx, top + height / 2, width, height, BG_PANEL, 0)
       .setInteractive();
-    const panelInset = scene.add
-      .rectangle(cx, top + height / 2, width - 8, height - 8, 0x000000, 0)
-      .setStrokeStyle(3, LINE);
+    const panelInset = scene.add.graphics({ x: cx, y: top + height / 2 });
+    drawPanelFrame(panelInset, width, height, { alpha: 0.98 });
 
     const title = scene.add
       .text(cx, top + 46, '選　單', textStyle({ size: 28, color: INK, bold: true }))
@@ -115,12 +114,10 @@ export function openMenu(scene: Phaser.Scene, entries: readonly MenuEntry[]): vo
     const save = state();
     const height = 300;
     const panel = scene.add
-      .rectangle(cx, top + height / 2, width, height, BG_PANEL, 0.98)
-      .setStrokeStyle(4, EDGE)
+      .rectangle(cx, top + height / 2, width, height, BG_PANEL, 0)
       .setInteractive();
-    const panelInset = scene.add
-      .rectangle(cx, top + height / 2, width - 8, height - 8, 0x000000, 0)
-      .setStrokeStyle(3, hexToNumber(GOLD));
+    const panelInset = scene.add.graphics({ x: cx, y: top + height / 2 });
+    drawPanelFrame(panelInset, width, height, { alpha: 0.98, accent: hexToNumber(GOLD) });
 
     const title = scene.add
       .text(cx, top + 44, '音　樂', textStyle({ size: 28, color: GOLD, bold: true }))

@@ -135,7 +135,7 @@ export class TalismanScene extends Phaser.Scene {
     this.order = [];
     this.cachedLoadout = undefined;
     const realm = realmForStage(save.world.stage);
-    drawBackdrop(this, realm.color, realm.scenery);
+    drawBackdrop(this, realm);
     this.tiles = [];
     this.slots = [];
     const kept = sanitizeTalismans(save.player.talismans, highest);
