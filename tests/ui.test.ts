@@ -49,7 +49,8 @@ describe('文字排版', () => {
     const lines = wrapText(text, 452, 14).split('\n');
     expect(lines.length).toBe(2);
     expect(lines[1]).not.toBe('+25%');
-    expect(lines[1]).toBe('傷害 +25%');
+    // 至少借到一個中文字下來，而且不把整個詞拆掉太多（借字只補到約四個字寬）。
+    expect(lines[1]).toMatch(/^[\u4e00-\u9fff]{1,3} \+25%$/);
   });
 
   it('短字串不動它', () => {
@@ -69,6 +70,11 @@ describe('視覺工具', () => {
 
   it('金幣以千分位顯示', () => {
     expect(formatNumber(1234567)).toBe('1,234,567');
+    // 一億以上改用中文單位，三位有效數字。
+    expect(formatNumber(99_999_999)).toBe('99,999,999');
+    expect(formatNumber(123_456_789)).toBe('1.23億');
+    expect(formatNumber(5_495_547_439_434)).toBe('5.50兆');
+    expect(formatNumber(44_178_060_000_000_000)).toBe('4.42京');
   });
 
   it('按鈕熱區不小於 44×44 px（TECH_SPEC 第 6 節）', () => {

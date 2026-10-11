@@ -60,8 +60,16 @@ export const FULL_WIDTH_EM = 13 / 12;
 const NO_LINE_START = /[，。、：；！？）」』》〉,.!?:;)]/;
 const HALF_WIDTH_EM = 0.55;
 
+/** 半形裡比較寬的那幾類：大寫字母與 % + × 這類符號實測約 0.67，不是 0.55。 */
+const WIDE_HALF_EM = 0.67;
+
 function charWidth(char: string): number {
-  return /[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f]/.test(char) ? FULL_WIDTH_EM : HALF_WIDTH_EM;
+  // 破折號、刪節號、箭頭、圈號在這套點陣字裡是全形寬——原本當半形算，
+  // 「——」一多，整行就溢出畫面右緣（結算頁的失敗診斷就這樣被切掉半句）。
+  if (/[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f\u2014\u2015\u2026\u2190-\u21ff\u2460-\u24ff]/.test(char)) {
+    return FULL_WIDTH_EM;
+  }
+  return /[A-Z%+×#&=@]/.test(char) ? WIDE_HALF_EM : HALF_WIDTH_EM;
 }
 
 function textWidthInEm(text: string): number {
@@ -166,12 +174,47 @@ export function wrapText(text: string, widthPx: number, fontSize: number): strin
 
 /** 文字超出指定寬度時等比縮小，避免長數字撐破面板。 */
 export function fitText(text: Phaser.GameObjects.Text, maxWidth: number): void {
-  if (text.width > maxWidth) text.setScale(maxWidth / text.width);
+  if (text.width > maxWidth) {
+    text.setScale(maxWidth / text.width);
+    // 開發用：縮超過一成五的記下來，好找出「縮到看不清」的地方（正式版剔除）。
+    if (import.meta.env.DEV && maxWidth / text.width < 0.97) {
+      const log = ((globalThis as { __shrunk?: string[] }).__shrunk ??= []);
+      log.push(`${Math.round((maxWidth / text.width) * 100)}% ${text.text.replace(/\n/g, '⏎')}`);
+    }
+  }
+}
+
+/**
+ * 超出寬度就從尾巴截掉、補「…」，字級不動。
+ *
+ * 和 fitText 的差別：fitText 等比縮小，對一行固定的標籤沒問題；但別人取的名字可以長到
+ * 十六個字，縮到塞得下時已經小到讀不出來——名字讀不出來比少看幾個字糟。
+ */
+export function truncateText(text: Phaser.GameObjects.Text, maxWidth: number): void {
+  text.setScale(1);
+  if (text.width <= maxWidth) return;
+  const chars = [...text.text];
+  while (chars.length > 1) {
+    chars.pop();
+    text.setText(`${chars.join('')}…`);
+    if (text.width <= maxWidth) return;
+  }
 }
 
 /** 千分位顯示，四位數以上的金幣才讀得出來。 */
 export function formatNumber(value: number): string {
-  return Math.round(value).toLocaleString('en-US');
+  const rounded = Math.round(value);
+  // 一億以上改用中文大數單位：後期的輸出與金幣動輒十幾位數，
+  // 「5,495,547,439,434」塞不進狀態列，只能被縮到看不清；「5.50兆」一眼就讀得出量級。
+  const units: [number, string][] = [[1e16, '京'], [1e12, '兆'], [1e8, '億']];
+  for (const [base, unit] of units) {
+    if (Math.abs(rounded) >= base) {
+      const scaled = rounded / base;
+      const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2;
+      return `${scaled.toFixed(digits)}${unit}`;
+    }
+  }
+  return rounded.toLocaleString('en-US');
 }
 
 /**

@@ -8,6 +8,7 @@
  * 本檔不 import Phaser，全部是純函式。
  */
 import type { SaveData } from '../save/types';
+import { formatNumber } from '../ui/theme';
 
 /** 一場結束時，用來比對紀錄的那幾個數字。 */
 export interface RunRecordInput {
@@ -41,7 +42,7 @@ export function updateRecords(save: SaveData, run: RunRecordInput): BeatenRecord
 
   if (run.dps > records.bestDps) {
     records.bestDps = run.dps;
-    beaten.push({ label: '最高每秒輸出', text: Math.round(run.dps).toLocaleString('en-US') });
+    beaten.push({ label: '最高每秒輸出', text: formatNumber(run.dps) });
   }
   if (run.kills > records.bestKills) {
     records.bestKills = run.kills;
@@ -72,7 +73,7 @@ export function recordLines(save: SaveData): { label: string; value: string }[] 
     { label: '最深境界', value: `第 ${save.world.highestStage} 關` },
     {
       label: '最高每秒輸出',
-      value: records.bestDps > 0 ? Math.round(records.bestDps).toLocaleString('en-US') : none,
+      value: records.bestDps > 0 ? formatNumber(records.bestDps) : none,
     },
     { label: '單場最多斬殺', value: records.bestKills > 0 ? `${records.bestKills} 隻` : none },
     {

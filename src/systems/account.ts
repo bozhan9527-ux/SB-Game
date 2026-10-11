@@ -88,6 +88,19 @@ export function hasAccount(save: SaveData): boolean {
 }
 
 /**
+ * 登出：這台裝置回到匿名，進度留在本機不動。
+ *
+ * 雲端身分（playerId 與密鑰）一起清掉——密鑰是從密碼推出來的，留著的話
+ * 這台裝置登出之後照樣能用那個帳號上榜、覆蓋雲端存檔，那不叫登出。
+ * 清掉之後下一次進榜單會自動開一個新的匿名身分；要回原帳號就用信箱密碼登入。
+ */
+export function logout(save: SaveData): void {
+  save.player.account = null;
+  save.player.cloud = null;
+  save.player.name = '';
+}
+
+/**
  * 註冊。
  *
  * **會把現在這個匿名身分收編進帳號**，不是發一個新的：玩家可能已經玩了

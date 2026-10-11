@@ -73,7 +73,7 @@ export class AchievementScene extends Phaser.Scene {
       list.add(
         this.add.text(left, y - 32, item.name, textStyle({ size: 21, color: INK, bold: true })),
       );
-      list.add(this.add.text(left, y - 6, item.desc, textStyle({ size: 14, color: INK_DIM })));
+      list.add(this.add.text(left, y - 6, item.desc, textStyle({ size: 15, color: INK_DIM })));
       const status = this.add.text(left, y + 13, '', textStyle({ size: 14, color: INK_DIM }));
       list.add(status);
 

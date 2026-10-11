@@ -421,12 +421,12 @@ export class TalismanScene extends Phaser.Scene {
       const x = 30 + i * ((GAME_WIDTH - 60) / COMPARE_MAX);
       this.columns.push(
         this.add
-          .text(x, DETAIL_TOP + 10, '', textStyle({ size: 13, color: INK }))
+          .text(x, DETAIL_TOP + 10, '', textStyle({ size: 15, color: INK }))
           .setLineSpacing(4)
           .setVisible(false),
       );
     }
-    this.hint = this.add.text(cx, 830, '', textStyle({ size: 14, color: GOLD })).setOrigin(0.5);
+    this.hint = this.add.text(cx, 830, '', textStyle({ size: 16, color: GOLD })).setOrigin(0.5);
   }
 
   /**
@@ -608,7 +608,7 @@ export class TalismanScene extends Phaser.Scene {
         '',
         ...(effects.length === 0
           ? ['（無特效）']
-          : effects.map((line) => wrapText(`· ${line}`, width, 12))),
+          : effects.map((line) => wrapText(`· ${line}`, width, 15))),
       ];
       column.setText(lines.join('\n')).setColor(def.color);
     });

@@ -77,7 +77,7 @@ export class ArchiveScene extends Phaser.Scene {
       .text(cx, top + 20, '個人紀錄', textStyle({ size: 22, color: GOLD, bold: true }))
       .setOrigin(0.5);
     this.add
-      .text(cx, top + 44, '這幾個數字只存在這台裝置上', textStyle({ size: 13, color: INK_DIM }))
+      .text(cx, top + 44, '這幾個數字只存在這台裝置上', textStyle({ size: 15, color: INK_DIM }))
       .setOrigin(0.5);
 
     lines.forEach((line, index) => {
@@ -290,8 +290,8 @@ export class ArchiveScene extends Phaser.Scene {
       .text(
         cx - 110,
         top,
-        wrapText('送出關卡進度等匿名統計，幫助調整難度。不含個人資料。', 200, 13),
-        textStyle({ size: 13, color: INK_DIM }),
+        wrapText('送出關卡進度等匿名統計，幫助調整難度。不含個人資料。', 210, 15),
+        textStyle({ size: 15, color: INK_DIM }),
       )
       .setOrigin(0.5)
       .setAlign('center')

@@ -22,6 +22,7 @@ import {
 import {
   MIN_PASSWORD_LENGTH,
   hasAccount,
+  logout,
   login,
   questionFor,
   register,
@@ -31,7 +32,7 @@ import {
   resetPassword,
   setQuestion,
 } from '../systems/account';
-import { showForm, showNotice } from '../ui/form';
+import { confirmForm, showForm, showNotice } from '../ui/form';
 import {
   REPLAY_CONTRACT_VERSION,
   MAX_SPEED_STAGE,
@@ -46,7 +47,7 @@ import {
 import { realmForStage } from '../systems/realms';
 import { createButton } from '../ui/button';
 import { drawBackdrop } from '../ui/backdrop';
-import { BG_PANEL, BG_PANEL_ALT, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatTime, hexToNumber, textStyle } from '../ui/theme';
+import { BG_PANEL, BG_PANEL_ALT, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatTime, hexToNumber, textStyle, truncateText } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
 
 const LIST_TOP = 240;
@@ -220,20 +221,29 @@ export class LeaderboardScene extends Phaser.Scene {
     // 有帳號就只需要一顆改名鍵；沒帳號的話這裡是整頁最重要的東西——
     // 他上不了榜，而且在此之前沒有任何地方告訴過他為什麼。
     if (hasAccount(save)) {
-      createButton(this, cx - 58, 208 + shift, {
-        width: 160,
+      // 三顆一樣大、字一樣大。道號不塞進按鈕裡：原本寫成「改名：（整個道號）」，
+      // 名字一長就被縮到看不見。道號寫在上面那一行狀態裡。
+      createButton(this, cx - 110, 208 + shift, {
+        width: 104,
         height: 42,
-        label: `改名：${save.player.name}`,
-        fontSize: 15,
+        label: '改名',
+        fontSize: 17,
         onClick: () => void this.rename(),
       });
       // 註冊之前就存在的帳號沒有救援問題，這顆是他們補上的地方。
-      createButton(this, cx + 84, 208 + shift, {
-        width: 116,
+      createButton(this, cx, 208 + shift, {
+        width: 104,
         height: 42,
         label: '救援問題',
-        fontSize: 15,
+        fontSize: 17,
         onClick: () => void this.doSetQuestion(),
+      });
+      createButton(this, cx + 110, 208 + shift, {
+        width: 104,
+        height: 42,
+        label: '登出',
+        fontSize: 17,
+        onClick: () => void this.doLogout(),
       });
     } else {
       createButton(this, cx - 110, 208 + shift, {
@@ -350,7 +360,7 @@ export class LeaderboardScene extends Phaser.Scene {
     // 「你已經在榜上了」和「註冊能拿到什麼」——講成「你不會出現在榜上」
     // 是錯的，而且那正是這一頁原本說的話。
     const ready = hasAccount(save)
-      ? '上榜已開通，通關就會自動送出'
+      ? `已登入：${save.player.name}　通關會自動上榜`
       : '上榜已開通　榜上叫你無名修士，註冊可換道號';
     if (boardReady(save)) {
       this.say(ready, INK_DIM);
@@ -432,6 +442,22 @@ export class LeaderboardScene extends Phaser.Scene {
         ? `道號：${outcome.name}\n之後通關就會自動上榜。`
         : `道號：${outcome.name}\n之後通關就會自動上榜。\n（救援問題沒設成功，可以到「救援問題」再設一次）`,
     );
+    this.scene.restart({ board: this.board });
+  }
+
+  /** 登出。蓋掉的是這台裝置的身分，不是進度——確認框要把這兩件事分開講。 */
+  private async doLogout(): Promise<void> {
+    const save = state();
+    const confirmed = await confirmForm(
+      '登出帳號？',
+      `目前登入：${save.player.name}（${save.player.account?.email ?? ''}）\n` +
+        '登出後這台裝置變回匿名，本機的進度留著不動。\n' +
+        '帳號與雲端存檔都還在，用信箱和密碼登入就回得來。',
+      '登出',
+    );
+    if (!confirmed) return;
+    logout(save);
+    persist();
     this.scene.restart({ board: this.board });
   }
 
@@ -695,7 +721,6 @@ export class LeaderboardScene extends Phaser.Scene {
     }
 
     const mineId = save.player.cloud?.playerId ?? null;
-    const width = GAME_WIDTH - 44;
     result.entries.slice(0, this.visibleRows).forEach((entry, index) => {
       const row = this.rows[index];
       if (row === undefined) return;
@@ -719,10 +744,11 @@ export class LeaderboardScene extends Phaser.Scene {
       }
       row.rank.setText(String(entry.rank));
 
-      row.name.setText(entry.name).setColor(isMine ? JADE : INK);
-      // 名字是別人打的字，長度不受這裡控制——夾住寬度，撐不破成績那一欄。
-      fitText(row.name, width - 160);
       row.score.setText(this.describe(entry)).setColor(isMine ? JADE : INK_DIM);
+      row.name.setText(entry.name).setColor(isMine ? JADE : INK);
+      // 名字是別人打的字，長度不受這裡控制。截到成績那一欄的左緣為止，字級不縮——
+      // 原本是等比縮小，十六個字的名字縮完小到看不見，還壓到右邊的關卡數。
+      truncateText(row.name, row.score.x - row.score.width - 14 - row.name.x);
     });
 
     this.selfRow.setText(
