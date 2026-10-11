@@ -301,7 +301,7 @@ def bolt(cv, x, y, length, col, glow, branch=True):
 # ---------------------------------------------------------------- 地貌
 def peaks(cv, p, rng):
     stars(cv, rng, p, 110)
-    orb(cv, p, 196, 104, 13)
+    orb(cv, p, 228, 66, 13)
     mist(cv, p, HORIZON - 44, 18, 0.35)
     ridge(cv, rng, HORIZON - 8, 78, 30, p["mtn"][0], p["hi"][0], sharp=1.5)
     mist(cv, p, HORIZON + 8, 16, 0.5)
@@ -317,7 +317,7 @@ def peaks(cv, p, rng):
 
 def forest(cv, p, rng):
     stars(cv, rng, p, 90)
-    orb(cv, p, 70, 96, 11, craters=False)
+    orb(cv, p, 40, 66, 11, craters=False)
     ridge(cv, rng, HORIZON - 4, 60, 34, p["mtn"][0], p["hi"][0], sharp=1.3)
     mist(cv, p, HORIZON + 6, 20, 0.55)
     ridge(cv, rng, HORIZON + 34, 34, 20, p["mtn"][1], p["hi"][1])
@@ -357,7 +357,7 @@ def sea(cv, p, rng):
 
 def volcano(cv, p, rng):
     stars(cv, rng, p, 100)
-    orb(cv, p, 60, 92, 10, craters=False)
+    orb(cv, p, 36, 68, 10, craters=False)
     ridge(cv, rng, HORIZON - 4, 40, 30, p["mtn"][0], p["hi"][0])
     vx, top, base = 190, HORIZON - 90, HORIZON + 30
     for j in range(top, base):
@@ -397,7 +397,7 @@ def volcano(cv, p, rng):
 
 def palace(cv, p, rng):
     stars(cv, rng, p, 130)
-    orb(cv, p, 194, 100, 16)
+    orb(cv, p, 226, 66, 15)
     ridge(cv, rng, HORIZON - 10, 70, 32, p["mtn"][0], p["hi"][0], sharp=1.4)
     mist(cv, p, HORIZON + 4, 18, 0.5)
     r1 = ridge(cv, rng, HORIZON + 40, 50, 26, p["mtn"][1], p["hi"][1])
@@ -424,7 +424,7 @@ def voidrock(cv, p, rng):
                 k = 0.45 * (1 - abs(j) / 8)
                 if dith(x, int(yc + j), k):
                     cv.set(x, int(yc + j), aur, 0.55)
-    orb(cv, p, 60, 120, 9, craters=False)
+    orb(cv, p, 30, 106, 9, craters=False)
     for (cx, cy, w, k) in ((200, 140, 40, 0), (70, 196, 30, 0), (150, 226, 50, 1), (232, 254, 26, 1), (40, 276, 36, 2)):
         depth = w // 2 + 6
         for j in range(depth):
@@ -478,10 +478,10 @@ def celestial(cv, p, rng):
             for x in range(int(x0 - half), int(x0 + half)):
                 if dith(x, y, 0.18 * (1 - y / (HORIZON + 60))):
                     cv.set(x, y, light, 0.6)
-    orb(cv, p, 135, 92, 14, halo=3.4, craters=False)
+    orb(cv, p, 135, 58, 12, halo=3.0, craters=False)
     # 浮環
     for k in range(3):
-        cy, rx, ry = 92, 34 + k * 14, 8 + k * 3
+        cy, rx, ry = 58, 30 + k * 12, 6 + k * 2
         for a in range(0, 360, 2):
             x = int(135 + rx * math.cos(math.radians(a)))
             y = int(cy + ry * math.sin(math.radians(a)))
@@ -513,7 +513,7 @@ def lum(c):
 
 
 def settle(cv, p, start=130, ramp=50, target=0.3):
-    """介面安全區：主要的面板與說明字都在畫面中下段，那一段的遠景整體壓暗到平均亮度 target 以下。
+    """介面安全區（月亮、太陽也都擺在第 110 列以上、避開畫面正中——招牌字與結算標題在那一帶）：主要的面板與說明字都在畫面中下段，那一段的遠景整體壓暗到平均亮度 target 以下。
 
     天界的雲海、金丹的午後天光本身很亮，字直接寫在上面就讀不到。
     壓暗是往這張圖最深的山色靠，不是往黑色靠——色相留著，只是沉下去。
