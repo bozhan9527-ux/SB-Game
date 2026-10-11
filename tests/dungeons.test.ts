@@ -31,7 +31,7 @@ import {
 import type { LoadoutSpec } from '../src/systems/loadout';
 import { buildLoadoutFromSpec, loadoutSpecOf } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
-import { ARENA_MAX_TIER, drawCard, tierCapFor } from '../src/systems/deck';
+import { ARENA_MAX_TIER, arenaDrawTier, drawCard, tierCapFor } from '../src/systems/deck';
 import { MAX_REPLAY_STEPS, replayRun } from '../src/systems/replay';
 
 /**
@@ -398,13 +398,23 @@ describe('試劍台', () => {
     expect(BALANCE.power.arenaDiscipleMultiplier).toBeLessThanOrEqual(2.5);
   });
 
-  it('抽到的符一律是一階，但階數沒有上限', () => {
+  it('起點一律是一階；走得越深抽得越高，而且同一個深度每個人抽到的都一樣', () => {
     const loadout = buildLoadoutFromSpec(dungeonSpecOf(maxed(), arena!, 1));
+    const plain = buildLoadoutFromSpec(dungeonSpecOf(fresh(), arena!, 1));
     expect(loadout.arena).toBe(true);
     const rng = createRng(7);
-    for (let i = 0; i < 40; i += 1) {
-      expect(drawCard(loadout, 30, rng).tier).toBe(1);
+    for (let i = 0; i < 40; i += 1) expect(drawCard(loadout, 1, rng).tier).toBe(1);
+    // 養成滿的人和全新的人，同一個深度抽到同一階——加成在試劍台全部不算。
+    for (const stage of [10, 30, 60]) {
+      const tiers = new Set<number>();
+      for (let i = 0; i < 20; i += 1) {
+        tiers.add(drawCard(loadout, stage, rng).tier);
+        tiers.add(drawCard(plain, stage, rng).tier);
+      }
+      expect([...tiers], `第 ${stage} 關`).toEqual([arenaDrawTier(stage)]);
     }
+    expect(arenaDrawTier(60)).toBeGreaterThan(arenaDrawTier(30));
+    expect(arenaDrawTier(30)).toBeGreaterThan(arenaDrawTier(10));
     // 合成是這個模式唯一能推的那條指數，所以不能有天花板卡住它。
     expect(tierCapFor(loadout, 1)).toBe(ARENA_MAX_TIER);
     expect(tierCapFor(loadout, 60)).toBe(ARENA_MAX_TIER);

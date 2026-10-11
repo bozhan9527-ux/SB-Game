@@ -124,6 +124,17 @@ export interface WaveBalance {
   arenaStep: number;
   /** 競技場每打過幾波，級距再 +1。同上，比聚寶洞那一組緩。 */
   arenaAccelWaves: number;
+  /**
+   * 試劍台抽到的符比主線同一關再低幾階。
+   *
+   * 試劍台原本一律只抽 1 階，但妖魔血量隨關卡指數成長、合成只能線性追——
+   * 不論牌組、不論手速，所有人都在第十關上下撞同一面牆，榜上比不出任何東西。
+   * 改成抽符階數跟著深度走（和主線同一條曲線，只是沒有洞府加成），再壓低這麼多階：
+   * 起點對每個人一樣，走得多深看的是排陣與合成。
+   */
+  arenaTierLag: number;
+  /** 試劍台的妖魔血量每關成長率（取代 hpGrowth，見 defense.ts 的 hpScaleFor）。 */
+  arenaHpGrowth: number;
   waveIntervalMs: number;
   /**
    * 同一波的妖魔攤在這一波多長的比例上出場。

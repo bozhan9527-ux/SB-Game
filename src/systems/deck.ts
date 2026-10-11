@@ -77,6 +77,12 @@ export function drawTierForStage(stage: number, rng: Rng, tierBonus = 0): number
   return Math.min(cap, base + bonus);
 }
 
+/** 試劍台在這個深度抽到的階數。起點是 1 階，往後和主線同一條曲線、再壓低 arenaTierLag 階。 */
+export function arenaDrawTier(stage: number): number {
+  const { field, wave } = BALANCE;
+  return Math.max(1, maxTierForStage(stage) - field.drawTierBelowMax - wave.arenaTierLag);
+}
+
 /**
  * 抽一張符。**抽符池就是這一場帶的四張**，不是全部二十張。
  *
@@ -86,9 +92,9 @@ export function drawTierForStage(stage: number, rng: Rng, tierBonus = 0): number
  */
 export function drawCard(loadout: Loadout, stage: number, rng: Rng): Card {
   const def = rng.pickWeighted(loadout.talismans, (card) => card.weight);
-  // 競技場一律抽 1 階。**所有人的起點完全一樣**是這個模式唯一的規則，
-  // 而「抽到的符跟著關卡上限走」會讓深一點的波次直接發高階符給你。
-  const tier = loadout.arena ? 1 : drawTierForStage(stage, rng, loadout.tierBonus);
+  // 競技場：抽到的階數跟著深度走，但不吃任何加成、也沒有「偶爾多一階」的骰子——
+  // 同一個深度，每個人抽到的都一樣（見 BALANCE.wave.arenaTierLag）。
+  const tier = loadout.arena ? arenaDrawTier(stage) : drawTierForStage(stage, rng, loadout.tierBonus);
   return { type: def.id, tier };
 }
 

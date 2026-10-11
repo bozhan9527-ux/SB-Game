@@ -47,7 +47,9 @@
     "speedMax": 74,
     "trackPx": 620,
     "leakCostBase": 1,
-    "leakCostGrowth": 1.02
+    "leakCostGrowth": 1.02,
+    "arenaTierLag": 0,
+    "arenaHpGrowth": 1.12
   },
   "rebirth": {
     "minStage": 82,

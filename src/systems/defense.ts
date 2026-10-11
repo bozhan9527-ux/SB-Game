@@ -458,6 +458,20 @@ function traitHpRatio(trait: MobTrait): number {
 /** 妖魔可以走的縱列數。畫面上是五條路，決定的是視覺分佈而非數值。 */
 export const LANES = 5;
 
+/**
+ * 這一場妖魔血量的總倍率。
+ *
+ * 試劍台另外乘上一條較緩的曲線：主線的血量每關 ×hpGrowth，靠的是洞府、門派、仙緣
+ * 一路補上的加成才追得上；試劍台加成全歸零，只剩符階（每 stagesPerTier 關 ×tierGrowth）在追，
+ * 每關差 4%，第二十幾關就撞上一面所有人都一樣的牆。換成 arenaHpGrowth（略快於符階），
+ * 剩下那一點差距加上越跨越大的級距，才是「打到守不住為止」——決定深度的是排陣與合成。
+ */
+export function hpScaleFor(loadout: Loadout, threat: number): number {
+  if (!loadout.arena) return loadout.mobHpMultiplier;
+  const { wave } = BALANCE;
+  return loadout.mobHpMultiplier * Math.pow(wave.arenaHpGrowth / wave.hpGrowth, Math.max(0, threat - 1));
+}
+
 export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
   const { field } = BALANCE;
   // 妖魔、階數上限與金幣全部看威脅度：飛升境每轉一世世界就更硬。
@@ -465,7 +479,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     loadout.threat,
     rng,
     loadout.traitChance,
-    loadout.mobHpMultiplier,
+    hpScaleFor(loadout, loadout.threat),
     loadout.mobSpeedMultiplier,
     loadout.waveCountMultiplier,
   );
@@ -1284,7 +1298,7 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
     state.threat,
     rng,
     state.loadout.traitChance,
-    state.loadout.mobHpMultiplier,
+    hpScaleFor(state.loadout, state.threat),
     state.loadout.mobSpeedMultiplier,
     state.loadout.waveCountMultiplier,
   );
@@ -1576,7 +1590,7 @@ function spawnMinions(
   const mob = mobs[rng.int(0, Math.max(0, mobs.length - 1))];
   const hp = Math.max(
     1,
-    waveHp(state.threat, BALANCE.wave.wavesPerStage) * def.amount * state.loadout.mobHpMultiplier,
+    waveHp(state.threat, BALANCE.wave.wavesPerStage) * def.amount * hpScaleFor(state.loadout, state.threat),
   );
   for (let i = 0; i < def.count; i += 1) {
     // 從首領兩側往外排，不和首領疊在同一路。
