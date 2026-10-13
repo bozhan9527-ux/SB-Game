@@ -5,6 +5,7 @@
  * - 撥弦用 Karplus-Strong（噪音短脈衝丟進延遲迴路），聽起來接近古箏／琵琶
  * - 鑼用數個非諧和正弦相加，衰減拉長
  * - 風聲、衝擊用白噪音加包絡
+ * - 雷符的電響用劈啪聲（稀疏的隨機尖脈衝），符紙的「啪」用極短的寬頻噪音
  */
 
 /** Karplus-Strong 撥弦。 */
@@ -120,6 +121,41 @@ export function renderThud(
     const frequency = fromFrequency + (toFrequency - fromFrequency) * t;
     phase += (2 * Math.PI * frequency) / rate;
     data[i] = Math.sin(phase) * Math.pow(1 - t, 2.2);
+  }
+  return buffer;
+}
+
+/**
+ * 劈啪聲：稀疏的隨機尖脈衝，越到後面越稀、越弱。雷符與燒符的那種「滋——啪」。
+ * density 是每秒的脈衝數。
+ */
+export function renderCrackle(ctx: BaseAudioContext, seconds: number, density: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * seconds);
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const chance = density / rate;
+  let tail = 0;
+  for (let i = 0; i < length; i += 1) {
+    const t = i / length;
+    if (Math.random() < chance * (1 - t)) tail = (Math.random() * 0.6 + 0.4) * (Math.random() < 0.5 ? -1 : 1);
+    // 每個脈衝以幾十個取樣快速衰減，聽起來是「啪」而不是「嗶」。
+    tail *= 0.93;
+    data[i] = (tail + (Math.random() * 2 - 1) * 0.08) * Math.pow(1 - t, 1.5);
+  }
+  return buffer;
+}
+
+/** 符紙的「啪」：兩毫秒的起音、快速衰減的寬頻噪音。所有攻擊音都疊一層，聽起來是紙符打出去。 */
+export function renderSnap(ctx: BaseAudioContext, seconds = 0.05): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const attack = Math.floor(rate * 0.002);
+  for (let i = 0; i < length; i += 1) {
+    const env = i < attack ? i / attack : Math.exp(-(i - attack) / (rate * 0.008));
+    data[i] = (Math.random() * 2 - 1) * env;
   }
   return buffer;
 }

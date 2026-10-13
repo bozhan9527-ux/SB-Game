@@ -4,30 +4,36 @@
  * 這裡放的是「呈現」層級的設定（顏色、字級），不是玩法數值，
  * 因此不受 TECH_SPEC 第 3 節「數值不得寫在 src/」的限制。
  */
-export const INK = '#f5ead4';
-// 次要文字。原本 #9a917c 在深底上對比只有 5:1 左右，手機上縮小之後讀不太到；提亮一階。
-export const INK_DIM = '#c2b096';
-export const GOLD = '#f0c75e';
-export const DANGER = '#e8616a';
-export const JADE = '#7fdba0';
+import { RENDER_SCALE } from '../config';
 
-// 介面材質：朱漆木框、金線、深色漆底。整套 UI 一個材質，背景交給各境界的遠景去換色。
-export const BG_DEEP = 0x140b10;
-export const BG_PANEL = 0x1f1218;
-export const BG_PANEL_ALT = 0x3b1d17;
-/** 面板與列表的分隔線：古銅色。 */
-export const LINE = 0x7a4a2c;
+// 手繪紙面：宣紙底、墨字、朱砂、石青石綠。整套介面畫在同一張紙上，背景交給各境界的遠景去換景。
+export const INK = '#2a2622';
+// 次要文字：淡墨。要在米黃紙上讀得出來，不能比這更淺。
+export const INK_DIM = '#6a5d4e';
+/** 「金」：在紙上用赭黃，亮金在米黃紙上幾乎看不見。 */
+export const GOLD = '#a8741a';
+export const DANGER = '#c8372d';
+export const JADE = '#2f7a58';
 
-/** 像素描邊：所有面板、按鈕、符牌的最外圈。 */
-export const EDGE = 0x0e0606;
+export const BG_DEEP = 0xd9ccb0;
+/** 面板紙色。 */
+export const BG_PANEL = 0xf5eddb;
+export const BG_PANEL_ALT = 0xebdfc4;
+/** 面板與列表的分隔線：淡墨。 */
+export const LINE = 0xa8977c;
 
-/** 漆木框的三個色階與金線的暗面。 */
-export const WOOD = 0x4a2218;
-export const WOOD_HI = 0x7a3a24;
-export const WOOD_LO = 0x24100c;
-export const GOLD_LO = 0xa7742a;
-/** 主要按鈕的朱漆。 */
-export const LACQUER = 0xb3302a;
+/** 墨線：所有面板、按鈕、符牌的外框。 */
+export const EDGE = 0x2a2622;
+
+/** 木牌的三個色階與赭黃暗面。 */
+export const WOOD = 0x8a5a36;
+export const WOOD_HI = 0xb0805a;
+export const WOOD_LO = 0x5a3420;
+export const GOLD_LO = 0xb08a40;
+/** 朱砂：主要按鈕的框與印。 */
+export const LACQUER = 0xc8372d;
+/** 黃符紙：主要按鈕的底。 */
+export const TALISMAN = 0xefd27a;
 
 /** 把顏色往白（amount > 0）或往黑（amount < 0）推。斜角的亮面與暗面都從底色算出來。 */
 export function shade(color: number, amount: number): number {
@@ -40,13 +46,46 @@ export function shade(color: number, amount: number): number {
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
+/**
+ * 寫在朱印、深色牌子上的淺色字：這幾個顏色照原樣用，不經過 paperInk。
+ */
+export const ON_SEAL = new Set(['#fbeedd', '#fff6e0', '#fff1dc', '#ffffff']);
+
+/**
+ * 把顏色換成「寫在米黃紙上讀得出來」的版本：同一個色相，壓到夠深。
+ *
+ * 遊戲資料裡的顏色（境界色、符種色、習性標記色）都是當年為深色底挑的淺色，
+ * 直接寫在紙上會淡到看不見。逐一改資料的話，下次新增一個境界又會忘；
+ * 統一在這裡轉，資料就可以繼續只描述「這是什麼顏色」。
+ * 本來就夠深的顏色原樣傳回。
+ */
+export function paperInk(color: string): string {
+  if (!/^#[0-9a-fA-F]{6}$/.test(color) || ON_SEAL.has(color.toLowerCase())) return color;
+  const n = Number.parseInt(color.slice(1), 16);
+  let r = (n >> 16) & 0xff;
+  let g = (n >> 8) & 0xff;
+  let b = n & 0xff;
+  const lum = (): number => 0.299 * r + 0.587 * g + 0.114 * b;
+  if (lum() <= 120) return color;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  // 幾乎沒有色相的淺灰、米白：換成淡墨。
+  if (max - min < 28) return INK_DIM;
+  // 依比例往黑壓，直到夠深；色相不變，飽和度看起來反而更足。
+  const k = 110 / lum();
+  r = Math.round(r * k);
+  g = Math.round(g * k);
+  b = Math.round(b * k);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
 /** 觸控熱區下限（TECH_SPEC 第 6 節）。 */
 export const MIN_TOUCH_SIZE = 44;
 
-/** 點陣字型的 family 名稱，由 main.ts 在開遊戲前載入。 */
-export const PIXEL_FONT = 'Cubic11';
+/** 手寫字型的 family 名稱，由 main.ts 在開遊戲前載入。 */
+export const GAME_FONT = 'LXGW WenKai TC';
 
-export const FONT = `"${PIXEL_FONT}", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif`;
+export const FONT = `"${GAME_FONT}", "Kaiti TC", "STKaiti", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", serif`;
 
 /** "#7fdba0" → 0x7fdba0，供 Phaser 的幾何圖形使用。 */
 export function hexToNumber(hex: string): number {
@@ -63,19 +102,20 @@ export function textStyle(options: TextStyleOptions): Phaser.Types.GameObjects.T
   return {
     fontFamily: FONT,
     fontSize: `${options.size}px`,
-    color: options.color ?? INK,
-    // 點陣字沒有粗體字重，硬加粗是把每一筆抹寬一點，像素邊就糊了。
+    color: paperInk(options.color ?? INK),
+    // 文楷只有一個字重，瀏覽器硬加粗會把筆畫抹糊。
     // bold 參數保留給呼叫端表達意圖，畫面上靠字級與顏色區分。
     fontStyle: 'normal',
+    // 攝影機放大了 RENDER_SCALE 倍，文字貼圖也要畫成同樣倍數，不然字是糊的。
+    resolution: RENDER_SCALE,
   };
 }
 
 /**
- * 點陣字「俐方體 11 號」的字寬（字級的倍數），在瀏覽器裡實測：全形字與全形標點是 13/12，
- * 半形約 0.52（取 0.55 留一點餘裕）。原本以全形 = 1 估算，每 12 個字就多出近一字寬，
- * 長句會超出面板右框。
+ * 文楷的字寬（字級的倍數）：全形字與全形標點是 1，半形約 0.5（取 0.55 留一點餘裕）。
+ * 估少了長句會超出面板右框，所以寧可估寬一點。
  */
-export const FULL_WIDTH_EM = 13 / 12;
+export const FULL_WIDTH_EM = 1;
 
 /** 不放在行首的標點（中文排版的「避頭」）。 */
 const NO_LINE_START = /[，。、：；！？）」』》〉,.!?:;)]/;
@@ -85,7 +125,7 @@ const HALF_WIDTH_EM = 0.55;
 const WIDE_HALF_EM = 0.67;
 
 function charWidth(char: string): number {
-  // 破折號、刪節號、箭頭、圈號在這套點陣字裡是全形寬——原本當半形算，
+  // 破折號、刪節號、箭頭、圈號在中文字型裡是全形寬——原本當半形算，
   // 「——」一多，整行就溢出畫面右緣（結算頁的失敗診斷就這樣被切掉半句）。
   if (/[\u2e80-\u9fff\uff00-\uffef\u3000-\u303f\u2014\u2015\u2026\u2190-\u21ff\u2460-\u24ff]/.test(char)) {
     return FULL_WIDTH_EM;

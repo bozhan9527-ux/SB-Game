@@ -6,6 +6,7 @@
  * 位移直接用這一次和上一次的座標差，再加上滑鼠滾輪給桌機用。
  */
 import Phaser from 'phaser';
+import { RENDER_SCALE } from '../config';
 
 export function dragScroll(
   scene: Phaser.Scene,
@@ -19,7 +20,8 @@ export function dragScroll(
   };
   scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
     if (!pointer.isDown) return;
-    move(pointer.y - pointer.prevPosition.y);
+    // 指標座標是畫布像素（邏輯座標的 RENDER_SCALE 倍），換回邏輯座標才是一比一。
+    move((pointer.y - pointer.prevPosition.y) / RENDER_SCALE);
   });
   scene.input.on(
     'wheel',

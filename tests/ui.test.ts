@@ -19,7 +19,7 @@ describe('文字排版', () => {
     }
   });
 
-  it('以點陣字的實際字寬換行：全形字一個佔 13/12 字級，每行不超過指定寬度', () => {
+  it('以字型的實際字寬換行：全形字一個佔一個字級，每行不超過指定寬度', () => {
     const text = '按住一張符拖到別的格位放開，或是點一下選起來、再點目標格，兩種都行。';
     const width = 464;
     const size = 16;
@@ -46,7 +46,7 @@ describe('文字排版', () => {
 
   it('短詞塊整塊換行時不會自己掛一行', () => {
     const text = '【被動】符籙相生：合成有 30% 機率保留一張符；天雷符傷害 +25%';
-    const lines = wrapText(text, 452, 14).split('\n');
+    const lines = wrapText(text, 430, 14).split('\n');
     expect(lines.length).toBe(2);
     expect(lines[1]).not.toBe('+25%');
     // 至少借到一個中文字下來，而且不把整個詞拆掉太多（借字只補到約四個字寬）。

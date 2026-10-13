@@ -85,7 +85,7 @@ export class SplashScene extends Phaser.Scene {
 
     const subtitle = this.add
       .text(cx, cy + 100, '拖符布陣 · 合成升階 · 鎮守山門', textStyle({ size: 21, color: INK }))
-      .setStroke('#140b10', 6)
+      .setStroke('#f5eddb', 6)
       .setOrigin(0.5)
       .setAlpha(0);
     this.tweens.add({
@@ -97,7 +97,7 @@ export class SplashScene extends Phaser.Scene {
 
     const skip = this.add
       .text(cx, GAME_HEIGHT - 70, '點一下繼續', textStyle({ size: 18, color: INK }))
-      .setStroke('#140b10', 5)
+      .setStroke('#f5eddb', 5)
       .setOrigin(0.5)
       .setAlpha(0);
     this.tweens.add({ targets: skip, alpha: 0.75, duration: 400, delay: 900 });

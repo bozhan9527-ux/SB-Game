@@ -1,10 +1,11 @@
 /**
  * 美術資源。
  *
- * 全部是像素畫，存成一格一點的 PNG（public/art/）。
- * 檔案由 scripts/pixel-art/ 的產生器輸出，改圖請改產生器再重跑，不要手改 PNG。
+ * 全部是手繪風（墨線、彩鉛排線、宣紙），存成 WebP（public/art/）。
+ * 檔案由 scripts/sketch-art/ 的產生器輸出，改圖請改產生器再重跑，不要手改圖檔。
  *
- * 遊戲開了 pixelArt，放大時取最近點；顯示倍數盡量取整數，每一格才會一樣大。
+ * 貼圖以遊戲點的兩倍（首領 1.5 倍、背景 1 倍）算圖；顯示倍數記在 art-manifest.json，
+ * 其他元件在使用的地方用 setDisplaySize 指定遊戲點大小。
  */
 import { CARDS, REALMS } from './data';
 import artManifest from './data/art-manifest.json';
@@ -60,14 +61,13 @@ const GLYPH_ARTS: readonly string[] = [...new Set(CARDS.map((card) => card.art))
 /**
  * 每種角色貼圖的尺寸、實際有畫的最上一列、顯示倍數。
  *
- * 由 scripts/pixel-art/build.py 量好寫進 art-manifest.json——重畫角色之後跑一次產生器，
- * 這裡就跟著對，不必再手改程式裡的數字。原生解析度重畫的角色顯示兩倍（一格 = 兩點，
- * 和背景同一個格子），還沒重畫的舊圖維持原本的倍數。
+ * 由 scripts/sketch-art/build.mjs 量好寫進 art-manifest.json——重畫角色之後跑一次產生器，
+ * 這裡就跟著對，不必再手改程式裡的數字。w、h 是貼圖像素，乘上 scale 才是遊戲點。
  */
 export interface ArtSize {
   w: number;
   h: number;
-  /** 實際有畫的最上一列（四幀取最高），血條掛在這裡，不掛在貼圖頂端。 */
+  /** 實際有畫的最上一列（各幀取最高，貼圖像素），血條掛在這裡，不掛在貼圖頂端。 */
   top: number;
   scale: number;
 }
@@ -77,18 +77,18 @@ const MANIFEST = artManifest as {
   boss: Record<string, ArtSize>;
   disciple: Record<string, ArtSize>;
 };
-const FALLBACK: ArtSize = { w: 56, h: 56, top: 0, scale: 1.5 };
+const FALLBACK: ArtSize = { w: 192, h: 184, top: 0, scale: 0.5 };
 
 export function enemyArtSize(art: MobArt): ArtSize {
   return MANIFEST.enemy[art] ?? FALLBACK;
 }
 
 export function bossArtSize(art: BossArt): ArtSize {
-  return MANIFEST.boss[art] ?? { w: 100, h: 100, top: 0, scale: 1.5 };
+  return MANIFEST.boss[art] ?? { w: 330, h: 318, top: 0, scale: 2 / 3 };
 }
 
 export function discipleArtSize(art: SectArt): ArtSize {
-  return MANIFEST.disciple[art] ?? { w: 40, h: 56, top: 0, scale: 1 };
+  return MANIFEST.disciple[art] ?? { w: 160, h: 224, top: 0, scale: 0.5 };
 }
 
 /** 各妖物貼圖實際的上緣（測試拿來和 PNG 對照）。 */
@@ -96,7 +96,7 @@ export const ENEMY_ART_TOP: Readonly<Record<string, number>> = Object.fromEntrie
   Object.entries(MANIFEST.enemy).map(([art, size]) => [art, size.top]),
 );
 
-/** 境界遠景（scripts/pixel-art/backdrops.py 產生，270×480，遊戲裡放大兩倍）。 */
+/** 境界遠景（scripts/sketch-art/world.mjs 產生，540×960，一點對一像素）。 */
 export function backdropTexture(realmId: string): string {
   return `bg-${realmId}`;
 }
@@ -112,8 +112,12 @@ export function bossIdleKey(art: BossArt): string {
 /**
  * 走路循環四幀：姿勢 A、A 上抬、姿勢 B、B 上抬。以獨立貼圖組成動畫，不需要 spritesheet。
  * 只有兩幀的話是左右腳硬切，四幀多了「彈起來」那一下，走起來才有重量。
+ * 每幀的線條都重新抖過一次，換幀時輪廓會微微「沸騰」，是手繪動畫的質感。
  */
 export const WALK_FRAMES = [0, 1, 2, 3] as const;
+
+/** 首領兩幀（呼吸起伏）：首領圖大，四幀太吃顯示記憶體，而牠本來就不走路。 */
+export const BOSS_FRAMES = [0, 1] as const;
 
 /** 門人造型分三階，隨境界提升換裝。 */
 export const DISCIPLE_TIERS = [0, 1, 2] as const;
@@ -170,7 +174,7 @@ const ASSETS: readonly ArtSpec[] = [
     WALK_FRAMES.map((frame) => ({ key: enemyTexture(art, frame), file: `enemy-${art}-${frame}` })),
   ),
   ...BOSS_ARTS.flatMap((art) =>
-    WALK_FRAMES.map((frame) => ({ key: bossTexture(art, frame), file: `boss-${art}-${frame}` })),
+    BOSS_FRAMES.map((frame) => ({ key: bossTexture(art, frame), file: `boss-${art}-${frame}` })),
   ),
   ...GLYPH_ARTS.map((art) => ({ key: glyphTexture(art), file: `glyph-${art}` })),
   ...ICON_NAMES.map((name) => ({ key: iconTexture(name), file: `icon-${name}` })),
@@ -193,7 +197,7 @@ const ASSETS: readonly ArtSpec[] = [
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
 export function createWalkAnimations(scene: Phaser.Scene): void {
-  const define = (key: string, frames: string[], frameRate = 11): void => {
+  const define = (key: string, frames: string[], frameRate = 8): void => {
     if (scene.anims.exists(key)) return;
     scene.anims.create({
       key,
@@ -212,7 +216,7 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
   }
   // 首領比小妖慢一拍：牠是在呼吸，不是在跑。
   for (const art of BOSS_ARTS) {
-    define(bossIdleKey(art), WALK_FRAMES.map((f) => bossTexture(art, f)), 5);
+    define(bossIdleKey(art), BOSS_FRAMES.map((f) => bossTexture(art, f)), 3);
   }
 }
 
@@ -220,6 +224,6 @@ export function preloadArt(scene: Phaser.Scene): void {
   // BASE_URL 在 GitHub Pages 上是 /SB-Game/，寫死路徑會 404。
   const base = import.meta.env.BASE_URL;
   for (const asset of ASSETS) {
-    scene.load.image(asset.key, `${base}art/${asset.file}.png`);
+    scene.load.image(asset.key, `${base}art/${asset.file}.webp`);
   }
 }

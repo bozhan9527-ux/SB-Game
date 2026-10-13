@@ -5,16 +5,22 @@
  * 上一個畫面與下一個畫面在同一幀之內互換，眼睛沒有任何線索知道剛剛發生了什麼——
  * 是我按錯了？還是它自己跳的？兩百多毫秒的黑場就足以把兩個畫面分成兩件事。
  *
- * 只做黑場，不做花俏的推移：這是每一次操作都會看到的東西，越安靜越好。
+ * 只淡到一張素紙色，不做花俏的推移：這是每一次操作都會看到的東西，越安靜越好。
+ * （像素時代淡到黑；手繪是攤在桌上的手札，淡到紙色才像翻頁，而不是關燈。）
  */
 import Phaser from 'phaser';
 
 /** 一次轉場的長度。再長就開始擋路了——這是玩家一場會看幾十次的東西。 */
 export const FADE_MS = 220;
 
+/** 轉場淡到的紙色（#e6dcc4）。 */
+const PAPER_R = 0xe6;
+const PAPER_G = 0xdc;
+const PAPER_B = 0xc4;
+
 /** 進場的淡入。每個 create() 開頭呼叫一次。 */
 export function fadeIn(scene: Phaser.Scene): void {
-  scene.cameras.main.fadeIn(FADE_MS, 0, 0, 0);
+  scene.cameras.main.fadeIn(FADE_MS, PAPER_R, PAPER_G, PAPER_B);
 }
 
 /**
@@ -26,7 +32,7 @@ export function fadeIn(scene: Phaser.Scene): void {
 export function fadeToScene(scene: Phaser.Scene, key: string, data?: object): void {
   const camera = scene.cameras.main;
   if (camera.fadeEffect.isRunning) return;
-  camera.fadeOut(FADE_MS, 0, 0, 0);
+  camera.fadeOut(FADE_MS, PAPER_R, PAPER_G, PAPER_B);
   camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
     // **一定要傳一個物件，即使是空的。**
     //

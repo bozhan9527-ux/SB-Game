@@ -165,7 +165,7 @@ export class ResultScene extends Phaser.Scene {
         title,
         textStyle({ size: 64, color: titleColor, bold: true }),
       )
-      .setStroke("#0b0f14", 10)
+      .setStroke("#f5eddb", 10)
       .setOrigin(0.5);
 
     this.add
@@ -176,7 +176,7 @@ export class ResultScene extends Phaser.Scene {
         textStyle({ size: 22, color: INK_DIM }),
       )
       // 結算頁的副標題會疊在明月前面，沒有描邊的話月亮那一段字讀不出來。
-      .setStroke("#0b0f14", 6)
+      .setStroke("#f5eddb", 6)
       .setOrigin(0.5)
       .setAlign("center");
 
@@ -526,7 +526,7 @@ export class ResultScene extends Phaser.Scene {
       this.add
         .text(cx, top + 42, "奇　遇", textStyle({ size: 34, color: GOLD, bold: true }))
         .setOrigin(0.5)
-        .setStroke("#0b0f14", 6),
+        .setStroke("#f5eddb", 6),
     );
     add(
       this.add
@@ -704,7 +704,7 @@ export class ResultScene extends Phaser.Scene {
           GAME_HEIGHT / 2,
           GAME_WIDTH,
           GAME_HEIGHT,
-          0x0b0f14,
+          0xe6dcc4,
           0.985,
         )
         .setInteractive(),

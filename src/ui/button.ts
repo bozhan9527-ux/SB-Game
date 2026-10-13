@@ -7,18 +7,17 @@ import {
   BG_PANEL_ALT,
   EDGE,
   GOLD,
-  GOLD_LO,
   INK,
   INK_DIM,
   JADE,
   LACQUER,
   MIN_TOUCH_SIZE,
-  WOOD,
+  TALISMAN,
   fitText,
   hexToNumber,
-  shade,
   textStyle,
 } from './theme';
+import { roughLine, roughRect } from './sketch';
 import { burstPixels } from './effects';
 
 export interface ButtonOptions {
@@ -51,41 +50,44 @@ export function createButton(
   const width = Math.max(MIN_TOUCH_SIZE, options.width);
   const height = Math.max(MIN_TOUCH_SIZE, options.height);
 
-  // 材質：主要按鈕是朱漆配亮金邊，一般按鈕是漆木配暗金邊。
-  // 呼叫端原本用「金底深字」表示主要按鈕、「玉底深字」表示可以出發——
-  // 在新材質下金底改成朱漆、玉底改成青玉漆，字一律淺色，對比才夠。
+  // 材質：主要按鈕是一張黃符（朱框），可以出發的是青玉色紙，一般按鈕是木牌色的紙片。
+  // 呼叫端原本用「金底」表示主要按鈕、「玉底」表示可以出發——沿用同一個約定，
+  // 字一律是墨色：紙面上淺色字讀不出來。
   const requestedFill = options.fillColor ?? BG_PANEL_ALT;
   const primary = requestedFill === hexToNumber(GOLD);
   const jade = requestedFill === hexToNumber(JADE);
-  const fill = primary ? LACQUER : jade ? 0x2f8a6a : requestedFill === BG_PANEL_ALT ? WOOD : requestedFill;
-  const rim = primary || options.strokeColor === hexToNumber(GOLD) ? hexToNumber(GOLD) : jade ? 0x9cf0c0 : GOLD_LO;
-  const darkText = options.textColor !== undefined && /^#[0-2]/.test(options.textColor);
-  const textColor = darkText ? (primary ? '#fff6e0' : '#f2fff6') : (options.textColor ?? INK);
+  const fill = primary ? TALISMAN : jade ? 0xbfe3c8 : requestedFill === BG_PANEL_ALT ? 0xe8d6b4 : requestedFill;
+  const rim = primary ? LACQUER : jade ? JADE_LINE : options.strokeColor === hexToNumber(GOLD) ? LACQUER : null;
+  // 呼叫端傳來的字色是為深底設計的：深色字（#0…#2…）照用，淺色字一律換成墨色。
+  const darkText = options.textColor !== undefined && /^#[0-4]/.test(options.textColor);
+  const textColor = darkText ? options.textColor! : options.textColor === undefined ? INK : readableOnPaper(options.textColor);
 
-  // 像素按鈕：實心投影＋深色描邊＋金邊＋上亮下暗的斜角，看起來是「凸出來可以按」的。
-  const shadow = scene.add.rectangle(4, 4, width, height, 0x000000, 0.45);
-  const background = scene.add.rectangle(0, 0, width, height, fill).setStrokeStyle(3, EDGE);
-  const rimLine = scene.add.rectangle(0, 0, width - 6, height - 6, 0x000000, 0).setStrokeStyle(2, rim);
-  const bevelLight = scene.add
-    .rectangle(-width / 2 + 5, -height / 2 + 5, width - 10, 3, shade(fill, 0.28), 1)
-    .setOrigin(0, 0);
-  const bevelDark = scene.add
-    .rectangle(-width / 2 + 5, height / 2 - 8, width - 10, 3, shade(fill, -0.4), 1)
-    .setOrigin(0, 0);
+  // 紙片按鈕：投影 + 紙 + 墨框（+ 朱框）。按下時紙片沉到投影上。
+  const seed = Math.round(width * 13 + height * 7 + x + y);
+  const shadow = scene.add.graphics();
+  roughRect(shadow, -width / 2 + 3, -height / 2 + 4, width, height, { fill: EDGE, fillAlpha: 0.22, stroke: null, seed });
+  const face = scene.add.graphics();
+  roughRect(face, -width / 2, -height / 2, width, height, { fill, stroke: EDGE, width: 2.4, seed });
+  if (rim !== null) {
+    roughRect(face, -width / 2 + 5, -height / 2 + 5, width - 10, height - 10, { stroke: rim, width: 1.4, strokeAlpha: 0.85, double: false, amp: 0.6, seed: seed + 3 });
+  }
+  if (primary && width >= 120) {
+    // 符頭：左右兩道短朱線
+    roughLine(face, -width / 2 + 12, -height / 2 + 10, -width / 2 + 12, height / 2 - 10, { stroke: LACQUER, width: 1.2, seed });
+    roughLine(face, width / 2 - 12, -height / 2 + 10, width / 2 - 12, height / 2 - 10, { stroke: LACQUER, width: 1.2, seed: seed + 1 });
+  }
+  // 互動熱區：看不見的矩形（Graphics 沒有點擊範圍）。
+  const background = scene.add.rectangle(0, 0, width, height, 0xffffff, 0.001);
 
   const text = scene.add
     .text(0, 0, options.label, textStyle({ size: options.fontSize ?? 26, color: textColor }))
-    .setOrigin(0.5)
-    // 一格硬投影：字壓在有斜角的漆面上也讀得清楚
-    .setShadow(2, 2, 'rgba(0,0,0,0.55)', 0);
+    .setOrigin(0.5);
 
-  const children: Phaser.GameObjects.GameObject[] = [shadow, background, rimLine, bevelLight, bevelDark, text];
+  const children: Phaser.GameObjects.GameObject[] = [shadow, face, background, text];
 
   const hasIcon = options.icon !== undefined && scene.textures.exists(options.icon);
-  // 圖示是 32 點見方的像素畫，顯示尺寸往上取到 16 的倍數：縮成 22 點的話，
-  // 最近點取樣會整排整排地丟格子，圖示看起來會缺角。
-  const requested = options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.15);
-  const iconSize = hasIcon ? Math.max(16, Math.ceil(requested / 16) * 16) : 0;
+  const requested = options.iconSize ?? Math.round((options.fontSize ?? 26) * 1.2);
+  const iconSize = hasIcon ? requested : 0;
   const gap = 10;
 
   /**
@@ -128,12 +130,12 @@ export function createButton(
 
   let enabled = true;
   let pressed = false;
-  // 按下是「往投影的方向沉兩點」，不是縮小：縮放會讓像素格變得一格大一格小。
+  // 按下是「紙片往投影的方向沉下去」。
   const press = (down: boolean): void => {
     if (pressed === down) return;
     pressed = down;
     const shift = down ? 3 : -3;
-    for (const child of [background, rimLine, bevelLight, bevelDark, text, ...(icon === null ? [] : [icon])]) {
+    for (const child of [face, text, ...(icon === null ? [] : [icon])]) {
       (child as Phaser.GameObjects.Components.Transform).x += shift;
       (child as Phaser.GameObjects.Components.Transform).y += shift;
     }
@@ -150,7 +152,7 @@ export function createButton(
     if (!enabled) return;
     audio.play('ui');
     const bounds = container.getBounds();
-    burstPixels(scene, bounds.centerX, bounds.centerY, GOLD);
+    burstPixels(scene, bounds.centerX, bounds.centerY, primary ? '#c8372d' : '#2a2622');
     options.onClick();
   });
 
@@ -170,4 +172,17 @@ export function createButton(
       return enabled;
     },
   };
+}
+
+const JADE_LINE = 0x2f7a58;
+
+/**
+ * 把為深底設計的淺色字換成紙面上讀得出來的顏色。
+ * 呼叫端傳的多半是 GOLD、JADE、DANGER 這幾個主題色（本身已經是深色）；
+ * 其他淺色一律回到墨色，比猜一個深一點的同色系可靠。
+ */
+function readableOnPaper(color: string): string {
+  const n = hexToNumber(color);
+  const lum = 0.299 * ((n >> 16) & 0xff) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff);
+  return lum < 150 ? color : INK;
 }

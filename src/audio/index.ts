@@ -22,7 +22,7 @@ import {
   rootForRealm,
   scaleNote,
 } from './notes';
-import { renderGong, renderNoise, renderPluck, renderThud } from './synth';
+import { renderCrackle, renderGong, renderNoise, renderPluck, renderSnap, renderThud } from './synth';
 
 export type SfxName =
   | 'ui'
@@ -38,6 +38,25 @@ export type SfxName =
   | 'victory'
   | 'defeat'
   | 'breakthrough';
+
+/**
+ * 攻擊音的音色：每一種符歸到一類，同一類同一種聲音。
+ * 二十種符各配一個聲音的話，玩家記不住；六類聽得出差別，也聽得出「現在是誰在打」。
+ */
+export type AttackVoice = 'blade' | 'thunder' | 'wind' | 'fire' | 'frost' | 'spirit';
+
+export const ATTACK_VOICE: Readonly<Record<string, AttackVoice>> = {
+  sword: 'blade', pierce: 'blade', breaker: 'blade', slayer: 'blade', myriad: 'blade',
+  bolt: 'thunder', tempest: 'thunder',
+  fan: 'wind', gale: 'wind',
+  flame: 'fire', pyre: 'fire',
+  frost: 'frost',
+  soul: 'spirit', abyss: 'spirit', spirit: 'spirit', taiyi: 'spirit', grand: 'spirit', seal: 'spirit', bastion: 'spirit', fortune: 'spirit',
+};
+
+export function attackVoice(cardType: string): AttackVoice {
+  return ATTACK_VOICE[cardType] ?? 'blade';
+}
 
 const MASTER_GAIN = 0.9;
 const MUSIC_GAIN = 0.22;
@@ -235,12 +254,18 @@ class AudioEngine {
           when: now + 0.07,
         });
         break;
+      // 小妖被打散：一團墨散開的「噗」，加一串符紙燒盡的劈啪。
       case 'mob':
-        this.emit(this.buffer('noise-mob', (c) => renderNoise(c, 0.5, 1.1)), this.sfxBus, {
-          gain: 0.42,
-          filter: { from: 2600, to: 420 },
+        this.emit(this.buffer('noise-mob', (c) => renderNoise(c, 0.32, 1.6)), this.sfxBus, {
+          gain: 0.34,
+          filter: { from: 1600, to: 300 },
         });
-        this.emit(this.buffer('thud-mob', (c) => renderThud(c, 140, 48, 0.4)), this.sfxBus, { gain: 0.45 });
+        this.emit(this.buffer('crackle-mob', (c) => renderCrackle(c, 0.3, 120)), this.sfxBus, {
+          gain: 0.14,
+          filter: { from: 2600, to: 1200 },
+          when: now + 0.03,
+        });
+        this.emit(this.buffer('thud-mob', (c) => renderThud(c, 140, 48, 0.3)), this.sfxBus, { gain: 0.38 });
         break;
       // 一般命中。這個聲音一秒會響好幾次，所以刻意做得又短又輕——
       // 它的作用是「有打到」的觸感，不是提示，音量一大就變成噪音。
@@ -264,11 +289,13 @@ class AudioEngine {
         });
         break;
       case 'bossHit':
+        this.emit(this.buffer('snap', (c) => renderSnap(c)), this.sfxBus, { gain: 0.2, rate: 0.7 });
         this.emit(this.buffer('noise-hit', (c) => renderNoise(c, 0.16, 3)), this.sfxBus, {
           gain: 0.22,
           filter: { from: 3200, to: 900 },
           rate: 0.9 + Math.random() * 0.25,
         });
+        this.emit(this.buffer('thud-bosshit', (c) => renderThud(c, 160, 70, 0.14)), this.sfxBus, { gain: 0.22 });
         break;
       case 'bossAttack':
         this.emit(this.buffer('thud-boss', (c) => renderThud(c, 120, 38, 0.6)), this.sfxBus, { gain: 0.75 });
@@ -302,6 +329,48 @@ class AudioEngine {
             { gain: 0.3, when: now + i * 0.1 },
           );
         }
+        break;
+    }
+  }
+
+  /**
+   * 符籙打中的聲音，依符種分六類（見 ATTACK_VOICE）。
+   *
+   * 一秒會響好幾次，所以每一個都又短又輕：它的作用是「有打到」的觸感與「是誰在打」，
+   * 不是提示。每一個都先疊一聲符紙的「啪」，再接那一類自己的聲音。
+   * 音高每次隨機飄一點，連續打同一種符才不會像機關槍。
+   */
+  attack(cardType: string): void {
+    const ctx = this.ctx;
+    if (ctx === null || !this.enabled) return;
+    const now = ctx.currentTime;
+    const drift = 0.92 + Math.random() * 0.16;
+    this.emit(this.buffer('snap', (c) => renderSnap(c)), this.sfxBus, { gain: 0.12, rate: drift, filter: { from: 2400, to: 1600 } });
+    switch (attackVoice(cardType)) {
+      case 'blade':
+        // 出鞘：高頻噪音由低往高一掃，尾巴一點金屬的弦音。
+        this.emit(this.buffer('noise-blade', (c) => renderNoise(c, 0.11, 3)), this.sfxBus, { gain: 0.16, rate: drift, filter: { from: 2200, to: 7200 } });
+        this.emit(this.buffer('pluck-blade', (c) => renderPluck(c, noteFrequency(31), 0.14, 1)), this.sfxBus, { gain: 0.05, rate: drift, when: now + 0.02 });
+        break;
+      case 'thunder':
+        this.emit(this.buffer('crackle-thunder', (c) => renderCrackle(c, 0.22, 260)), this.sfxBus, { gain: 0.2, rate: drift, filter: { from: 3600, to: 1400 } });
+        this.emit(this.buffer('thud-thunder', (c) => renderThud(c, 110, 50, 0.16)), this.sfxBus, { gain: 0.16 });
+        break;
+      case 'wind':
+        this.emit(this.buffer('noise-wind', (c) => renderNoise(c, 0.2, 1.4)), this.sfxBus, { gain: 0.15, rate: drift, filter: { from: 700, to: 2600 } });
+        break;
+      case 'fire':
+        this.emit(this.buffer('noise-fire', (c) => renderNoise(c, 0.2, 2)), this.sfxBus, { gain: 0.16, rate: drift, filter: { from: 1800, to: 380 } });
+        this.emit(this.buffer('crackle-fire', (c) => renderCrackle(c, 0.18, 90)), this.sfxBus, { gain: 0.1, filter: { from: 2200, to: 900 } });
+        break;
+      case 'frost':
+        this.emit(this.buffer('pluck-frost1', (c) => renderPluck(c, noteFrequency(36), 0.18, 1)), this.sfxBus, { gain: 0.08, rate: drift });
+        this.emit(this.buffer('pluck-frost2', (c) => renderPluck(c, noteFrequency(43), 0.14, 1)), this.sfxBus, { gain: 0.06, rate: drift, when: now + 0.035 });
+        break;
+      case 'spirit':
+        // 木魚一樣的悶「篤」，加一點鑼的泛音。
+        this.emit(this.buffer('pluck-spirit', (c) => renderPluck(c, noteFrequency(scaleNote(-5, 4)), 0.16, 0.2)), this.sfxBus, { gain: 0.14, rate: drift });
+        this.emit(this.buffer('gong-spirit', (c) => renderGong(c, 520, 0.3)), this.sfxBus, { gain: 0.05, rate: drift });
         break;
     }
   }

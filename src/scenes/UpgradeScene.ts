@@ -225,12 +225,12 @@ export class UpgradeScene extends Phaser.Scene {
     audio.play('gold');
     this.tweens.killTweensOf(row.flash);
     row.flash.setAlpha(0.28);
-    this.tweens.add({ targets: row.flash, alpha: 0, duration: 420, ease: 'Stepped', easeParams: [4] });
+    this.tweens.add({ targets: row.flash, alpha: 0, duration: 420, ease: 'Quad.easeOut' });
     burstPixels(this, row.buttonX, row.flash.y, GOLD, 8);
     floatLabel(this, row.buttonX, row.flash.y - 30, gain, JADE);
     this.tweens.killTweensOf(row.level);
     row.level.setScale(1.25);
-    this.tweens.add({ targets: row.level, scale: 1, duration: 180, ease: 'Stepped', easeParams: [3] });
+    this.tweens.add({ targets: row.level, scale: 1, duration: 180, ease: 'Quad.easeOut' });
   }
 
   private refresh(): void {

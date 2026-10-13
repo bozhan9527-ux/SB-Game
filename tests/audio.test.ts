@@ -366,3 +366,15 @@ describe('樂句的高點', () => {
     }
   });
 });
+
+describe('攻擊音', () => {
+  it('每一種符都明確歸到一類攻擊音（新增符時別忘了配聲音）', async () => {
+    const { CARDS } = await import('../src/data');
+    const source = await import('../src/audio');
+    // 沒列在表上的符會退回劍聲，所以要檢查的是「表上有沒有它」，不是 attackVoice 回傳什麼。
+    for (const card of CARDS) {
+      expect([card.id, card.id in source.ATTACK_VOICE]).toEqual([card.id, true]);
+    }
+    expect(new Set(CARDS.map((card) => source.attackVoice(card.id))).size).toBe(6);
+  });
+});

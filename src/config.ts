@@ -10,8 +10,24 @@
 export const GAME_WIDTH = 540;
 export const GAME_HEIGHT = 960;
 
+/**
+ * 算圖倍率：畫布實際是 1080×1920，每個場景的主攝影機放大兩倍看 540×960 的邏輯座標。
+ *
+ * 手繪線條與手寫字在手機上會被放大二到三倍；畫布只有 540 寬的話，
+ * 瀏覽器把它拉大時線和字都會糊掉。像素畫時代用最近點放大不怕糊，手繪不行。
+ * 邏輯座標一律不變（GAME_WIDTH、GAME_HEIGHT），只有指標位置要用 worldX/worldY。
+ */
+export const RENDER_SCALE = devRenderScale() ?? 2;
+
+/** 開發用：`?renderScale=1` 以一倍算圖（無 GPU 的自動化截圖環境用軟體算圖，兩倍太慢）。 */
+function devRenderScale(): number | null {
+  if (!import.meta.env?.DEV) return null;
+  const value = Number(new URLSearchParams(globalThis.location?.search ?? '').get('renderScale'));
+  return value === 1 || value === 2 ? value : null;
+}
+
 /** 背景色，與 index.html 的 body 背景一致，避免 letterbox 邊條看起來像破圖。 */
-export const BACKGROUND_COLOR = '#0f1328';
+export const BACKGROUND_COLOR = '#d9ccb0';
 
 /** TECH_SPEC 第 6 節：目標裝置最小支援 360×640 CSS px。 */
 export const MIN_SUPPORTED_WIDTH = 360;

@@ -73,7 +73,7 @@ export function createSlider(
   };
 
   const pick = (pointer: Phaser.Input.Pointer): void => {
-    const localX = pointer.x - container.x - trackLeft;
+    const localX = pointer.worldX - container.x - trackLeft;
     value = clamp01(localX / trackWidth);
     render();
     options.onChange(value);

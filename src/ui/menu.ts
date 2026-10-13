@@ -43,7 +43,7 @@ export function openMenu(scene: Phaser.Scene, entries: readonly MenuEntry[]): vo
   const width = GAME_WIDTH - 80;
 
   const veil = scene.add
-    .rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.78)
+    .rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0xe6dcc4, 0.82)
     .setInteractive();
   const root = scene.add.container(0, 0, [veil]).setDepth(200);
   // 點空白處關閉是手機上最自然的退出方式，但關閉鍵仍然要有——

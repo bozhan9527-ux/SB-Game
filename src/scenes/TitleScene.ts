@@ -67,13 +67,13 @@ export class TitleScene extends Phaser.Scene {
 
     this.buildTopBar(save);
 
-    // 招牌字：霞鶩文楷點陣化的書法金字（title-logo.png），沒有那張圖時退回點陣字。
+    // 招牌：木框紅底的金字匾額（title-logo，含「仙俠」朱印），沒有那張圖時退回手寫字加朱印。
     if (this.textures.exists(ART.titleLogo)) {
-      this.add.image(cx, 118, ART.titleLogo).setScale(2);
+      this.add.image(cx, 120, ART.titleLogo).setDisplaySize(450, 150);
     } else {
       addLogo(this, cx, 110, 60);
+      addSeal(this, cx + 222, 136);
     }
-    addSeal(this, cx + 222, 136);
     // 副標題只留在開場動畫：這裡寫的話會壓到仙宮的塔尖。
     // 中間那一大塊留給主視覺：仙山、明月、御劍的主角。資訊面板壓到下半部。
     const infoBottom = this.buildIdentity(452, save, realm, sect);
@@ -150,34 +150,28 @@ export class TitleScene extends Phaser.Scene {
    * 靜態的一張圖撐不起「入口」，會動的那幾樣才是讓人停下來看的理由。
    */
   private buildKeyArt(): void {
-    this.add.image(0, 0, ART.titleKey).setOrigin(0, 0).setScale(2).setDepth(-100);
+    this.add.image(0, 0, ART.titleKey).setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(-100);
 
-    // 祥雲：白、半透明，從左往右飄，在仙山前面
-    for (const [y, scale, alpha, duration] of [[300, 4, 0.16, 52000], [372, 2, 0.2, 38000]] as const) {
-      const cloud = this.add.image(-160, y, ART.cloud).setScale(scale).setAlpha(alpha).setDepth(-90);
+    // 祥雲：半透明，從左往右飄，在仙山前面
+    for (const [y, width, alpha, duration] of [[300, 260, 0.45, 52000], [372, 150, 0.55, 38000]] as const) {
+      const cloud = this.add.image(-160, y, ART.cloud).setAlpha(alpha).setDepth(-90);
+      cloud.setDisplaySize(width, (width * cloud.height) / cloud.width);
       this.tweens.add({ targets: cloud, x: GAME_WIDTH + 160, duration, delay: Phaser.Math.Between(0, 9000), repeat: -1 });
     }
 
-    // 御劍的主角：劍與人一起浮動，劍光往後拖
-    const hero = this.add.container(392, 336).setDepth(-80);
-    const sword = this.add.image(0, 0, ART.titleSword).setScale(2).setOrigin(0.5, 1);
-    const body = this.add.image(-22, -10, ART.titleHero).setScale(2).setOrigin(0.5, 1);
-    const trail = this.add.graphics();
-    trail.fillStyle(0xd8e8ff, 0.5);
-    for (let i = 0; i < 18; i += 1) {
-      if (i % 2 === 0) trail.fillRect(60 + i * 6, -12, 6, 2);
-    }
-    trail.fillStyle(0xffffff, 0.75);
-    trail.fillRect(60, -12, 34, 2);
-    hero.add([trail, sword, body]);
-    this.tweens.add({ targets: hero, y: 326, duration: 1400, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+    // 御劍的主角：人站在劍上，一起浮動；劍氣畫在劍的貼圖裡。
+    const hero = this.add.container(176, 430).setDepth(-80);
+    const sword = this.add.image(0, 0, ART.titleSword).setDisplaySize(220, 60);
+    const body = this.add.image(-6, 4, ART.titleHero).setDisplaySize(200, 150).setOrigin(0.5, 132 / 150);
+    hero.add([sword, body]);
+    this.tweens.add({ targets: hero, y: 418, duration: 1400, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
     // 仙鶴：兩幀拍翅，從右往左飛過月前，飛出畫面再從右邊回來
     if (!this.anims.exists('title-crane')) {
-      this.anims.create({ key: 'title-crane', frames: [{ key: ART.titleCrane0 }, { key: ART.titleCrane1 }], frameRate: 4, repeat: -1 });
+      this.anims.create({ key: 'title-crane', frames: [{ key: ART.titleCrane0 }, { key: ART.titleCrane1 }], frameRate: 3, repeat: -1 });
     }
-    [[0, 238], [26, 230], [48, 244]].forEach(([dx, y], index) => {
-      const crane = this.add.sprite(GAME_WIDTH + 40 + (dx ?? 0), y ?? 240, ART.titleCrane0).setScale(2).setDepth(-85);
+    [[0, 250], [40, 236], [76, 258]].forEach(([dx, y], index) => {
+      const crane = this.add.sprite(GAME_WIDTH + 40 + (dx ?? 0), y ?? 240, ART.titleCrane0).setDisplaySize(index === 1 ? 54 : 72, index === 1 ? 36 : 48).setDepth(-85);
       crane.play('title-crane');
       crane.anims.setProgress(index * 0.4);
       this.tweens.add({ targets: crane, x: -60 + (dx ?? 0), duration: 26000, delay: 2000, repeat: -1, repeatDelay: 6000 });
@@ -324,12 +318,13 @@ export class TitleScene extends Phaser.Scene {
     this.add
       .rectangle(x, y, cell - 6, cell - 6, BG_PANEL_ALT, 0.9)
       .setStrokeStyle(3, hexToNumber(sect.color));
-    // 原寸、只裁頭與上半身：格子只有 44 點，整個人縮進去會掉格子變形。
-    // 只裁頭與上半身：格子只有 44 點。
+    // 只裁頭與上半身：格子只有 44 點，整個人縮進去就看不出是誰。
+    // 裁切範圍是貼圖像素（門人貼圖 160×224，頭在上方三分之一）。
     this.add
       .image(x, y, discipleTexture(sect.art, 0, 0))
-      .setCrop(0, 0, 32, 34)
-      .setOrigin(0.5, 17 / 44);
+      .setCrop(24, 16, 112, 116)
+      .setScale(0.37)
+      .setOrigin(0.5, (16 + 58) / 224);
     x += cell / 2 + 13;
 
     // 一條細線分開「我是誰」和「我帶什麼」——五個等距的方格會讓人以為是同一類東西。
@@ -340,7 +335,7 @@ export class TitleScene extends Phaser.Scene {
       this.add
         .rectangle(x, y, cell - 8, cell - 8, BG_PANEL_ALT, 0.9)
         .setStrokeStyle(3, hexToNumber(def.color));
-      this.add.image(x, y, glyphTexture(def.art));
+      this.add.image(x, y, glyphTexture(def.art)).setDisplaySize(32, 40);
       x += cell;
     });
 

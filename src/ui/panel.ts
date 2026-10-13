@@ -1,32 +1,24 @@
 /**
- * 像素面板：漆木外框、金線、四角祥雲角飾，內底是半透明深色漆。
+ * 面板：一張攤在宣紙上的紙片——淡淡的投影、紙色底、手抖的墨線框，
+ * 裡面再一圈細朱線（朱絲欄的框），重要的面板四角多兩道朱砂角線。
  *
  * 所有主要面板共用這一個畫法，不各自用 rectangle + setStrokeStyle 拼——
- * 各拼各的結果是框線粗細、透明度到處不一樣，像素畫一眼就看得出不齊。
+ * 各拼各的結果是框線粗細、透明度到處不一樣，手繪畫面一眼就看得出不齊。
+ *
+ * 名字沿用 pixelPanel／drawPanelFrame：呼叫的地方很多，改名只會製造一大片無關的 diff。
  */
 import Phaser from 'phaser';
-import { BG_PANEL, EDGE, GOLD, GOLD_LO, WOOD, WOOD_HI, WOOD_LO, hexToNumber, shade } from './theme';
+import { BG_PANEL, EDGE, GOLD, LACQUER, hexToNumber } from './theme';
+import { hatchRect, roughLine, roughRect } from './sketch';
 
 export interface PixelPanelOptions {
-  /** 金線顏色，預設是暗金；重要的面板可以給亮金或境界色。 */
+  /** 內框線顏色，預設是淡朱；重要的面板給 GOLD_ACCENT，會改成較深的朱線加角線。 */
   accent?: number;
   fill?: number;
   alpha?: number;
-  /** 四角祥雲角飾。小面板關掉比較乾淨。 */
+  /** 四角的朱砂角線。小面板關掉比較乾淨。 */
   corners?: boolean;
 }
-
-/** 祥雲角飾：一格 = 3 點。G 是金、H 是亮金。左上角的樣子，其他三角鏡射。 */
-const CORNER = [
-  'GGGGGG.',
-  'GHHHHG.',
-  'GH..GGG',
-  'GH.G..G',
-  'GHG.GGG',
-  'GG..G..',
-  '..GGG..',
-];
-const CELL = 3;
 
 export function drawPanelFrame(
   g: Phaser.GameObjects.Graphics,
@@ -36,42 +28,39 @@ export function drawPanelFrame(
 ): void {
   const hw = width / 2;
   const hh = height / 2;
-  const accent = options.accent ?? GOLD_LO;
+  const important = options.accent === GOLD_ACCENT;
   const fill = options.fill ?? BG_PANEL;
+  const alpha = options.alpha ?? 0.96;
+  const seed = Math.round(width * 7 + height * 3);
 
-  // 內底，上緣一條亮帶讓面板有厚度
-  g.fillStyle(fill, options.alpha ?? 0.94);
-  g.fillRect(-hw, -hh, width, height);
-  g.fillStyle(shade(fill, 0.08), options.alpha ?? 0.94);
-  g.fillRect(-hw + 12, -hh + 12, width - 24, 3);
+  // 投影：往右下錯開一點的淡墨
+  roughRect(g, -hw + 4, -hh + 5, width, height, { fill: EDGE, fillAlpha: 0.12 * alpha, stroke: null, seed });
+  // 紙
+  roughRect(g, -hw, -hh, width, height, { fill, fillAlpha: alpha, stroke: null, seed });
+  // 紙紋：很淡的斜排線
+  hatchRect(g, -hw + 4, -hh + 4, width - 8, height - 8, 0xb8a888, { gap: 9, alpha: 0.12 * alpha, width: 1, seed });
+  // 墨框
+  roughRect(g, -hw, -hh, width, height, { stroke: EDGE, width: 2.6, seed });
+  // 朱絲欄內框
+  if (width >= 80 && height >= 60) {
+    const inset = 7;
+    roughRect(g, -hw + inset, -hh + inset, width - inset * 2, height - inset * 2, {
+      stroke: options.accent !== undefined && !important ? options.accent : LACQUER,
+      strokeAlpha: important ? 0.75 : 0.35,
+      width: important ? 1.6 : 1.1,
+      double: false,
+      amp: 0.6,
+      seed: seed + 1,
+    });
+  }
 
-  // 漆木框：外描邊 → 木（上左亮、下右暗）→ 金線
-  const band = (inset: number, size: number, top: number, bottom: number): void => {
-    g.fillStyle(top, 1);
-    g.fillRect(-hw + inset, -hh + inset, width - inset * 2, size);
-    g.fillRect(-hw + inset, -hh + inset, size, height - inset * 2);
-    g.fillStyle(bottom, 1);
-    g.fillRect(-hw + inset, hh - inset - size, width - inset * 2, size);
-    g.fillRect(hw - inset - size, -hh + inset, size, height - inset * 2);
-  };
-  band(0, 3, EDGE, EDGE);
-  band(3, 3, WOOD_HI, WOOD_LO);
-  band(6, 3, WOOD, WOOD_LO);
-  band(9, 2, shade(accent, 0.25), shade(accent, -0.3));
-
-  if (options.corners !== false && width >= 120 && height >= 80) {
-    const gold = hexToNumber(GOLD);
-    const light = 0xfff1b0;
-    for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]] as const) {
-      const ox = sx > 0 ? -hw : hw - CELL;
-      const oy = sy > 0 ? -hh : hh - CELL;
-      CORNER.forEach((row, j) => {
-        [...row].forEach((ch, i) => {
-          if (ch === '.') return;
-          g.fillStyle(ch === 'H' ? light : gold, 1);
-          g.fillRect(ox + sx * i * CELL, oy + sy * j * CELL, CELL, CELL);
-        });
-      });
+  if (options.corners !== false && important && width >= 120 && height >= 80) {
+    const len = 16;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      const cx = sx * (hw - 3);
+      const cy = sy * (hh - 3);
+      roughLine(g, cx, cy, cx - sx * len, cy, { stroke: LACQUER, width: 3, seed: seed + sx * 3 + sy });
+      roughLine(g, cx, cy, cx, cy - sy * len, { stroke: LACQUER, width: 3, seed: seed + sx * 5 + sy * 7 });
     }
   }
 }
@@ -89,5 +78,5 @@ export function pixelPanel(
   return scene.add.container(cx, cy, [g]);
 }
 
-/** 亮金線的面板：結算、突破這類「重要」的面板用。 */
+/** 「重要」的面板（結算、突破）：深一點的朱線加四角角線。 */
 export const GOLD_ACCENT = hexToNumber(GOLD);

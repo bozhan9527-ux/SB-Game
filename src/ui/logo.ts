@@ -1,8 +1,7 @@
 /**
- * 招牌字：金色由亮到暗的三段漸層、深色粗描邊、往下的實心影。
+ * 招牌字：濃墨寫在紙上，外圈一道紙色留白，右下錯開一層淡朱——像蓋在墨字底下的印泥。
  *
- * 開場與主畫面共用。漸層切成硬邊的三段而不是平滑過渡——
- * 平滑漸層放在點陣字上會糊成一團，三段色帶才像像素畫裡上色的方式。
+ * 開場與主畫面共用。名字沿用 applyGoldFace（呼叫的地方不必改）。
  */
 import Phaser from 'phaser';
 import { GOLD, textStyle } from './theme';
@@ -10,16 +9,13 @@ import { GOLD, textStyle } from './theme';
 export function applyGoldFace(text: Phaser.GameObjects.Text): Phaser.GameObjects.Text {
   const height = text.height;
   const gradient = text.context.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, '#fff3b8');
-  gradient.addColorStop(0.42, '#fff3b8');
-  gradient.addColorStop(0.42, GOLD);
-  gradient.addColorStop(0.7, GOLD);
-  gradient.addColorStop(0.7, '#c4862e');
-  gradient.addColorStop(1, '#c4862e');
+  gradient.addColorStop(0, '#3a2a22');
+  gradient.addColorStop(1, '#1a1410');
+  const size = text.style.fontSize ? parseInt(String(text.style.fontSize), 10) : 60;
   return text
     .setFill(gradient)
-    .setStroke('#2a0c0a', Math.max(6, Math.round(text.style.fontSize ? parseInt(String(text.style.fontSize), 10) / 9 : 8)))
-    .setShadow(0, 6, '#1a0606', 0, true, true);
+    .setStroke('#f5eddb', Math.max(6, Math.round(size / 9)))
+    .setShadow(Math.round(size / 22), Math.round(size / 18), 'rgba(200,55,45,0.45)', 0, false, true);
 }
 
 /** 一整行招牌字（主畫面用）。 */
@@ -33,7 +29,7 @@ export function addSeal(scene: Phaser.Scene, x: number, y: number, label = '仙�
   const chars = [...label];
   const size = 18;
   const h = chars.length * (size + 2) + 12;
-  const box = scene.add.rectangle(0, 0, size + 14, h, 0xb3302a).setStrokeStyle(3, 0x6e1a18);
+  const box = scene.add.rectangle(0, 0, size + 14, h, 0xc8372d).setStrokeStyle(2, 0x8a2018);
   const parts: Phaser.GameObjects.GameObject[] = [box];
   chars.forEach((char, i) => {
     parts.push(

@@ -251,7 +251,7 @@ export class TalismanScene extends Phaser.Scene {
         .rectangle(0, 0, TILE_W, CHOSEN_H, BG_PANEL, 0.92)
         .setStrokeStyle(3, LINE)
         .setInteractive({ useHandCursor: true });
-      const glyph = this.add.image(0, -8, glyphTexture('sword'));
+      const glyph = this.add.image(0, -8, glyphTexture('sword')).setDisplaySize(32, 40);
       const name = this.add.text(0, 22, '', textStyle({ size: 13, color: INK })).setOrigin(0.5);
       const container = this.add.container(x, CHOSEN_Y, [background, glyph, name]);
       container.setData('glyph', glyph);
@@ -293,11 +293,11 @@ export class TalismanScene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       // 圖騰放大成格子的主體。二十張符靠名字分辨要一個一個讀，
       // 靠形狀是掃過去就認得——而這一頁的工作正是「比較」。
-      // 每張符的顏色也上到圖騰上，讓同一系的符在視覺上先聚成一群。
+      // 圖騰本身已經上了彩鉛，同一系的符顏色相近，掃過去先聚成一群。
       const glyph = this.add
         .image(x, y - 10, glyphTexture(def.art))
+        .setDisplaySize(32, 40)
         .setAlpha(unlocked ? 1 : 0.22);
-      if (unlocked) glyph.setTint(hexToNumber(def.color));
       const name = this.add
         .text(x, y + 24, def.name, textStyle({ size: 14, color: unlocked ? def.color : INK_DIM }))
         .setOrigin(0.5);

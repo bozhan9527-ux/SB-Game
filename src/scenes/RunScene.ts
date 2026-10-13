@@ -92,15 +92,16 @@ import {
   INK,
   INK_DIM,
   JADE,
+  LACQUER,
   LINE,
-  WOOD,
-  WOOD_HI,
   fitText,
   formatNumber,
   wrapText,
   hexToNumber,
+  paperInk,
   textStyle,
 } from "../ui/theme";
+import { roughLine } from "../ui/sketch";
 import type { RunEntryData, RunResultData } from "./types";
 import type { ScoreLoadout } from "../net/protocol";
 import { fadeIn, fadeToScene } from "../ui/transition";
@@ -213,8 +214,10 @@ const CURSE_COLOR = "#7adf8a";
 
 /** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
 const FREEZE_BOSS_HIT_MS = 28;
+/** 受擊時泛的那一下朱紅（乘色）。 */
+const HIT_TINT = 0xff9a8a;
 /** 首領外圍光暈與火星的顏色。 */
-const BOSS_GLOW = 0xb06aff;
+const BOSS_GLOW = 0x9b3fa8;
 const FREEZE_BOSS_HIT_GAP_MS = 500;
 const FREEZE_BOSS_KILL_MS = 160;
 const FREEZE_MERGE_MS = 24;
@@ -361,6 +364,8 @@ export class RunScene extends Phaser.Scene {
   /** 每隻妖魔累積中的傷害，湊夠一段時間才吐一個數字。 */
   private pendingDamage = new Map<number, { total: number; since: number }>();
   private lastHitSoundAt = 0;
+  /** 同一幀有好幾種符打中時，輪到誰發聲（見 applyReport）。 */
+  private hitSoundTurn = 0;
   private lastFreezeAt = -9999;
   /** 固定時步的累積器與已跑格數。見 update() 與 src/systems/replay.ts。 */
   private stepAccum = 0;
@@ -574,11 +579,11 @@ export class RunScene extends Phaser.Scene {
 
   private ensureSparkTexture(): void {
     if (this.textures.exists("spark")) return;
-    // 一個 3×3 的實心方塊：火花、彈道、魔焰都用它，畫面上全是方的，才和像素畫同一個世界。
+    // 一顆圓墨點：火花、彈道、魔焰都用它。
     const g = this.make.graphics({ x: 0, y: 0 });
     g.fillStyle(0xffffff, 1);
-    g.fillRect(0, 0, 3, 3);
-    g.generateTexture("spark", 3, 3);
+    g.fillCircle(2, 2, 2);
+    g.generateTexture("spark", 4, 4);
     g.destroy();
   }
 
@@ -607,12 +612,12 @@ export class RunScene extends Phaser.Scene {
 
     // 山門：朱欄橫跨整個畫面、兩側角樓、中央匾額，底下一段石階通到手牌托盤。
     // 妖魔碰到朱欄就算攻進來；欄下那一條細光是結界，顏色跟著耐久變（見 refreshGateDamage）。
-    // 貼圖的朱欄上緣在第 36 列（半解析），放大兩倍後要對齊 GATE_Y。
+    // 牌坊貼圖 540×148 點，朱欄上緣在第 72 點，要對齊 GATE_Y。
     if (this.textures.exists(ART.gate)) {
       this.add
         .image(GAME_WIDTH / 2, GATE_Y - 72, ART.gate)
         .setOrigin(0.5, 0)
-        .setScale(2)
+        .setDisplaySize(GAME_WIDTH, 148)
         .setDepth(27);
     } else {
       this.add.image(GAME_WIDTH / 2, GATE_Y + 6, ART.gateBeam).setScale(3).setDepth(27);
@@ -699,7 +704,7 @@ export class RunScene extends Phaser.Scene {
         textStyle({ size: 26, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
-      .setStroke("#0b0f14", 7)
+      .setStroke("#f5eddb", 7)
       .setDepth(46)
       .setAlpha(0);
   }
@@ -716,18 +721,12 @@ export class RunScene extends Phaser.Scene {
    * 而原本那裡放的是「放棄」：被打斷時唯一能按的鍵是放棄整場，這是設計上的失誤。
    */
   private buildHud(accentHex: string): void {
-    // 頂列：深色漆底，底緣一道漆木＋金線收邊，和手牌托盤是同一套材質。
+    // 頂列：一條紙帶，底緣一道墨線加一道淡朱線收邊，和手牌托盤是同一張紙。
     const hud = this.add.graphics().setDepth(50);
     hud.fillStyle(BG_PANEL, 1);
-    hud.fillRect(0, 0, GAME_WIDTH, 110);
-    hud.fillStyle(WOOD_HI, 1);
-    hud.fillRect(0, 110, GAME_WIDTH, 2);
-    hud.fillStyle(WOOD, 1);
-    hud.fillRect(0, 112, GAME_WIDTH, 2);
-    hud.fillStyle(hexToNumber(GOLD), 1);
-    hud.fillRect(0, 114, GAME_WIDTH, 1);
-    hud.fillStyle(EDGE, 1);
-    hud.fillRect(0, 115, GAME_WIDTH, 2);
+    hud.fillRect(0, 0, GAME_WIDTH, 112);
+    roughLine(hud, 0, 112, GAME_WIDTH, 112, { stroke: EDGE, width: 2.6, double: true, seed: 11 });
+    roughLine(hud, 0, 117, GAME_WIDTH, 117, { stroke: LACQUER, width: 1.2, strokeAlpha: 0.6, seed: 12 });
 
     this.add
       .text(
@@ -845,7 +844,7 @@ export class RunScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     // 這層要吃掉輸入，否則點在暫停畫面的空白處會穿透到底下的陣位。
     const veil = this.add
-      .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
+      .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xe6dcc4, 0.8)
       .setInteractive();
     const panel = pixelPanel(this, cx, GAME_HEIGHT / 2, GAME_WIDTH - 96, 320, {
       accent: hexToNumber(GOLD),
@@ -950,11 +949,11 @@ export class RunScene extends Phaser.Scene {
             x + 34,
             y - 41,
             "",
-            textStyle({ size: 13, color: GOLD }),
+            textStyle({ size: 13, color: "#fbeedd" }),
           )
           .setOrigin(1, 0.5)
           .setDepth(30)
-          .setBackgroundColor("#12141c")
+          .setBackgroundColor("#2f7a58")
           .setPadding(4, 1, 4, 1)
           .setVisible(false),
       );
@@ -965,12 +964,12 @@ export class RunScene extends Phaser.Scene {
         this.add
           .container(x, y, [
             this.add
-              .rectangle(0, 0, CARD_WIDTH * 0.82, CARD_HEIGHT * 0.82, 0x24103a, 0.72)
+              .rectangle(0, 0, CARD_WIDTH * 0.82, CARD_HEIGHT * 0.82, 0x6a4a8a, 0.55)
               .setStrokeStyle(3, hexToNumber(SEAL_COLOR)),
             this.add
               .text(0, 0, "封", textStyle({ size: 30, color: SEAL_COLOR, bold: true }))
               .setOrigin(0.5)
-              .setStroke("#0b0f14", 6),
+              .setStroke("#f5eddb", 6),
           ])
           .setDepth(29)
           .setVisible(false),
@@ -981,12 +980,12 @@ export class RunScene extends Phaser.Scene {
         this.add
           .container(x, y, [
             this.add
-              .rectangle(0, 0, CARD_WIDTH * 0.82, CARD_HEIGHT * 0.82, 0x0e2a14, 0.45)
+              .rectangle(0, 0, CARD_WIDTH * 0.82, CARD_HEIGHT * 0.82, 0x3a7a4a, 0.3)
               .setStrokeStyle(3, hexToNumber(CURSE_COLOR)),
             this.add
               .text(CARD_WIDTH * 0.26, -CARD_HEIGHT * 0.26, "蝕", textStyle({ size: 20, color: CURSE_COLOR, bold: true }))
               .setOrigin(0.5)
-              .setStroke("#0b0f14", 5),
+              .setStroke("#f5eddb", 5),
           ])
           .setDepth(29)
           .setVisible(false),
@@ -1056,7 +1055,7 @@ export class RunScene extends Phaser.Scene {
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
       if (this.drag === null) return;
-      this.dragView.container.setPosition(pointer.x, pointer.y - 44);
+      this.dragView.container.setPosition(pointer.worldX, pointer.worldY - 44);
       this.showDropPreview(pointer);
     });
     this.input.on("pointerup", (pointer: Phaser.Input.Pointer) =>
@@ -1095,8 +1094,8 @@ export class RunScene extends Phaser.Scene {
     this.dragView.refresh(card);
     this.dragView.container.setVisible(true);
     const pointer = this.input.activePointer;
-    this.dragFrom = { x: pointer.x, y: pointer.y };
-    this.dragView.container.setPosition(pointer.x, pointer.y - 44);
+    this.dragFrom = { x: pointer.worldX, y: pointer.worldY };
+    this.dragView.container.setPosition(pointer.worldX, pointer.worldY - 44);
     this.discardZone.setVisible(source.where === "hand");
     this.showMergeHints(card, source);
     this.refreshCards();
@@ -1227,10 +1226,10 @@ export class RunScene extends Phaser.Scene {
     if (source === null || label === undefined) return;
     const card = this.cardAt(source);
     // 棄符優先，和 endDrag 走同一條規則——預覽說的和放手做的必須是同一件事。
-    const discarding = source.where === "hand" && pointer.y > DISCARD_Y;
+    const discarding = source.where === "hand" && pointer.worldY > DISCARD_Y;
     const target = discarding
       ? null
-      : this.slotAt(pointer.x, pointer.y, card);
+      : this.slotAt(pointer.worldX, pointer.worldY, card);
 
     // 先把所有格位還原成一般的合成提示，再單獨標出這一格。
     if (card !== null) this.showMergeHints(card, source);
@@ -1240,7 +1239,7 @@ export class RunScene extends Phaser.Scene {
         .setVisible(discarding)
         .setText(discarding ? "棄符" : "")
         .setColor(DANGER);
-      label.setPosition(pointer.x, pointer.y - 108);
+      label.setPosition(pointer.worldX, pointer.worldY - 108);
       return;
     }
 
@@ -1295,7 +1294,7 @@ export class RunScene extends Phaser.Scene {
       if (this.selected === null) return;
       const chosen = this.selected;
       this.clearSelection();
-      if (chosen.where === "hand" && pointer.y > DISCARD_Y && !this.over) {
+      if (chosen.where === "hand" && pointer.worldY > DISCARD_Y && !this.over) {
         if (discardHand(this.run, chosen.index)) {
           this.record({ kind: "discard", index: chosen.index });
           audio.play("gateTrap");
@@ -1308,8 +1307,8 @@ export class RunScene extends Phaser.Scene {
 
     // 手指幾乎沒動＝這是一次點擊，不是拖曳。改走兩段式，讓玩家看清楚再決定落點。
     const moved = Math.hypot(
-      pointer.x - this.dragFrom.x,
-      pointer.y - this.dragFrom.y,
+      pointer.worldX - this.dragFrom.x,
+      pointer.worldY - this.dragFrom.y,
     );
     if (moved < TAP_SLOP && !this.over) {
       this.select(source);
@@ -1322,13 +1321,13 @@ export class RunScene extends Phaser.Scene {
     if (this.over) return;
 
     // 棄符先判：棄符區在磁吸半徑之內，先問磁吸的話它永遠吸回手牌那一格。
-    if (source.where === "hand" && pointer.y > DISCARD_Y) {
+    if (source.where === "hand" && pointer.worldY > DISCARD_Y) {
       if (discardHand(this.run, source.index)) {
         this.record({ kind: "discard", index: source.index });
         audio.play("gateTrap");
       }
     } else {
-      const target = this.slotAt(pointer.x, pointer.y, this.cardAt(source));
+      const target = this.slotAt(pointer.worldX, pointer.worldY, this.cardAt(source));
       if (target !== null) this.applyDrop(source, target);
     }
 
@@ -1409,8 +1408,7 @@ export class RunScene extends Phaser.Scene {
       scale: 3.4,
       alpha: 0,
       duration: 320,
-      ease: "Stepped",
-      easeParams: [5],
+      ease: "Sine.easeInOut",
       onComplete: () => ring.destroy(),
     });
     this.burst(x, y, GOLD, 14, 1.2);
@@ -1839,17 +1837,20 @@ export class RunScene extends Phaser.Scene {
     // 靈光只是演出：傷害在 tickCombat 已經結算完，這裡畫的是「剛剛打到誰」。
     let drawn = 0;
     const hitThisFrame = new Set<number>();
+    const hitTypes = new Set<string>();
     for (const shot of report.shots) {
       const view = this.enemySprites.get(shot.enemyId);
       const slot = this.fieldViews[shot.slot];
       if (view === undefined || slot === undefined) continue;
+      const firing = this.run.field[shot.slot];
+      if (firing !== null && firing !== undefined) hitTypes.add(firing.type);
       // 命中要有反應。原本只畫一條彈道，妖魔身上什麼都沒發生——
       // 玩家看不出「有沒有打到」，打擊感就是這樣掉的。
       // 一幀之內同一隻只閃一次，密集開火時才不會抖成一團。
       if (!hitThisFrame.has(shot.enemyId)) {
         hitThisFrame.add(shot.enemyId);
         this.flashEnemy(view, shot.killed);
-        this.burst(view.x, view.y - 18, "#fff2bf", 4, 0.6);
+        this.burst(view.x, view.y - 18, "#2a2622", 4, 0.6);
         // 打在首領身上的每一下都是這一場的重點，給它重量。
         if (
           view.getData("boss") === true &&
@@ -1871,9 +1872,14 @@ export class RunScene extends Phaser.Scene {
       drawn += 1;
     }
     // 命中音一秒可能響幾十次，節流成最多每 90ms 一次，而且只在真的有打到時才響。
+    // 聲音依符種而異（劍、雷、風、火、冰、靈）：這一幀打中的符輪流發聲，
+    // 不然場上全是劍陣符時，偶爾一張天雷符的聲音永遠輪不到。
     if (hitThisFrame.size > 0 && this.time.now - this.lastHitSoundAt > 90) {
       this.lastHitSoundAt = this.time.now;
-      audio.play("hit");
+      const types = hitTypes.size > 0 ? [...hitTypes] : [];
+      const type = types[this.hitSoundTurn++ % Math.max(1, types.length)];
+      if (type !== undefined) audio.attack(type);
+      else audio.play("hit");
     }
     this.flushDamageNumbers();
 
@@ -2101,8 +2107,7 @@ export class RunScene extends Phaser.Scene {
       targets: g,
       alpha: 0,
       duration: 260,
-      ease: "Stepped",
-      easeParams: [3],
+      ease: "Sine.easeInOut",
       onComplete: () => g.destroy(),
     });
   }
@@ -2159,13 +2164,13 @@ export class RunScene extends Phaser.Scene {
       const size = bossArtSize(enemy.bossArt);
       const bossW = size.w * size.scale;
       const bossH = size.h * size.scale;
-      const aura = this.add.circle(0, 0, Math.max(bossW, bossH) * 0.42, hexToNumber(DANGER), 0.16);
+      const aura = this.add.circle(0, 0, Math.max(bossW, bossH) * 0.42, hexToNumber(DANGER), 0.07);
       const body = this.add
         .sprite(0, 0, bossTexture(enemy.bossArt, 0))
         .setDisplaySize(bossW, bossH);
       body.play(bossIdleKey(enemy.bossArt));
       // 首領發光：只有 WebGL 有 preFX，Canvas 後備時就是沒有光暈，其他照常。
-      const glow = body.preFX?.addGlow(BOSS_GLOW, 3, 0, false, 0.1, 12);
+      const glow = body.preFX?.addGlow(BOSS_GLOW, 1, 0, false, 0.1, 8);
       if (glow !== undefined) container.setData("glow", glow);
       // 護體罡氣：一圈金色方框，護盾越薄越淡。沒有它，玩家只會覺得「怎麼打不動」。
       const shieldRing = this.add
@@ -2176,10 +2181,9 @@ export class RunScene extends Phaser.Scene {
       if (glow !== undefined) {
         this.tweens.add({
           targets: glow,
-          outerStrength: 6,
+          outerStrength: 3,
           duration: 900,
-          ease: "Stepped",
-          easeParams: [4],
+          ease: "Sine.easeInOut",
           yoyo: true,
           repeat: -1,
         });
@@ -2194,17 +2198,17 @@ export class RunScene extends Phaser.Scene {
         alpha: { start: 0.9, end: 0 },
         tint: [BOSS_GLOW, 0xffd6ff, hexToNumber(GOLD)],
         frequency: 90,
-        blendMode: Phaser.BlendModes.ADD,
+        blendMode: Phaser.BlendModes.NORMAL,
       });
       // 浮動放在外面這一層：受擊時會停掉 body 自己的補間來做後退，
       // 浮動要是也掛在 body 上，被打一下就不動了。
-      // 受擊用的白色覆蓋層：首領有 150px，整隻換成純白剪影一秒閃兩次太刺眼，
-      // 也把造型細節整個吃掉。疊一層半透明的白，同一支動畫同時開始，幀永遠對得上。
+      // 受擊用的朱紅覆蓋層：首領有 150px，整隻換成剪影一秒閃兩次太刺眼，
+      // 也把造型細節整個吃掉。疊一層半透明的朱紅，同一支動畫同時開始，幀永遠對得上。
       const flashCopy = this.add
         .sprite(0, 0, bossTexture(enemy.bossArt, 0))
         .setDisplaySize(bossW, bossH)
-        .setTintFill(0xffffff)
-        .setAlpha(0.55)
+        .setTintFill(0xc8372d)
+        .setAlpha(0.2)
         .setVisible(false);
       flashCopy.play(bossIdleKey(enemy.bossArt));
       container.setData("flashCopy", flashCopy);
@@ -2217,14 +2221,13 @@ export class RunScene extends Phaser.Scene {
         scale: 1,
         alpha: 1,
         duration: 420,
-        ease: "Stepped",
-        easeParams: [6],
+        ease: "Sine.easeInOut",
       });
       container.setData("body", body);
       container.setData("boss", true);
       this.tweens.add({
         targets: aura,
-        alpha: 0.3,
+        alpha: 0.14,
         duration: 900,
         yoyo: true,
         repeat: -1,
@@ -2233,8 +2236,7 @@ export class RunScene extends Phaser.Scene {
         targets: hover,
         y: -6,
         duration: 1000,
-        ease: "Stepped",
-        easeParams: [4],
+        ease: "Sine.easeInOut",
         yoyo: true,
         repeat: -1,
       });
@@ -2267,7 +2269,7 @@ export class RunScene extends Phaser.Scene {
       ? -56
       : Math.round(-0.6 * art.h * art.scale + art.top * art.scale - 8);
     if (!enemy.boss) {
-      const barBg = this.add.rectangle(0, barY, 46, 6, 0x000000, 0.7).setStrokeStyle(3, EDGE);
+      const barBg = this.add.rectangle(0, barY, 46, 6, 0xf5eddb, 0.9).setStrokeStyle(2, EDGE);
       // 會回血的血條用綠色：血條自己慢慢變長時，玩家要一眼看得出那是回血，不是看錯。
       const bar = this.add
         .rectangle(-23, barY, 46, 6, enemy.trait === "regen" ? 0x5fd068 : 0xd8434f, 1)
@@ -2288,7 +2290,7 @@ export class RunScene extends Phaser.Scene {
           textStyle({ size: 15, color: mark.color, bold: true }),
         )
         .setOrigin(0, 0.5)
-        .setStroke("#0b0f14", 5);
+        .setStroke("#f5eddb", 5);
       container.add(label);
       container.setData("mark", label);
     }
@@ -2371,7 +2373,7 @@ export class RunScene extends Phaser.Scene {
         textStyle({ size: 26, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
-      .setStroke("#0b0f14", 6);
+      .setStroke("#f5eddb", 6);
     const bg = this.add
       .rectangle(cx, 160 + shift, width, 22, 0x2a1216, 1)
       .setStrokeStyle(3, LINE);
@@ -2386,7 +2388,7 @@ export class RunScene extends Phaser.Scene {
     const skillTag = this.add
       .text(cx + name.width / 2 + 10, 128 + shift, `〔${boss.skillName}〕`, textStyle({ size: 15, color: GOLD, bold: true }))
       .setOrigin(0, 0.5)
-      .setStroke("#0b0f14", 5);
+      .setStroke("#f5eddb", 5);
     this.bossSkillTag = skillTag;
     this.bossShieldBar = this.add
       .rectangle(cx - width / 2, 160 + shift, 0, 18, hexToNumber(GOLD), 0.85)
@@ -2438,7 +2440,7 @@ export class RunScene extends Phaser.Scene {
     if (gap >= 90) {
       const bands = [-1, 1].map((side) =>
         this.add
-          .rectangle(cx, centerY + side * gap, GAME_WIDTH, 0, 0x0b0f14, 0.86)
+          .rectangle(cx, centerY + side * gap, GAME_WIDTH, 0, 0x2a2622, 0.82)
           .setDepth(47),
       );
       this.tweens.add({
@@ -2460,7 +2462,7 @@ export class RunScene extends Phaser.Scene {
         textStyle({ size: 44, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
-      .setStroke("#0b0f14", 8)
+      .setStroke("#f5eddb", 8)
       .setDepth(48)
       .setScale(1.6)
       .setAlpha(0);
@@ -2529,12 +2531,11 @@ export class RunScene extends Phaser.Scene {
       card === null || card === undefined
         ? INK
         : (CARDS.find((c) => c.id === card.type)?.color ?? INK);
-    // 外層是符色的光暈、內層是調亮的芯，後面再拖一小段尾巴：
-    // 加法混色疊起來，中心最亮、邊緣帶色，就是「發光」。
+    // 外層是符色的淡彩、芯是壓深的符色、最前端一點墨：
+    // 在紙上像一筆彩鉛畫過去，一眼看得出是哪一種符打的。
     const angle = Math.atan2(toY - fromY, toX - fromX) + Math.PI / 2;
-    const tint = hexToNumber(color);
-    // 芯用符色本身、外層光暈也是符色：淺色的符調亮之後幾乎是純白，
-    // 一條白棍在深色底上看起來像飛來飛去的木頭，認不出是哪一張符打的。
+    const tint = hexToNumber(paperInk(color));
+    const wash = hexToNumber(color);
     const duration = Phaser.Math.Clamp(
       Phaser.Math.Distance.Between(fromX, fromY, toX, toY) * 0.5,
       90,
@@ -2542,9 +2543,9 @@ export class RunScene extends Phaser.Scene {
     );
     const parts: [number, number, number, number, number][] = [
       // 寬, 高, 顏色, 透明度, 延遲
-      [12, 27, tint, 0.5, 0],
+      [10, 27, wash, 0.6, 0],
       [3, 21, tint, 1, 0],
-      [3, 6, 0xffffff, 0.9, 0],
+      [3, 6, EDGE, 0.9, 0],
       [3, 9, tint, 0.7, 30],
       [3, 6, tint, 0.4, 60],
     ];
@@ -2554,7 +2555,7 @@ export class RunScene extends Phaser.Scene {
         .setDisplaySize(w, h)
         .setTint(c)
         .setAlpha(a)
-        .setBlendMode(Phaser.BlendModes.ADD)
+        .setBlendMode(Phaser.BlendModes.NORMAL)
         .setRotation(angle)
         .setDepth(30);
       this.tweens.add({
@@ -2609,7 +2610,8 @@ export class RunScene extends Phaser.Scene {
     if (body === undefined) return;
     const flashCopy = view.getData("flashCopy") as Phaser.GameObjects.Sprite | undefined;
     if (flashCopy !== undefined) flashCopy.setVisible(true);
-    else body.setTintFill(0xffffff);
+    // 紙面上白閃看起來像整隻被擦掉：改成泛一下朱紅（乘色，線條還在）。
+    else body.setTint(HIT_TINT);
     // 熄燈交給 syncEnemies 按時間關，不綁在位移的 tween 上：
     // 位移要 150ms 才走完，白閃只該亮 45ms，綁在一起就變成一團白。
     view.setData("tintUntil", now + FLASH_MS);
@@ -2641,7 +2643,8 @@ export class RunScene extends Phaser.Scene {
     const body = view.getData("body") as EnemyBody | undefined;
     if (body !== undefined) {
       this.tweens.killTweensOf(body);
-      body.setTintFill(0xffffff);
+      // 倒下時褪成淡墨，像被符力化掉。
+      body.setTint(0x9a8a78);
     }
     this.tweens.add({
       targets: view,
@@ -2650,8 +2653,7 @@ export class RunScene extends Phaser.Scene {
       angle: boss ? 0 : 20,
       alpha: 0,
       duration: boss ? 460 : 230,
-      ease: "Stepped",
-      easeParams: [boss ? 6 : 3],
+      ease: "Quad.easeIn",
       onComplete: () => view.destroy(),
     });
   }
@@ -2707,8 +2709,8 @@ export class RunScene extends Phaser.Scene {
   }
 
   /**
-   * 倒下時碎成一把方塊：往上噴開、再被重力拉下來。
-   * 原本是一團往外飛的光點，看起來像被打散的煙；方塊有重量，才像「碎了」。
+   * 倒下時濺成一把墨點與紙屑：往上噴開、再被重力拉下來。
+   * 有重量的往下掉，才像「被打散了」，而不是化成一團煙。
    */
   private crumble(x: number, y: number, count: number, boss: boolean): void {
     const emitter = this.add.particles(x, y - 20, "spark", {
@@ -2719,8 +2721,8 @@ export class RunScene extends Phaser.Scene {
       scale: { start: boss ? 2.2 : 1.6, end: 1 },
       alpha: { start: 1, end: 0 },
       tint: boss
-        ? [hexToNumber(GOLD), BOSS_GLOW, 0xffffff]
-        : [hexToNumber(DANGER), 0x9aa0c4, 0xece6d2],
+        ? [hexToNumber(GOLD), BOSS_GLOW, EDGE]
+        : [hexToNumber(DANGER), EDGE, 0x8a7a64],
       emitting: false,
     });
     emitter.setDepth(45);
@@ -2735,7 +2737,7 @@ export class RunScene extends Phaser.Scene {
       scale: { start: 1.4 * size, end: 0.3 * size },
       alpha: { start: 0.9, end: 0 },
       tint: hexToNumber(color),
-      blendMode: Phaser.BlendModes.ADD,
+      blendMode: Phaser.BlendModes.NORMAL,
       emitting: false,
     });
     emitter.setDepth(45);
@@ -2762,7 +2764,7 @@ export class RunScene extends Phaser.Scene {
     const label = this.add
       .text(x, y, text, textStyle({ size, color, bold: true }))
       .setOrigin(0.5)
-      .setStroke("#0b0f14", 6)
+      .setStroke("#f5eddb", 6)
       .setDepth(depth);
     this.tweens.add({
       targets: label,
@@ -2937,8 +2939,7 @@ export class RunScene extends Phaser.Scene {
       alpha: 0,
       delay: holdMs,
       duration: 300,
-      ease: "Stepped",
-      easeParams: [3],
+      ease: "Sine.easeInOut",
     });
   }
 
@@ -2969,12 +2970,12 @@ export class RunScene extends Phaser.Scene {
     const title = this.add
       .text(GAME_WIDTH / 2, titleY, realmTitle(this.run.stage), textStyle({ size: 48, color: accentHex, bold: true }))
       .setOrigin(0.5)
-      .setStroke("#0b0f14", 8)
+      .setStroke("#f5eddb", 8)
       .setDepth(80);
     const sub = this.add
       .text(GAME_WIDTH / 2, subY, realm.subtitle, textStyle({ size: 20, color: INK_DIM }))
       .setOrigin(0.5)
-      .setStroke("#0b0f14", 6)
+      .setStroke("#f5eddb", 6)
       .setDepth(80);
     const parts: Phaser.GameObjects.GameObject[] = [title, sub];
     if (!roomForTitle) {
@@ -2988,7 +2989,7 @@ export class RunScene extends Phaser.Scene {
         this.add
           .text(GAME_WIDTH / 2, bottom - 12, "把符拖到陣位；同種同階疊起來可以合成", textStyle({ size: 20, color: INK }))
           .setOrigin(0.5)
-          .setStroke("#0b0f14", 6)
+          .setStroke("#f5eddb", 6)
           .setDepth(80),
       );
     } else {
