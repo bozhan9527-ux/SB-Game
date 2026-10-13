@@ -82,13 +82,15 @@ export function jitter(pts, amp, step = 14) {
 let uid = 0;
 
 export class Pic {
-  constructor(w, h, { lineScale = 1 } = {}) {
+  constructor(w, h, { lineScale = 1, vivid = false } = {}) {
     this.w = w;
     this.h = h;
     this.defs = [];
     this.out = [];
     /** 線寬倍率：小圖（圖示、遠景小人）線要細一點，不然糊成一團。 */
     this.ls = lineScale;
+    /** 角色用：彩鉛底色塗得比較飽，在紙上才不會灰灰髒髒的（場景與紙面維持淡彩）。 */
+    this.vivid = vivid;
     this.filters = new Map();
   }
   /** 鉛筆顆粒濾鏡，範圍限定在 (x0,y0)–(x1,y1)。同一個範圍共用一個濾鏡。 */
@@ -139,8 +141,11 @@ export class Pic {
     const x0 = Math.min(...xs) - 6, x1 = Math.max(...xs) + 6, y0 = Math.min(...ys) - 6, y1 = Math.max(...ys) + 6;
     const L = Math.hypot(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     gap *= this.ls;
+    if (this.vivid && base > 0) base = Math.min(0.9, base * 1.3 + 0.06);
+    // 角色的底色是平塗（不過顆粒濾鏡），排線才帶顆粒：底色過濾鏡會被打成一片雜點，看起來髒。
+    if (this.vivid && base > 0) this.add(`<path d="${d}" fill="${color}" opacity="${base}"/>`);
     let g = `<g clip-path="url(#${id})" ${this.grainOf(pts)}>`;
-    if (base > 0) g += `<path d="${d}" fill="${color}" opacity="${base}"/>`;
+    if (base > 0 && !this.vivid) g += `<path d="${d}" fill="${color}" opacity="${base}"/>`;
     const lines = (ang, op2) => {
       const ca = Math.cos(ang), sa = Math.sin(ang);
       for (let s = -L / 2; s < L / 2; s += gap * (0.8 + R() * 0.5)) {
@@ -226,6 +231,11 @@ ${paper ? '<rect width="100%" height="100%" filter="url(#paperN)" opacity=".55"/
 // ---------- 常用部件 ----------
 
 /** 沿中線畫成飄帶（披帛、尾巴、劍穗）。 */
+/** 腳下的影子：一抹淡墨橢圓，角色才是站在地上而不是貼在紙上。 */
+export function groundShadow(p, x, y, rx, ry = 5) {
+  p.wash(ellipsePts(x, y, rx, ry, 16, 0.04), '#5a4a3a', 0.22);
+}
+
 export function ribbon(p, center, w, color, opt = {}) {
   const L = [], Rr = [];
   center.forEach(([x, y], i) => {
@@ -237,7 +247,7 @@ export function ribbon(p, center, w, color, opt = {}) {
   });
   const poly = L.concat(Rr);
   p.hatch(poly, color, { gap: 2.6, base: opt.base ?? 0.4, op: 0.8 });
-  p.ink(poly.concat([poly[0]]), { w: opt.ow ?? 1.8, amp: 0.3 });
+  if ((opt.ow ?? 1.8) > 0) p.ink(poly.concat([poly[0]]), { w: opt.ow ?? 1.8, amp: 0.3, passes: opt.passes ?? 2 });
   return poly;
 }
 

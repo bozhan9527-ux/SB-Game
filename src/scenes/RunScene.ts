@@ -214,9 +214,11 @@ const CURSE_COLOR = "#7adf8a";
 
 /** 凍格：首領受擊與斬殺首領時停住幾毫秒。詳見 freeze()。 */
 const FREEZE_BOSS_HIT_MS = 28;
+/** 首領狂暴後常駐的泛紅（乘色）。 */
+const RAGE_TINT = 0xffb4a4;
 /** 受擊時泛的那一下朱紅（乘色）。 */
 const HIT_TINT = 0xff9a8a;
-/** 首領外圍光暈與火星的顏色。 */
+/** 首領身後魔焰火星的顏色。 */
 const BOSS_GLOW = 0x9b3fa8;
 const FREEZE_BOSS_HIT_GAP_MS = 500;
 const FREEZE_BOSS_KILL_MS = 160;
@@ -2052,9 +2054,11 @@ export class RunScene extends Phaser.Scene {
       this.burst(bossView.x, bossView.y + 40, "#f0c95a", 10, 1);
     }
     if (kind === "rage") {
-      // 狂暴之後光暈轉紅、而且一直紅著：玩家要知道牠現在比剛才危險。
-      const glow = bossView?.getData("glow") as Phaser.FX.Glow | undefined;
-      if (glow !== undefined) glow.color = 0xff3a3a;
+      // 狂暴之後整隻泛紅、而且一直紅著：玩家要知道牠現在比剛才危險。
+      // 記成底色（baseTint），受擊閃過之後回到這個紅，不會被清掉。
+      const body = bossView?.getData("body") as EnemyBody | undefined;
+      bossView?.setData("baseTint", RAGE_TINT);
+      body?.setTint(RAGE_TINT);
     }
   }
 
@@ -2169,25 +2173,14 @@ export class RunScene extends Phaser.Scene {
         .sprite(0, 0, bossTexture(enemy.bossArt, 0))
         .setDisplaySize(bossW, bossH);
       body.play(bossIdleKey(enemy.bossArt));
-      // 首領發光：只有 WebGL 有 preFX，Canvas 後備時就是沒有光暈，其他照常。
-      const glow = body.preFX?.addGlow(BOSS_GLOW, 1, 0, false, 0.1, 8);
-      if (glow !== undefined) container.setData("glow", glow);
+      // 首領不加發光濾鏡：手繪版的首領身後已經畫了一圈自己顏色的氣焰，
+      // 再疊一層 glow 在紙上會變成一大團螢光色，把造型蓋掉。
       // 護體罡氣：一圈金色方框，護盾越薄越淡。沒有它，玩家只會覺得「怎麼打不動」。
       const shieldRing = this.add
         .rectangle(0, 0, bossW * 0.92, bossH * 0.92, 0x000000, 0)
         .setStrokeStyle(4, hexToNumber(GOLD), 1)
         .setVisible(false);
       container.setData("shieldRing", shieldRing);
-      if (glow !== undefined) {
-        this.tweens.add({
-          targets: glow,
-          outerStrength: 3,
-          duration: 900,
-          ease: "Sine.easeInOut",
-          yoyo: true,
-          repeat: -1,
-        });
-      }
       // 魔焰火星：從身後往上飄的小方塊。掛在容器裡，跟著首領走。
       const embers = this.add.particles(0, 20, "spark", {
         x: { min: -56, max: 56 },

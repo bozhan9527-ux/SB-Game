@@ -52,10 +52,14 @@ function stormCloud(p, x, y, s, fill = '#6a6a7a') {
   ruyi(p, x, y, s, fill, { tail: 0, line: '#3a3a46' });
 }
 
+/** 浮島：上緣是長草的緩坡，下緣是垂下來的參差岩根（不是倒三角）。 */
 function floatRock(p, x, y, w, color = '#9a94a8') {
-  const pts = [[x - w / 2, y], [x - w * 0.3, y - 10], [x + w * 0.3, y - 12], [x + w / 2, y], [x + w * 0.2, y + w * 0.4], [x, y + w * 0.6], [x - w * 0.2, y + w * 0.35]];
+  const pts = [[x - w / 2, y], [x - w * 0.32, y - w * 0.1], [x - w * 0.05, y - w * 0.14], [x + w * 0.28, y - w * 0.1], [x + w / 2, y],
+    [x + w * 0.4, y + w * 0.12], [x + w * 0.3, y + w * 0.16], [x + w * 0.18, y + w * 0.32], [x + w * 0.06, y + w * 0.26], [x - w * 0.04, y + w * 0.42],
+    [x - w * 0.14, y + w * 0.24], [x - w * 0.26, y + w * 0.3], [x - w * 0.34, y + w * 0.14]];
   p.shape(pts, color, { gap: 3, base: 0.3, ow: 2, cross: true });
-  p.hatch([[x - w / 2, y], [x - w * 0.3, y - 10], [x + w * 0.3, y - 12], [x + w / 2, y], [x, y + 4]], '#79c09a', { gap: 2.6, base: 0.4 });
+  p.hatch([[x - w / 2, y], [x - w * 0.32, y - w * 0.1], [x - w * 0.05, y - w * 0.14], [x + w * 0.28, y - w * 0.1], [x + w / 2, y], [x, y + w * 0.05]], '#79c09a', { gap: 2.6, base: 0.45 });
+  for (let i = 0; i < 4; i++) p.ink([[x - w * 0.3 + i * w * 0.18, y - w * 0.08], [x - w * 0.31 + i * w * 0.18, y - w * 0.15]], { w: 1.2, color: '#2f8462', passes: 1 });
 }
 
 function star(p, x, y, r, color = '#e8b33c') {
@@ -88,7 +92,7 @@ export function backdrop(realm) {
       for (let i = 0; i < 12; i++) { const a2 = (i / 12) * Math.PI * 2; p.pencil([[400 + Math.cos(a2) * 54, 140 + Math.sin(a2) * 54], [400 + Math.cos(a2) * 70, 140 + Math.sin(a2) * 70]], { color: '#d8a030', w: 1.6, op: 0.6 }); }
       floatRock(p, 120, 200, 90); floatRock(p, 300, 150, 60);
       pagoda(p, 120, 196, 0.6);
-      for (let row = 0; row < 4; row++) for (let i = -1; i < 7; i++) ruyi(p, i * 100 + (row % 2) * 50, 290 + row * 30, 0.9, '#f2e2b0', { tail: 0, ow: 1.8 });
+      for (let row = 0; row < 2; row++) for (let i = -1; i < 7; i++) ruyi(p, i * 110 + (row % 2) * 55, 270 + row * 26, 0.85, '#f2e2b0', { tail: 0, ow: 1.6 });
       break;
     case 'volcano':
       hill(p, -20, 560, 330, 100, { op: 0.35, fill: '#a898a8' });
@@ -141,7 +145,7 @@ export function arena() {
   const road = [[8, 0], [w - 8, 0], [w - 4, h], [4, h]];
   p.add(`<path d="${smooth(road, true)}" fill="#ece3cf" opacity=".85"/>`);
   p.add(`<path d="${smooth(road, true)}" fill="#ddd2ba" opacity=".3"/>`);
-  p.hatch(road, '#b8ad98', { gap: 7, op: 0.18, base: 0, angle: -0.5, w: 1.2 });
+  p.hatch(road, '#b8ad98', { gap: 9, op: 0.1, base: 0, angle: -0.5, w: 1.1 });
   // 石階橫紋與石板縫
   for (let y = 40; y < h; y += 38 + R() * 8) {
     p.pencil([[10, y], [w - 10, y + J(2)]], { w: 1.3, op: 0.45 });
@@ -275,6 +279,63 @@ export const ICON_LIST = Object.keys(icons);
 export function icon(name) {
   const p = new Pic(40, 40);
   icons[name](p);
+  return p;
+}
+
+// ---------- 載入畫面：山門 ----------
+
+/**
+ * 一扇大門（左扇；右扇是鏡射）。270×820：朱漆木板、門框、九排門釘、鋪首銅環。
+ * x 從外緣（0）到門縫（270），銅環靠門縫那一側。
+ */
+export function door() {
+  const w = 270, h = 820;
+  const p = new Pic(w, h, { vivid: true });
+  // 門板
+  p.shape([[4, 0], [w, 0], [w, h], [4, h]], '#b8382c', { gap: 3.2, base: 0.62, sharp: true, ow: 3.4, angle: -1.35 });
+  // 木紋
+  for (let x = 40; x < w; x += 46) p.pencil([[x + J(2), 6], [x + J(3), h - 6]], { w: 1.4, op: 0.45, color: '#5a1a14' });
+  // 內框（上下兩塊裙板）
+  for (const [y0, y1] of [[40, 470], [520, 780]]) {
+    p.shape([[30, y0], [w - 26, y0], [w - 26, y1], [30, y1]], null, { sharp: true, ow: 2, oc: '#5a1a14', passes: 1 });
+  }
+  // 門釘：九排五列
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 5; c++) {
+    const x = 56 + c * 42, y = 70 + r * 46;
+    p.solid(x, y, 7, 7, '#e8b33c', { ow: 1.6 });
+    p.dot(x - 2, y - 2, 1.6, '#fff3c0');
+  }
+  // 鋪首銅環（靠門縫）
+  const kx = w - 56, ky = 470;
+  p.solid(kx, ky, 34, 32, '#d8a030', { ow: 2.6 });
+  for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; p.ink([[kx + Math.cos(a) * 26, ky + Math.sin(a) * 25], [kx + Math.cos(a) * 33, ky + Math.sin(a) * 31]], { w: 1.4, color: '#8a6420', passes: 1 }); }
+  eyes(p, kx, ky - 6, 10, 1.3, 'angry');
+  p.ink([[kx - 9, ky + 10], [kx, ky + 16], [kx + 9, ky + 10]], { w: 2, passes: 1 });
+  p.ink(ellipsePts(kx, ky + 42, 24, 24, 24, 0.02), { w: 5, color: '#8a6420', closed: true });
+  p.ink(ellipsePts(kx, ky + 42, 24, 24, 24, 0.02), { w: 1.6, color: '#f0d070', passes: 1, closed: true });
+  // 門縫那一側的立邊
+  p.shape([[w - 10, 0], [w, 0], [w, h], [w - 10, h]], '#7a2018', { base: 0.7, gap: 2.4, ow: 2, sharp: true });
+  return p;
+}
+
+/** 簡化版的眼睛（鋪首用），避免從 chars 循環匯入。 */
+function eyes(p, x, y, gap, s, style) {
+  for (const k of [-1, 1]) {
+    p.dot(x + k * gap, y, 2.6 * s);
+    if (style === 'angry') p.ink([[x + k * (gap + 6), y - 6], [x + k * (gap - 3), y - 3]], { w: 1.8, passes: 1 });
+  }
+}
+
+/** 門楣：屋簷、橫樑、「山門」金字匾額。540×220。 */
+export function gateLintel() {
+  const p = new Pic(540, 220, { vivid: true });
+  p.shape([[0, 150], [540, 150], [540, 196], [0, 196]], '#8a2a20', { gap: 2.6, base: 0.6, sharp: true, ow: 3 });
+  for (let x = 30; x < 540; x += 60) p.shape([[x - 12, 156], [x + 12, 156], [x + 12, 190], [x - 12, 190]], '#3e6a5a', { base: 0.55, gap: 2.4, ow: 1.6, sharp: true });
+  eaveRoof(p, 270, 150, 470, 74, '#3e4a52');
+  p.shape([[190, 112], [350, 112], [350, 206], [190, 206]], WOOD, { base: 0.75, gap: 2.6, ow: 3, sharp: true });
+  p.shape([[200, 122], [340, 122], [340, 196], [200, 196]], '#7a2a22', { base: 0.8, gap: 2.6, ow: 1.8, sharp: true });
+  p.letter(237, 178, '山', '#f3c84a', { size: 50, fillOp: 0.95, stroke: 4 });
+  p.letter(303, 178, '門', '#f3c84a', { size: 50, fillOp: 0.95, stroke: 4 });
   return p;
 }
 

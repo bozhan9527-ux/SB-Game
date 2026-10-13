@@ -29,12 +29,20 @@ const HOLD_MS = 1950;
 
 export class SplashScene extends Phaser.Scene {
   private done = false;
+  /** 從山門進來時，門要開一陣子：字晚一點才浮上來，整段也多停這麼久（見 BootScene）。 */
+  private gateMs = 0;
 
   constructor() {
     super('Splash');
   }
 
+  init(data: { gateMs?: number }): void {
+    this.done = false;
+    this.gateMs = data.gateMs ?? 0;
+  }
+
   create(): void {
+    const lead = this.gateMs * 0.55;
     const save = state();
     const realm = realmForStage(save.world.stage);
     drawBackdrop(this, realm);
@@ -62,7 +70,7 @@ export class SplashScene extends Phaser.Scene {
         scale: 1,
         duration: 460,
         ease: 'Cubic.easeOut',
-        delay: index * CHAR_STEP,
+        delay: lead + index * CHAR_STEP,
       });
     });
 
@@ -80,7 +88,7 @@ export class SplashScene extends Phaser.Scene {
       alpha: 0.9,
       duration: 460,
       ease: 'Cubic.easeOut',
-      delay: CHARS.length * CHAR_STEP,
+      delay: lead + CHARS.length * CHAR_STEP,
     });
 
     const subtitle = this.add
@@ -92,7 +100,7 @@ export class SplashScene extends Phaser.Scene {
       targets: subtitle,
       alpha: 1,
       duration: 420,
-      delay: CHARS.length * CHAR_STEP + 220,
+      delay: lead + CHARS.length * CHAR_STEP + 220,
     });
 
     const skip = this.add
@@ -100,7 +108,7 @@ export class SplashScene extends Phaser.Scene {
       .setStroke('#f5eddb', 5)
       .setOrigin(0.5)
       .setAlpha(0);
-    this.tweens.add({ targets: skip, alpha: 0.75, duration: 400, delay: 900 });
+    this.tweens.add({ targets: skip, alpha: 0.75, duration: 400, delay: lead + 900 });
 
     // 整個畫面都是跳過鍵。這裡沒有任何別的可按，做成一顆按鈕反而是多一步。
     this.add
@@ -108,7 +116,7 @@ export class SplashScene extends Phaser.Scene {
       .setInteractive()
       .on('pointerdown', () => this.enter());
 
-    this.time.delayedCall(HOLD_MS, () => this.enter());
+    this.time.delayedCall(HOLD_MS + this.gateMs, () => this.enter());
   }
 
   /** 進主畫面。點擊與計時器都會呼叫，所以要擋住第二次。 */

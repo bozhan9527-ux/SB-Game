@@ -160,11 +160,11 @@ export class TitleScene extends Phaser.Scene {
     }
 
     // 御劍的主角：人站在劍上，一起浮動；劍氣畫在劍的貼圖裡。
-    const hero = this.add.container(176, 430).setDepth(-80);
+    const hero = this.add.container(176, 410).setDepth(-80);
     const sword = this.add.image(0, 0, ART.titleSword).setDisplaySize(220, 60);
     const body = this.add.image(-6, 4, ART.titleHero).setDisplaySize(200, 150).setOrigin(0.5, 132 / 150);
     hero.add([sword, body]);
-    this.tweens.add({ targets: hero, y: 418, duration: 1400, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: hero, y: 398, duration: 1400, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
     // 仙鶴：兩幀拍翅，從右往左飛過月前，飛出畫面再從右邊回來
     if (!this.anims.exists('title-crane')) {

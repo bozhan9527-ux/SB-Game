@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Pic, seedRng } from './lib.mjs';
+import { Pic, groundShadow, seedRng } from './lib.mjs';
 import { opaqueTop, rasterize, readImage, writeImage } from './render.mjs';
 import { MOBS, SECTS, disciple } from './chars.mjs';
 import { BOSSES } from './bosses.mjs';
@@ -40,11 +40,12 @@ async function save(name, pic, res, opt = {}) {
 }
 
 /** 一組動畫幀；回傳 manifest 用的尺寸（貼圖像素）與顯示倍數。 */
-async function frames(prefix, w, h, draw, count, res) {
+async function frames(prefix, w, h, draw, count, res, shadow = 0.3) {
   let top = Infinity, size = null;
   for (let f = 0; f < count; f++) {
     seedRng(hash(prefix) * 13 + f * 101);
-    const p = new Pic(w, h);
+    const p = new Pic(w, h, { vivid: true });
+    if (shadow > 0) groundShadow(p, w / 2, h - 6, w * shadow, Math.max(4, w * 0.05));
     draw(p, w / 2, h - 3, f);
     const img = await save(`${prefix}-${f}`, p, res);
     top = Math.min(top, opaqueTop(img));
@@ -60,7 +61,7 @@ manifest.disciple ??= {};
 
 if (only === 'all' || only === 'chars') {
   for (const [art, def] of Object.entries(MOBS)) {
-    manifest.enemy[art] = await frames(`enemy-${art}`, def.w, def.h, def.draw, 4, RES.char);
+    manifest.enemy[art] = await frames(`enemy-${art}`, def.w, def.h, def.draw, 4, RES.char, def.shadow ?? 0.3);
   }
   for (const sect of SECTS) {
     let size = null;
@@ -72,7 +73,7 @@ if (only === 'all' || only === 'chars') {
 
 if (only === 'all' || only === 'bosses') {
   for (const [art, def] of Object.entries(BOSSES)) {
-    manifest.boss[art] = await frames(`boss-${art}`, def.w, def.h, def.draw, 2, RES.boss);
+    manifest.boss[art] = await frames(`boss-${art}`, def.w, def.h, def.draw, 2, RES.boss, def.float ? 0 : 0.26);
   }
   console.log('首領完成');
 }
@@ -111,6 +112,9 @@ if (only === 'all' || only === 'title') {
   await one('title-sword', W.titleSword);
   await one('title-crane-0', () => W.titleCrane(0));
   await one('title-crane-1', () => W.titleCrane(1));
+  // 載入畫面的山門：大門算 1.5 倍（兩扇各佔半個畫面，2 倍太吃記憶體）
+  await one('boot-door', W.door, 1.5);
+  await one('boot-lintel', W.gateLintel);
   console.log('主畫面完成');
 }
 

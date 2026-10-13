@@ -52,7 +52,7 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     frame.clear();
     roughRect(frame, -hw + 3, -hh + 4, CARD_WIDTH, CARD_HEIGHT, { fill: EDGE, fillAlpha: 0.2, stroke: null, seed: 5 });
     roughRect(frame, -hw, -hh, CARD_WIDTH, CARD_HEIGHT, { fill: color, stroke: null, seed: 3 });
-    hatchRect(frame, -hw, -hh, CARD_WIDTH, CARD_HEIGHT, shade(color, -0.35), { gap: 3.2, alpha: 0.5, width: 1.2, seed: 2 });
+    hatchRect(frame, -hw, -hh, CARD_WIDTH, CARD_HEIGHT, shade(color, -0.3), { gap: 3.6, alpha: 0.3, width: 1.1, seed: 2 });
     roughRect(frame, -hw, -hh, CARD_WIDTH, CARD_HEIGHT, { stroke: EDGE, width: 2.4, seed: 3 });
   };
   const paper: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle = scene.textures.exists(ART.cardPaper)

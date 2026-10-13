@@ -373,3 +373,5 @@ for (const v of Object.values(BOSSES)) {
   v.w = W;
   v.h = H;
 }
+// 浮在空中的首領沒有腳下的影子。
+for (const art of ['storm', 'swordsea', 'ghostking']) BOSSES[art].float = true;
