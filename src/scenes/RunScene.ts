@@ -309,6 +309,8 @@ export class RunScene extends Phaser.Scene {
   private curseViews: Phaser.GameObjects.Container[] = [];
   private waveBar!: Phaser.GameObjects.Rectangle;
   private gateBar!: Phaser.GameObjects.Rectangle;
+  /** 山門的牌坊圖：被撞時只有它晃（見 joltGate）。 */
+  private gateImage: Phaser.GameObjects.Image | null = null;
   private bossPanel: Phaser.GameObjects.Container | null = null;
   private bossBar: Phaser.GameObjects.Rectangle | null = null;
   /** 血條上那一截金色：護體罡氣還剩多少。首領走進陣位時會被符牌蓋住，護盾得在這裡也看得到。 */
@@ -616,7 +618,7 @@ export class RunScene extends Phaser.Scene {
     // 妖魔碰到朱欄就算攻進來；欄下那一條細光是結界，顏色跟著耐久變（見 refreshGateDamage）。
     // 牌坊貼圖 540×148 點，朱欄上緣在第 72 點，要對齊 GATE_Y。
     if (this.textures.exists(ART.gate)) {
-      this.add
+      this.gateImage = this.add
         .image(GAME_WIDTH / 2, GATE_Y - 72, ART.gate)
         .setOrigin(0.5, 0)
         .setDisplaySize(GAME_WIDTH, 148)
@@ -1904,9 +1906,8 @@ export class RunScene extends Phaser.Scene {
       if (kill.boss) {
         this.bossPanel?.destroy();
         this.bossPanel = null;
-        // 斬殺首領是一整關的句點，凍格拉長，再補一次鏡頭震動。
+        // 斬殺首領是一整關的句點，凍格拉長。不震鏡頭：見 joltGate。
         this.freeze(FREEZE_BOSS_KILL_MS);
-        this.cameras.main.shake(260, 0.012);
         audio.play("victory");
       } else {
         audio.play("mob");
@@ -1921,7 +1922,7 @@ export class RunScene extends Phaser.Scene {
         view?.destroy();
         this.enemySprites.delete(leak.enemyId);
       }
-      this.cameras.main.shake(leak.boss ? 320 : 200, leak.boss ? 0.016 : 0.01);
+      this.joltGate(leak.boss ? 7 : 4);
       audio.play("bossAttack");
       this.gateBar.setAlpha(1);
       this.tweens.add({ targets: this.gateBar, alpha: 0, duration: 420 });
@@ -2072,7 +2073,6 @@ export class RunScene extends Phaser.Scene {
     if (item.id === "thunder") {
       this.banner("notice", "雷劫！一格被劈封，把好符換出來", "#9fd8ff", 1200);
       audio.play("bossAttack");
-      this.cameras.main.shake(160, 0.006);
       for (const slot of report.sealed) {
         const view = this.sealViews[slot];
         if (view === undefined) continue;
@@ -2482,7 +2482,6 @@ export class RunScene extends Phaser.Scene {
       22,
       900,
     );
-    this.cameras.main.shake(420, 0.011);
     audio.play("bossRoar");
     // 招式與對策等登場演出收完再講：疊在大字上面，兩樣都讀不進去。
     const skill = bossSkill(boss.skill);
@@ -2561,6 +2560,29 @@ export class RunScene extends Phaser.Scene {
         onComplete: () => piece.destroy(),
       });
     }
+  }
+
+  /**
+   * 山門被撞：只晃山門本身，不震鏡頭。
+   *
+   * 原本是整個鏡頭震動，而妖魔撞門是一整場裡最頻繁的事——鏡頭一震，手牌與陣位跟著晃，
+   * 正在拖的符對不準格子（製作人回報「震動嚴重影響出牌」）。
+   * 回饋留在被撞的那個東西上：山門左右晃兩下，加上原本那道紅光與扣耐久的數字。
+   */
+  private joltGate(strength: number): void {
+    const gate = this.gateImage;
+    if (gate === null) return;
+    this.tweens.killTweensOf(gate);
+    gate.x = GAME_WIDTH / 2;
+    this.tweens.add({
+      targets: gate,
+      x: GAME_WIDTH / 2 + strength,
+      duration: 45,
+      yoyo: true,
+      repeat: 2,
+      ease: "Sine.easeInOut",
+      onComplete: () => gate.setX(GAME_WIDTH / 2),
+    });
   }
 
   /**
