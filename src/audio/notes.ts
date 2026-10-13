@@ -2,32 +2,31 @@
  * 音高、和弦進行與樂句。
  *
  * 修仙題材配上五聲音階（宮商角徵羽）最省事也最對味——五聲音階任兩音都不會撞，
- * 隨機取音也不會難聽，很適合這種程式即時生成的配樂。
+ * 很適合這種程式即時生成的配樂。
  *
- * 但「不難聽」和「好聽」之間差的是**結構**。第一版只有一小節八拍在無限重複，
- * 而且低音從頭到尾釘在同一個和弦上——沒有和聲進行，再怎麼調速度與節奏都只是原地打轉。
- * 現在改用流行歌最通用的骨架：四小節一段、四個和弦走一輪、樂句做成 A－A－B－A'。
+ * 2026-10-13 隨手繪改版重新編排：原本是古箏單音旋律配流行和弦，四小節一輪，聽久了像兒歌。
+ * 現在照國樂的編制分四層——
+ * - **洞簫主旋律**：長短音交錯、帶顫音與氣聲，八小節一段、有起承轉合
+ * - **古箏琶音**：根音、五度、八度的空五度分解（古箏的招牌聲響），每拍一顆
+ * - **笙的持續和聲**：根音加五度墊在底下，慢起慢收
+ * - **木魚與碰鈴**：木魚點拍、碰鈴兩小節一響
  */
-
 /** 五聲音階相對於主音的半音數：宮 商 角 徵 羽。 */
 export const PENTATONIC = [0, 2, 4, 7, 9] as const;
 
 /** 一小節八拍（八分音符）。 */
 export const BEATS_PER_BAR = 8;
-/** 一段四小節。這是流行歌最基本的樂句長度，也是重複才不會膩的下限。 */
-export const BARS_PER_PHRASE = 4;
+/** 一段八小節：前四小節陳述、後四小節推到高點再收回主音。 */
+export const BARS_PER_PHRASE = 8;
 
 /**
- * 和弦進行：I – V – vi – IV（相對主音的半音數）。
+ * 和弦進行：I – vi – IV – V – I – vi – ii – V（相對主音的半音數）。
  *
- * 這是流行樂裡用得最兇的一組，理由也很實際：四個和弦都只含大調音階內的音，
- * 而五聲音階（宮商角徵羽 = do re mi so la）落在這四個和弦上沒有一個是避開音——
- * 也就是說旋律可以自由走，不必為了配和弦而挑音。
- *
- * vi 那一小節會帶出一點惆悵，IV 再把它推回來，整段就有了起承轉合，
- * 而不是像第一版那樣八拍一個迴圈原地繞。
+ * 前四小節是最穩的一輪；後四小節把 IV 換成 ii，色彩更幽一點，最後停在 V 上——
+ * 不落地，才會自然接回下一輪的 I。所有和弦音都在大調音階內，
+ * 五聲旋律（do re mi so la）走在上面不會撞。
  */
-export const CHORD_ROOTS = [0, 7, 9, 5] as const;
+export const CHORD_ROOTS = [0, 9, 5, 7, 0, 9, 2, 7] as const;
 
 /** A4 = 440Hz，以半音距離換算頻率。 */
 export function noteFrequency(semitonesFromA4: number): number {
@@ -58,13 +57,13 @@ export function octaveShift(highestSemitone: number, ceiling: number): number {
 }
 
 /**
- * 旋律與點綴的音域上限（相對 A4 的半音數）。
+ * 簫的旋律與古箏琶音的音域上限（相對 A4 的半音數）。
  *
  * 訂在「最高的境界剛好不用折」的位置：正常情況下 octaveShift 永遠回 0，
  * 亮度就純粹由主音決定，越高的境界越亮。這兩個數字是安全網，不是日常會踩到的線。
  */
 export const MELODY_CEILING = 16;
-export const SPARKLE_CEILING = 21;
+export const ARPEGGIO_CEILING = 21;
 
 /** 境界越高，主音越高，配樂自然變得更亮。 */
 export function rootForRealm(realmIndex: number): number {
@@ -72,73 +71,70 @@ export function rootForRealm(realmIndex: number): number {
   return -24 + Math.min(12, Math.floor(realmIndex / 2) * 2);
 }
 
+/** 簫的一個音：音級（五聲音階，5 以上是上一個八度）、從第幾拍起、吹幾拍。 */
+export interface FluteNote {
+  degree: number;
+  at: number;
+  beats: number;
+}
+
 /**
- * 四小節的旋律，音級以五聲音階計（0=宮 1=商 2=角 3=徵 4=羽，5 以上是上一個八度）。
+ * 八小節的簫旋律。每一小節的第一個音都落在當下和弦的和弦音上（旋律和低音是同一件事）。
  *
- * 四小節做成一條**起承轉合的弧線**：
- * 第一節往上鋪、第二節在徵音上盤旋、第三節推到全曲最高、第四節一路級進落回主音收句。
- * 第一版沒有這個形狀，只有八拍在原地轉，所以聽兩輪就膩。
- *
- * 每一小節的第一個音都刻意落在**當下那個和弦的和弦音**上：
- * I 起於宮、V 起於徵、vi 起於羽、IV 起於羽——旋律和低音才是同一件事，不是各走各的。
- *
- * 境界之間會旋轉起點（見 barForRealm），所以只有第 0 個境界是從第一節開始聽。
- * 這不要緊：I–V–vi–IV 從任何一點切進去都是流行樂用了幾十年的進行
- * （V–vi–IV–I、vi–IV–I–V、IV–I–V–vi 各自都是常見組合），每個境界因此有自己的情緒。
+ * 一、二小節往上鋪；三、四小節從八度宮音一路級進回徵音；
+ * 五、六小節推到全曲最高的角音（第 7 級）；七、八小節一路落回宮音收句。
+ * 長音（三、四拍）與短音（一拍）交錯，簫才有「吹」的感覺，不是一顆一顆撥出來。
  */
-const PHRASE: readonly (readonly number[])[] = [
-  [0, 2, 4, 3, 2, 4, 5, 4], // A ：I  ——往上鋪
-  [3, 5, 4, 3, 2, 3, 4, 3], // A ：V  ——同樣的走法，換個落點
-  [4, 3, 2, 4, 5, 7, 5, 4], // B ：vi ——推到全曲最高
-  [4, 2, 3, 2, 0, 2, 1, 0], // A'：IV ——落回主音收句
+const MELODY: readonly (readonly FluteNote[])[] = [
+  [{ degree: 0, at: 0, beats: 2 }, { degree: 1, at: 2, beats: 1 }, { degree: 2, at: 3, beats: 1 }, { degree: 4, at: 4, beats: 4 }],
+  [{ degree: 4, at: 0, beats: 3 }, { degree: 3, at: 3, beats: 1 }, { degree: 2, at: 4, beats: 2 }, { degree: 1, at: 6, beats: 2 }],
+  [{ degree: 5, at: 0, beats: 2 }, { degree: 4, at: 2, beats: 2 }, { degree: 3, at: 4, beats: 2 }, { degree: 4, at: 6, beats: 2 }],
+  [{ degree: 3, at: 0, beats: 4 }, { degree: 2, at: 4, beats: 2 }, { degree: 1, at: 6, beats: 2 }],
+  [{ degree: 2, at: 0, beats: 2 }, { degree: 4, at: 2, beats: 2 }, { degree: 5, at: 4, beats: 2 }, { degree: 7, at: 6, beats: 2 }],
+  [{ degree: 7, at: 0, beats: 3 }, { degree: 6, at: 3, beats: 1 }, { degree: 5, at: 4, beats: 2 }, { degree: 4, at: 6, beats: 2 }],
+  [{ degree: 6, at: 0, beats: 2 }, { degree: 5, at: 2, beats: 2 }, { degree: 4, at: 4, beats: 2 }, { degree: 3, at: 6, beats: 2 }],
+  [{ degree: 1, at: 0, beats: 2 }, { degree: 2, at: 2, beats: 1 }, { degree: 1, at: 3, beats: 1 }, { degree: 0, at: 4, beats: 4 }],
 ];
 
 /**
- * 每一小節哪幾拍出聲。
- *
- * 每一拍都平均落下聽起來像節拍器，不像音樂——留白才有律動。
- * 第三小節（B 句）刻意換一種切分，做出「這裡不一樣」的對比；
- * 第四小節結尾多補一個音，收得乾淨。
+ * 古箏的分解和弦：相對當下和弦根音的半音數，每拍一顆（null 為休止）。
+ * 只用根音、五度、八度——空五度是古箏最有辨識度的聲響，也不會和簫的五聲旋律撞。
+ * 最後一拍空下來，讓小節之間有一口氣。
  */
-const RHYTHM: readonly (readonly boolean[])[] = [
-  [true, false, true, true, false, true, true, false],
-  [true, false, true, true, false, true, true, false],
-  // 第三節換一種切分做對比，而且要讓第 6 拍出聲——全曲最高的那個音在那裡。
-  // 第一版把它排成休止，等於寫了一個高點卻從來沒彈出來。
-  [true, true, false, true, true, true, false, false],
-  [true, false, true, true, false, true, true, true],
-];
+export const ARPEGGIO: readonly (number | null)[] = [0, 7, 12, 7, 12, 19, 12, null];
 
-/** 低音的音級（null 為休止），相對於**當下的和弦根音**。根音與五度交替，走出往前推的步伐。 */
-export const BASS_BEATS: readonly (number | null)[] = [0, null, 3, null, 0, null, 3, null];
+/** 低音（古箏低音弦）在哪幾拍、彈根音還是五度（相對和弦根音的半音數）。 */
+export const BASS_BEATS: readonly (number | null)[] = [0, null, null, null, 7, null, null, null];
 
-/** 鼓點：兩個正拍加一個切分，流行歌最基本的律動。 */
-export const DRUM_BEATS: readonly number[] = [0, 4, 6];
+/** 木魚：兩個正拍加一個切分。音量壓得很低，它是律動不是節拍器。 */
+export const DRUM_BEATS: readonly number[] = [0, 3, 6];
+
+/** 碰鈴幾小節響一次。 */
+export const BELL_EVERY_BARS = 2;
 
 /**
  * 這個境界的第 bar 小節。
  *
- * 境界之間換的是**整段的起點**（旋律與和弦一起轉），不是音高。
- * 一起轉才保得住「每小節的第一個音落在和弦音上」這件事；
- * 而從不同的和弦起頭，同一段聽起來的情緒也真的不一樣——
- * 從 vi 起頭偏惆悵，從 IV 起頭有被托起來的感覺。
+ * 境界之間換的是**整段的起點**（旋律與和弦一起轉，每個境界錯開兩小節），不是音高。
+ * 一起轉才保得住「每小節的第一個音落在和弦音上」；從不同的和弦起頭，
+ * 同一段聽起來的情緒也真的不一樣——從 vi 起頭偏惆悵，從 IV 起頭有被托起來的感覺。
  */
 export function barForRealm(realmIndex: number, bar: number): {
-  degrees: readonly number[];
-  rhythm: readonly boolean[];
+  notes: readonly FluteNote[];
   chordRoot: number;
+  bell: boolean;
 } {
-  const offset = (realmIndex + bar) % BARS_PER_PHRASE;
+  const offset = (realmIndex * 2 + bar) % BARS_PER_PHRASE;
   return {
-    degrees: PHRASE[offset] ?? PHRASE[0] ?? [],
-    rhythm: RHYTHM[offset] ?? RHYTHM[0] ?? [],
+    notes: MELODY[offset] ?? MELODY[0] ?? [],
     chordRoot: CHORD_ROOTS[offset] ?? 0,
+    bell: offset % BELL_EVERY_BARS === 0,
   };
 }
 
-/** 這個境界完整的四小節旋律音級，攤平成一條。測試與音域計算用。 */
+/** 這個境界完整一段的旋律音級，攤平成一條。測試與音域計算用。 */
 export function phraseForRealm(realmIndex: number): number[] {
   const out: number[] = [];
-  for (let bar = 0; bar < BARS_PER_PHRASE; bar += 1) out.push(...barForRealm(realmIndex, bar).degrees);
+  for (let bar = 0; bar < BARS_PER_PHRASE; bar += 1) out.push(...barForRealm(realmIndex, bar).notes.map((note) => note.degree));
   return out;
 }

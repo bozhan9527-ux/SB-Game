@@ -239,10 +239,27 @@ const glyphs = {
   fan: (p, x, y) => { for (const k of [-1, 0, 1]) p.shape([[x + k * 10 - 4, y + 18], [x + k * 13 - 6, y - 4], [x + k * 9, y - 22], [x + k * 13 + 2, y - 4], [x + k * 10 + 2, y + 18]], '#6ac070', { gap: 2, ow: 1.8 }); },
   flame: (p, x, y) => flame(p, x, y, 0.7, '#e8622e', '#e8b33c', 2),
   frost: (p, x, y) => { for (const a of [0, 1.047, 2.094]) { const c = Math.cos(a), s = Math.sin(a), L = 19; p.ink([[x - s * L, y - c * L], [x + s * L, y + c * L]], { w: 2.4, color: '#2f64a8' }); for (const d of [-1, 1]) { const bx = x + s * L * 0.6 * d, by = y + c * L * 0.6 * d, b2 = Math.atan2(-c * d, -s * d); for (const t of [0.7, -0.7]) p.ink([[bx, by], [bx + Math.cos(b2 + t) * 6, by + Math.sin(b2 + t) * 6]], { w: 1.7, color: '#2f64a8', passes: 1 }); } } },
-  pyre: (p, x, y) => { flame(p, x, y - 4, 0.62, '#d8402a', '#f0a040', 2); for (const k of [-1, 1]) p.ink([[x - 14 * k, y + 22], [x + 10 * k, y + 14]], { w: 3, color: WOOD }); },
+  // 焚天：三足火盆上沖起三道細長火舌、火星四濺——和烈焰符（一團圓胖的火）分開。
+  pyre: (p, x, y) => {
+    for (const [dx, h, c] of [[-8, 16, '#d8402a'], [8, 14, '#d8402a'], [0, 22, '#f06a2a']]) {
+      p.shape([[x + dx - 5, y + 8], [x + dx - 4, y - h * 0.4], [x + dx, y - h], [x + dx + 4, y - h * 0.4], [x + dx + 5, y + 8]], c, { gap: 2, base: 0.6, ow: 1.8 });
+    }
+    for (const [dx, dy] of [[-15, -6], [15, -9], [-13, -15], [14, -18]]) p.dot(x + dx, y + dy, 1.6, '#e8622e');
+    p.shape([[x - 15, y + 6], [x + 15, y + 6], [x + 11, y + 15], [x - 11, y + 15]], '#7a5a3a', { gap: 2, base: 0.7, ow: 2, sharp: true });
+    for (const k of [-1, 0, 1]) p.ink([[x + k * 8, y + 15], [x + k * 11, y + 23]], { w: 2.2 });
+  },
   pierce: (p, x, y) => { p.ink([[x - 14, y + 18], [x + 12, y - 16]], { w: 2.6, color: WOOD }); p.shape([[x + 8, y - 12], [x + 18, y - 24], [x + 15, y - 10]], '#a8b8ff', { base: 0.6, ow: 1.8 }); for (const k of [-1, 1]) p.ink([[x - 14, y + 18], [x - 16 + k * 4, y + 10 + k * 4]], { w: 1.8, color: ZHU, passes: 1 }); p.ink(ellipsePts(x, y + 2, 12, 5, 12, 0.05), { w: 1.4, color: GRAPH, passes: 1, closed: true }); },
   fortune: (p, x, y) => { p.solid(x, y, 17, 17, '#f0c040', { ow: 2.2, tint: '#d8a020', op: 0.3 }); p.shape([[x - 5, y - 5], [x + 5, y - 5], [x + 5, y + 5], [x - 5, y + 5]], null, { paint: FU, ow: 1.8, sharp: true }); for (const [dx, dy] of [[0, -11], [0, 11], [-11, 0], [11, 0]]) p.dot(x + dx, y + dy, 1.4, '#8a5a10'); },
-  soul: (p, x, y) => { p.shape([[x, y + 18], [x - 12, y + 6], [x - 10, y - 8], [x - 2, y - 14], [x - 3, y - 24], [x + 7, y - 14], [x + 12, y - 2], [x + 10, y + 10]], '#c86ab0', { gap: 2, base: 0.45, ow: 2 }); p.dot(x - 4, y - 2, 1.8); p.dot(x + 4, y - 2, 1.8); },
+  // 追魂：被鎖鏈勾住的小鬼魂。圓頭、波浪下擺——輪廓刻意和火焰（尖頂）分開，牌面縮小後一眼不會認錯。
+  soul: (p, x, y) => {
+    const g = [[x - 11, y + 18], [x - 13, y + 4], [x - 10, y - 7], [x - 2, y - 12], [x + 6, y - 10], [x + 12, y - 2], [x + 12, y + 18], [x + 8, y + 14], [x + 4, y + 20], [x, y + 14], [x - 4, y + 20], [x - 8, y + 14]];
+    p.shape(g, '#c8b8e8', { gap: 2, base: 0.55, ow: 2 });
+    p.dot(x - 5, y, 2); p.dot(x + 4, y, 2);
+    p.ink([[x - 2, y + 7], [x, y + 9], [x + 2, y + 7]], { w: 1.2, passes: 1 });
+    // 鎖鏈：三個環從右上斜下來，末端一個鉤子勾住鬼魂頭頂
+    for (const [cx, cy] of [[x + 15, y - 20], [x + 11, y - 16.5], [x + 7, y - 13]]) p.ink(ellipsePts(cx, cy, 3, 2, 10, 0.02, 0.75), { w: 1.8, color: '#3a3440', passes: 1, closed: true });
+    p.ink([[x + 5, y - 11], [x + 1, y - 9], [x - 3, y - 11], [x - 3, y - 15]], { w: 2.2, color: '#3a3440', passes: 1 });
+  },
   breaker: (p, x, y) => { p.ink([[x - 4, y + 22], [x + 4, y - 18]], { w: 3, color: WOOD }); p.shape([[x + 2, y - 10], [x + 18, y - 22], [x + 18, y + 2], [x + 4, y - 2]], '#c7d6e0', { gap: 2, ow: 2, sharp: true }); p.ink([[x - 6, y - 14], [x + 14, y - 2]], { w: 1.6, color: ZHU, passes: 1 }); },
   abyss: (p, x, y) => { p.blob(x, y, 17, 17, '#4a3a8a', { base: 0.6, gap: 2, ow: 2 }); p.ink(spiral(x, y, 14, 1.6, 1), { w: 1.8, color: '#e8e0ff', passes: 1 }); },
   spirit: (p, x, y) => { for (const [dx, dy] of [[0, -18], [0, 18], [-18, 0], [18, 0]]) p.ink([[x + dx * 0.55, y + dy * 0.55], [x + dx, y + dy]], { w: 2, color: '#2f8462', passes: 1 }); for (const k of [-1, 1]) p.shape([[x, y + 8], [x + k * 12, y - 2], [x + k * 4, y - 12], [x, y - 4]], '#9fe8d8', { gap: 2, ow: 1.8 }); p.shape([[x, y + 8], [x - 5, y - 6], [x, y - 16], [x + 5, y - 6]], '#79c0a0', { gap: 2, ow: 1.8 }); },

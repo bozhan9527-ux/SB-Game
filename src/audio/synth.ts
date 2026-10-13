@@ -159,3 +159,66 @@ export function renderSnap(ctx: BaseAudioContext, seconds = 0.05): AudioBuffer {
   }
   return buffer;
 }
+
+/**
+ * 洞簫／竹笛：基音加少量泛音，起音帶一點氣聲，拉長之後才加顫音（吹奏者不會一開口就抖）。
+ * 低音域聽起來像簫，高音域像笛，正好讓境界越高、配樂越亮。
+ */
+export function renderFlute(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const attack = 0.08;
+  const release = Math.min(0.3, seconds * 0.4);
+  let phase = 0;
+  let breath = 0;
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const env = Math.min(1, t / attack) * Math.min(1, (seconds - t) / release);
+    // 顫音在 0.25 秒後慢慢加深
+    const vibrato = 1 + 0.006 * Math.min(1, Math.max(0, t - 0.25) / 0.3) * Math.sin(2 * Math.PI * 5.2 * t);
+    phase += (2 * Math.PI * frequency * vibrato) / rate;
+    const tone = Math.sin(phase) + 0.22 * Math.sin(2 * phase) + 0.07 * Math.sin(3 * phase);
+    // 氣聲：低通過的噪音，起音時最明顯
+    breath = breath * 0.9 + (Math.random() * 2 - 1) * 0.1;
+    const air = breath * (0.35 + 0.65 * Math.exp(-t * 8));
+    data[i] = (tone * 0.5 + air * 0.5) * Math.max(0, env);
+  }
+  return buffer;
+}
+
+/** 笙一樣的持續和聲：兩個略微走音的正弦（合起來會慢慢「呼吸」），慢起慢收。 */
+export function renderPad(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const attack = Math.min(0.5, seconds * 0.3);
+  const release = Math.min(0.7, seconds * 0.4);
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const env = Math.min(1, t / attack) * Math.min(1, (seconds - t) / release);
+    const tone =
+      Math.sin(2 * Math.PI * frequency * t) +
+      Math.sin(2 * Math.PI * frequency * 1.004 * t) * 0.8 +
+      Math.sin(2 * Math.PI * frequency * 2 * t) * 0.25;
+    data[i] = tone * 0.3 * Math.max(0, env);
+  }
+  return buffer;
+}
+
+/** 木魚：一聲短促的「篤」——中頻正弦極快衰減，前面一點敲擊的噪音。 */
+export function renderWoodblock(ctx: BaseAudioContext, frequency = 880, seconds = 0.12): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const body = Math.sin(2 * Math.PI * frequency * t) * Math.exp(-t / 0.022);
+    const click = t < 0.003 ? (Math.random() * 2 - 1) * (1 - t / 0.003) : 0;
+    data[i] = body * 0.8 + click * 0.4;
+  }
+  return buffer;
+}

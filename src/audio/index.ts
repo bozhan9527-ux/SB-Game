@@ -8,13 +8,13 @@
  * 整個模組都是靜默的，unlock() 由 main.ts 掛的一次性事件觸發。
  */
 import {
+  ARPEGGIO,
+  ARPEGGIO_CEILING,
   BARS_PER_PHRASE,
   BASS_BEATS,
   BEATS_PER_BAR,
   DRUM_BEATS,
   MELODY_CEILING,
-  PENTATONIC,
-  SPARKLE_CEILING,
   barForRealm,
   noteFrequency,
   octaveShift,
@@ -22,7 +22,7 @@ import {
   rootForRealm,
   scaleNote,
 } from './notes';
-import { renderCrackle, renderGong, renderNoise, renderPluck, renderSnap, renderThud } from './synth';
+import { renderCrackle, renderFlute, renderGong, renderNoise, renderPad, renderPluck, renderSnap, renderThud, renderWoodblock } from './synth';
 
 export type SfxName =
   | 'ui'
@@ -400,6 +400,8 @@ class AudioEngine {
   /**
    * 一次排一個小節的音，快結束時再排下一節。
    * 用 AudioContext 的時間軸而非 setInterval，掉幀時節奏不會亂。
+   *
+   * 四層（見 notes.ts）：笙的持續和聲、古箏琶音與低音、洞簫主旋律、木魚與碰鈴。
    */
   private scheduleBar(): void {
     const ctx = this.ctx;
@@ -410,65 +412,79 @@ class AudioEngine {
     const bar = barForRealm(realm, this.musicBar % BARS_PER_PHRASE);
     this.musicBar += 1;
     const start = Math.max(this.nextBarTime, ctx.currentTime + 0.05);
+    const barSeconds = BEATS_PER_BAR * BEAT_SECONDS;
 
-    // 音域用整段四小節去算，不是只看這一小節——否則四個小節會各自被移到不同的八度，
-    // 樂句就斷成四截了。
-    const allNotes = phraseForRealm(realm).map((degree) => scaleNote(root + 12, degree));
-    const melodyShift = octaveShift(Math.max(...allNotes), MELODY_CEILING);
-    const allSparkle = phraseForRealm(realm).map((degree) =>
-      scaleNote(root + 24, degree % PENTATONIC.length),
-    );
-    const sparkleShift = octaveShift(Math.max(...allSparkle), SPARKLE_CEILING);
+    // 音域用整段去算，不是只看這一小節——否則每個小節會各自被移到不同的八度，樂句就斷成好幾截。
+    const melodyShift = octaveShift(Math.max(...phraseForRealm(realm).map((degree) => scaleNote(root + 12, degree))), MELODY_CEILING);
+    const arpTop = root + 9 + Math.max(...ARPEGGIO.map((step) => step ?? 0));
+    const arpShift = octaveShift(arpTop, ARPEGGIO_CEILING);
+
+    // 笙：根音加五度，整小節鋪著，稍微長一點和下一小節疊上，才不會一節一節斷開。
+    for (const [interval, gain] of [[0, 0.2], [7, 0.13]] as const) {
+      const frequency = noteFrequency(root + bar.chordRoot + interval);
+      this.emit(
+        this.buffer(`music-pad-${Math.round(frequency)}`, (c) => renderPad(c, frequency, barSeconds * 1.15)),
+        this.musicBus,
+        { gain, when: start },
+      );
+    }
 
     for (let beat = 0; beat < BEATS_PER_BAR; beat += 1) {
       const when = start + beat * BEAT_SECONDS;
-      const degree = bar.degrees[beat] ?? 0;
 
-      // 主旋律。衰減 0.9 秒：拖太長會把相鄰的音糊成一片持續音，
-      // 聽起來像鋪底而不是旋律，快起來之後更明顯。
-      if (bar.rhythm[beat] === true) {
-        const frequency = noteFrequency(scaleNote(root + 12, degree) + melodyShift);
+      // 古箏琶音：每拍一顆，小節頭重一點。
+      const step = ARPEGGIO[beat] ?? null;
+      if (step !== null) {
+        const frequency = noteFrequency(root + bar.chordRoot + step + arpShift);
         this.emit(
-          this.buffer(`music-${Math.round(frequency)}`, (c) => renderPluck(c, frequency, 0.9, 0.72)),
-          this.musicBus,
-          { gain: beat === 0 ? 0.52 : 0.36, when },
-        );
-      } else {
-        // 休止的拍子改在半拍後點一個高八度的輕音。
-        // 留白不等於空白——這一點是整段「活起來」的地方。
-        const sparkle = noteFrequency(
-          scaleNote(root + 24, degree % PENTATONIC.length) + sparkleShift,
-        );
-        this.emit(
-          this.buffer(`music-hi-${Math.round(sparkle)}`, (c) => renderPluck(c, sparkle, 0.5, 0.9)),
-          this.musicBus,
-          { gain: 0.16, when: when + BEAT_SECONDS * 0.5 },
-        );
-      }
-
-      // 低音跟著**當下的和弦**走，不是一直釘在主音上。
-      // 這是第一版最缺的一塊：沒有和聲進行，速度與節奏再怎麼調都只是原地打轉。
-      const bassDegree = BASS_BEATS[beat] ?? null;
-      if (bassDegree !== null) {
-        const bass = noteFrequency(scaleNote(root - 12 + bar.chordRoot, bassDegree));
-        this.emit(
-          this.buffer(`music-bass-${Math.round(bass)}`, (c) => renderPluck(c, bass, 1.4, 0.28)),
-          this.musicBus,
-          { gain: beat % 4 === 0 ? 0.44 : 0.3, when },
-        );
-      }
-
-      // 鼓點：兩個正拍加一個切分。音量壓得很低，它是律動不是節拍器。
-      if (DRUM_BEATS.includes(beat)) {
-        this.emit(
-          this.buffer('music-drum', (c) => renderThud(c, 96, 44, 0.22)),
+          this.buffer(`music-zheng-${Math.round(frequency)}`, (c) => renderPluck(c, frequency, 0.8, 0.85)),
           this.musicBus,
           { gain: beat === 0 ? 0.3 : 0.19, when },
         );
       }
+
+      // 低音：古箏低音弦，根音與五度。
+      const bass = BASS_BEATS[beat] ?? null;
+      if (bass !== null) {
+        const frequency = noteFrequency(root - 12 + bar.chordRoot + bass);
+        this.emit(
+          this.buffer(`music-bass-${Math.round(frequency)}`, (c) => renderPluck(c, frequency, 1.6, 0.3)),
+          this.musicBus,
+          { gain: beat === 0 ? 0.5 : 0.36, when },
+        );
+      }
+
+      // 木魚：兩個正拍加一個切分，很輕。
+      if (DRUM_BEATS.includes(beat)) {
+        this.emit(
+          this.buffer('music-woodblock', (c) => renderWoodblock(c, 820)),
+          this.musicBus,
+          { gain: beat === 0 ? 0.24 : 0.15, when },
+        );
+      }
     }
 
-    this.nextBarTime = start + BEATS_PER_BAR * BEAT_SECONDS;
+    // 簫：照譜吹，每個音吹滿它的拍數（稍微短一點，換氣）。
+    for (const note of bar.notes) {
+      const frequency = noteFrequency(scaleNote(root + 12, note.degree) + melodyShift);
+      const seconds = note.beats * BEAT_SECONDS * 0.94;
+      this.emit(
+        this.buffer(`music-flute-${Math.round(frequency)}-${note.beats}`, (c) => renderFlute(c, frequency, seconds)),
+        this.musicBus,
+        { gain: note.at === 0 ? 0.4 : 0.32, when: start + note.at * BEAT_SECONDS },
+      );
+    }
+
+    // 碰鈴：兩小節一響，標出樂句的段落。
+    if (bar.bell) {
+      this.emit(
+        this.buffer('music-bell', (c) => renderGong(c, 1320, 1.4)),
+        this.musicBus,
+        { gain: 0.09, when: start },
+      );
+    }
+
+    this.nextBarTime = start + barSeconds;
     const delayMs = Math.max(50, (this.nextBarTime - ctx.currentTime - 0.4) * 1000);
     this.musicTimer = setTimeout(() => this.scheduleBar(), delayMs);
   }
