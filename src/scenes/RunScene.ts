@@ -105,6 +105,7 @@ import { roughLine } from "../ui/sketch";
 import type { RunEntryData, RunResultData } from "./types";
 import type { ScoreLoadout } from "../net/protocol";
 import { fadeIn, fadeToScene } from "../ui/transition";
+import { platform } from "../platform";
 
 /** 妖魔的行進區間。上緣是妖魔出場處，下緣就是山門。 */
 const ARENA_TOP = 116;
@@ -281,6 +282,10 @@ export class RunScene extends Phaser.Scene {
   private run!: DefenseState;
   private rng!: ReturnType<typeof createRng>;
   private over = false;
+  /** 失守後正在等玩家決定要不要接關（128 平台付費）：戰鬥停住。 */
+  private continueOverlay: Phaser.GameObjects.Container | null = null;
+  /** 這一場接關了幾次。接過關就不上排行榜：耐久是付費補回來的，伺服器重播不出來。 */
+  private continues = 0;
 
   private enemySprites = new Map<number, Phaser.GameObjects.Container>();
   private handViews: CardView[] = [];
@@ -487,6 +492,8 @@ export class RunScene extends Phaser.Scene {
     this.run = createDefenseState(loadout, this.rng);
     if (import.meta.env.DEV) applyDebugBoss(this.run);
     this.over = false;
+    this.continueOverlay = null;
+    this.continues = 0;
     this.enemySprites.clear();
     // Phaser 重用 Scene 實例，這幾個單場狀態不清就會帶進下一關。
     this.paused = false;
@@ -1753,7 +1760,7 @@ export class RunScene extends Phaser.Scene {
    * 加速是「一幀補幾格」，不是「一格變長」——後者會讓 3× 跑出和 1× 不同的結果。
    */
   override update(_time: number, delta: number): void {
-    if (this.over) return;
+    if (this.over || this.continueOverlay !== null) return;
     // 教學的前兩步把戰鬥停住：新手還在找哪裡可以拖的時候，妖魔不該已經走到山門。
     if (this.step === "deploy" || this.step === "merge") return;
     if (this.paused) return;
@@ -1782,8 +1789,10 @@ export class RunScene extends Phaser.Scene {
     this.updateHud();
 
     if (this.run.outcome === "cleared") this.finish(true, null);
-    else if (this.run.outcome === "defeated") this.finish(false, "breached");
-    else if (this.run.outcome === "timeout") this.finish(false, "timeout");
+    else if (this.run.outcome === "defeated") {
+      if (this.canContinue()) this.offerContinue();
+      else this.finish(false, "breached");
+    } else if (this.run.outcome === "timeout") this.finish(false, "timeout");
   }
 
   /**
@@ -3092,6 +3101,98 @@ export class RunScene extends Phaser.Scene {
     this.waveBar.setDisplaySize(GAME_WIDTH * progress, 4);
   }
 
+  // -------------------------------------------------------------- 接關
+
+  /** 只有在 128 平台裡才能接關；重打舊關（回放）不賣接關。 */
+  private canContinue(): boolean {
+    return platform.available() && this.replayStage === null;
+  }
+
+  /**
+   * 山門失守：戰鬥停住，問要不要花平台代幣接關。
+   * 接關＝山門耐久回滿、從失守這一刻接著打（場上的符與妖魔都不動）；不接就照常結算。
+   */
+  private offerContinue(): void {
+    if (this.continueOverlay !== null) return;
+    audio.play("defeat");
+    // 手上拖到一半的符收掉，不然接關回來時手指早就不在原處。
+    this.drag = null;
+    this.dragView.container.setVisible(false);
+    this.clearSelection();
+    this.refreshCards();
+
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const veil = this.add
+      .rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0xe6dcc4, 0.8)
+      .setInteractive();
+    const panel = pixelPanel(this, cx, cy, GAME_WIDTH - 96, 330, {
+      accent: hexToNumber(GOLD),
+      alpha: 0.98,
+    });
+    const title = this.add
+      .text(cx, cy - 124, "山門失守", textStyle({ size: 32, color: DANGER, bold: true }))
+      .setOrigin(0.5);
+    const body = this.add
+      .text(cx, cy - 66, "花代幣接關：山門耐久回滿，\n場上的符原地接著打。", textStyle({ size: 20 }))
+      .setAlign("center")
+      .setOrigin(0.5);
+    const note = this.add
+      .text(cx, cy + 128, "", textStyle({ size: 16, color: DANGER }))
+      .setOrigin(0.5);
+
+    let busy = false;
+    const yes = createButton(this, cx, cy + 6, {
+      width: 260,
+      height: 56,
+      label: "接關",
+      fillColor: hexToNumber(GOLD),
+      onClick: () => {
+        if (busy) return;
+        busy = true;
+        yes.setLabel("等待平台確認…");
+        note.setText("");
+        void platform.purchaseContinue().then((result) => {
+          if (this.over || this.continueOverlay === null) return;
+          busy = false;
+          if (result.ok) {
+            this.resumeAfterContinue();
+            return;
+          }
+          yes.setLabel("接關");
+          note.setText(result.reason === "timeout" ? "平台沒有回應，請再試一次" : "沒有完成付款，可以再試或結算");
+        });
+      },
+    });
+    const no = createButton(this, cx, cy + 76, {
+      width: 260,
+      height: 56,
+      label: "不接了，結算",
+      fontSize: 22,
+      onClick: () => {
+        if (busy) return;
+        this.finish(false, "breached");
+      },
+    });
+
+    this.continueOverlay = this.add
+      .container(0, 0, [veil, panel, title, body, yes.container, no.container, note])
+      .setDepth(96);
+  }
+
+  /** 接關成功：耐久回滿、關掉首領砸門的累積，戰鬥從停住的地方繼續。 */
+  private resumeAfterContinue(): void {
+    this.continues += 1;
+    this.run.disciples = this.run.maxDisciples;
+    this.run.bossGateAccum = 0;
+    this.run.outcome = "running";
+    this.stepAccum = 0;
+    this.continueOverlay?.destroy();
+    this.continueOverlay = null;
+    audio.play("victory");
+    this.updateHud();
+  }
+
   // -------------------------------------------------------------- 結束
 
   /**
@@ -3122,7 +3223,10 @@ export class RunScene extends Phaser.Scene {
   ): void {
     if (this.over) return;
     this.over = true;
+    this.continueOverlay?.destroy();
+    this.continueOverlay = null;
     audio.play(victory ? "victory" : "defeat");
+    if (!victory) platform.gameOver();
 
     const result: RunResultData = {
       victory,
@@ -3149,6 +3253,7 @@ export class RunScene extends Phaser.Scene {
       // 它錯掉的症狀是玩家永遠不會上榜，而畫面上完全看不出來。
       submission:
         this.runLoadout === null ||
+        this.continues > 0 ||
         !runIsRankable({
           abandoned: reason === "abandon",
           dungeonRules:

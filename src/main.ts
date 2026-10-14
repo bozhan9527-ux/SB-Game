@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { audio, installAudioUnlock } from './audio';
 import { GAME_WIDTH, GAME_HEIGHT, BACKGROUND_COLOR, RENDER_SCALE } from './config';
 import { state } from './state';
+import { initPlatform } from './platform';
 import { GAME_FONT, paperInk } from './ui/theme';
 import { realmIndexForStage } from './systems/realms';
 import { BootScene } from './scenes/BootScene';
@@ -70,6 +71,9 @@ const setColor = Phaser.GameObjects.Text.prototype.setColor;
 Phaser.GameObjects.Text.prototype.setColor = function (this: Phaser.GameObjects.Text, color: string | CanvasGradient | CanvasPattern) {
   return setColor.call(this, typeof color === 'string' ? paperInk(color) : color);
 };
+
+// 被 128 合 1 平台嵌著時建立橋接（接關付費、回報結束）；直接開網址時什麼都不做。
+initPlatform();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
