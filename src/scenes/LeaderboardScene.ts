@@ -14,7 +14,8 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { cloudEnabled, fetchLeaderboard } from '../net/client';
 import type { BoardKind, LeaderboardEntry } from '../net/protocol';
-import { MAX_NAME_LENGTH } from '../net/protocol';
+import { MAX_NAME_LENGTH, dailyBoard, dayOfBoard } from '../net/protocol';
+import { dayOf } from '../systems/daily';
 import {
   boardReady,
   registerForBoard,
@@ -110,10 +111,11 @@ export class LeaderboardScene extends Phaser.Scene {
       // 預設停在第 1 關的話，推很遠的人每次進來都要點一長串才找得到自己。
       [speedBoard(track ?? Math.max(1, save.world.highestStage)), '速通'],
       ['arena', '競技場'],
+      [dailyBoard(dayOf(Date.now())), '今日'],
     ];
     tabs.forEach(([kind, label], index) => {
       const active = kind === this.board || (index === 1 && track !== null);
-      createButton(this, cx + (index - 1) * 116, 86, {
+      createButton(this, cx + (index - 1.5) * 116, 86, {
         width: 110,
         height: 36,
         label,
@@ -204,7 +206,9 @@ export class LeaderboardScene extends Phaser.Scene {
         cx,
         136 + shift,
         // 競技場不看主線進度：在那一頁寫「最深到第 85 關」會被讀成競技場成績。
-        this.board === 'arena'
+        dayOfBoard(this.board) !== null
+          ? '每日挑戰：全服同一組，比誰撐最多波'
+          : this.board === 'arena'
           ? '試劍台：加成歸零，比誰撐最多波'
           : `你最深到第 ${save.world.highestStage} 關`,
         textStyle({ size: 22, color: GOLD, bold: true }),
@@ -692,7 +696,7 @@ export class LeaderboardScene extends Phaser.Scene {
     const time = formatTime(entry.elapsedMs);
     // 速通榜上整條賽道都是同一關，關卡再寫一次是廢話——秒數才是分數。
     if (trackOfBoard(this.board) !== null) return time;
-    if (this.board === 'arena') return `${entry.score} 波　${time}`;
+    if (this.board === 'arena' || dayOfBoard(this.board) !== null) return `${entry.score} 波　${time}`;
     return `第 ${entry.score} 關　${time}`;
   }
 

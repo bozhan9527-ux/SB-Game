@@ -43,6 +43,7 @@ import type { RunResultData } from "./types";
 import { fadeIn, fadeToScene } from "../ui/transition";
 import { enterMainline } from "./flow";
 import { consumeRevive, newbieShield, onStageCleared, onStageFailed } from "../systems/realmrun";
+import { DAILY_ID, claimDaily, dayOf } from "../systems/daily";
 import { mustAscend } from "../systems/karma";
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
@@ -128,6 +129,12 @@ export class ResultScene extends Phaser.Scene {
       result.victory && dungeon !== null && result.dungeon !== null
         ? grantFloor(save, dungeon, result.dungeon.floor).lines
         : [];
+    // 每日挑戰：今天第一次撐過 3 波、10 波各給仙緣。無限模式的一場永遠是「力盡」收場，
+    // 所以這裡看的是走了幾波，不是 victory。
+    if (dungeon !== null && dungeon.id === DAILY_ID && result.endlessCleared !== null) {
+      const gained = claimDaily(save, result.submission?.daily ?? dayOf(Date.now()), result.endlessCleared);
+      this.dungeonRewards.push(gained > 0 ? `每日挑戰 仙緣 +${gained}` : `今日最佳 ${save.player.daily.best} 波`);
+    }
 
     const beaten = updateRecords(save, {
       victory: result.victory,

@@ -19,6 +19,7 @@ import { starterTalismans, talismanDefs } from './talismans';
 import { OMEN_RULE_PREFIX, omenOfRules } from './omens';
 import { chosenTribulations, tribulationsFor, tribulationsForRun, weekRule, weeklyTribulationLevels } from './tribulations';
 import { jieCount } from './karma';
+import { dailyConfig, dailyRule } from './daily';
 import { amountOf } from './upgrades';
 import type { BlessingMap } from './blessings';
 import { NO_BLESSINGS, blessingValue, sanitizeBlessings } from './blessings';
@@ -281,7 +282,13 @@ export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
  */
 export const ARENA_RULE = 'arena';
 
-export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
+export function buildLoadoutFromSpec(rawSpec: LoadoutSpec): Loadout {
+  // 每日挑戰：門派與四張符由天數決定，不管客戶端報了什麼——
+  // 全服同一組才比得了，伺服器重播也走這一行。
+  const daily = dailyRule(rawSpec.rules);
+  const dailyCfg = daily === null ? null : dailyConfig(daily);
+  const spec: LoadoutSpec =
+    dailyCfg === null ? rawSpec : { ...rawSpec, sectId: dailyCfg.sectId, talismans: dailyCfg.talismans, libraryFloor: 999 };
   const sect = sectById(spec.sectId);
   if (sect === null) throw new Error('尚未選擇門派，無法開始挑戰');
   const has = (id: string): boolean => spec.rules.includes(id);
@@ -352,6 +359,11 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   // 再疊天劫會變成兩套條件打架。奇遇不算副本規則，帶著奇遇照樣吃天劫。
   const mainline = !spec.endless && spec.rules.every((rule) => rule.startsWith(OMEN_RULE_PREFIX));
   if (mainline && !loadout.arena) applyTribulationList(loadout, tribulationsForRun(spec.stage, spec.tribulations ?? {}));
+  // 每日挑戰：今天的兩張機緣與一種天劫（試劍台規則之上再加這一層）。
+  if (dailyCfg !== null) {
+    applyBlessings(loadout, dailyCfg.blessings);
+    applyTribulationList(loadout, chosenTribulations(dailyCfg.tribulations));
+  }
   // 每週天劫塔：天劫由週數決定（全服同一組），不看玩家自己背的。
   const week = weekRule(spec.rules);
   if (week !== null && !loadout.arena) applyTribulationList(loadout, chosenTribulations(weeklyTribulationLevels(week)));

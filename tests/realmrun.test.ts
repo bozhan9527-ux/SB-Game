@@ -155,3 +155,46 @@ describe('門派傳承與 v24 轉換', () => {
     expect(next['player']['dungeons']).toEqual({ library: 4 });
   });
 });
+
+import { claimDaily, dailyConfig, dailyRule, dayOf } from '../src/systems/daily';
+import { buildLoadoutFromSpec as buildSpec } from '../src/systems/loadout';
+import { boardsFor } from '../src/systems/leaderboard';
+import { dungeonById as findDungeon, dungeonSpecOf as specOfDungeon } from '../src/systems/dungeons';
+
+describe('每日挑戰', () => {
+  it('同一天全服同一組；換一天換一組；四張符含一張起手符', () => {
+    const a = dailyConfig(1000);
+    expect(dailyConfig(1000)).toEqual(a);
+    expect(a.talismans).toHaveLength(4);
+    expect(new Set(a.talismans).size).toBe(4);
+    expect(a.talismans.some((id) => ['sword', 'bolt', 'fan', 'flame'].includes(id))).toBe(true);
+    expect(Object.values(a.blessings).every((v) => v === 2)).toBe(true);
+    const days = new Set([1000, 1001, 1002, 1003, 1004].map((d) => JSON.stringify(dailyConfig(d))));
+    expect(days.size).toBeGreaterThan(1);
+  });
+
+  it('配置不管客戶端報什麼門派與符，一律照當天那一組', () => {
+    const save = at(30);
+    save.player.sectId = 'body';
+    const now = Date.UTC(2026, 9, 22, 4);
+    const spec = specOfDungeon(save, findDungeon('daily')!, 1, now);
+    const day = dayOf(now);
+    expect(dailyRule(spec.rules)).toBe(day);
+    const cfg = dailyConfig(day);
+    const loadout = buildSpec(spec);
+    expect(loadout.arena).toBe(true);
+    expect(loadout.sect.id).toBe(cfg.sectId);
+    expect(loadout.talismans.map((t) => t.id).sort()).toEqual([...cfg.talismans].sort());
+    expect(Object.keys(loadout.blessings).sort()).toEqual(Object.keys(cfg.blessings).sort());
+    expect(boardsFor(1, true, false, day)).toEqual([`daily${day}`]);
+  });
+
+  it('每天第一次撐過 3 波、10 波各給 1 點仙緣；換日重來', () => {
+    const save = at(5);
+    expect(claimDaily(save, 50, 2)).toBe(0);
+    expect(claimDaily(save, 50, 4)).toBe(1);
+    expect(claimDaily(save, 50, 12)).toBe(1);
+    expect(claimDaily(save, 50, 20)).toBe(0);
+    expect(claimDaily(save, 51, 12)).toBe(2);
+  });
+});

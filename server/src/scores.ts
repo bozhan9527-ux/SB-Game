@@ -18,7 +18,8 @@ import type { Env } from './http';
 import { fail, isNonEmptyString, json, readJson, sha256, timingSafeEqual } from './http';
 import { LIMITS, ipKey, sweep, take, tooMany } from './limits';
 import { omenRulesValid } from '../../src/systems/omens';
-import { REPLAY_CONTRACT_VERSION, anonName, isBoardKind, trackOfBoard } from '../../src/net/protocol';
+import { REPLAY_CONTRACT_VERSION, anonName, dayOfBoard, isBoardKind, trackOfBoard } from '../../src/net/protocol';
+import { dailyRule, dayOf } from '../../src/systems/daily';
 import type {
   LeaderboardEntry,
   LeaderboardResult,
@@ -193,7 +194,7 @@ function actionsOf(raw: unknown): ReplayAction[] | null {
  *   一關一個也讓新玩家打完第一場就上得去，不必等到走完主線。
  * - arena：競技場連下幾波。
  */
-export type BoardKind = 'depth' | 'arena' | `speed${number}`;
+export type BoardKind = 'depth' | 'arena' | `speed${number}` | `daily${number}`;
 
 /** 這個榜是分數大的贏，還是小的贏。速通比誰快，其餘比誰多。 */
 function lowerIsBetter(board: BoardKind): boolean {
@@ -329,10 +330,20 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   // 手動改個 board 就能進競技榜，那個榜立刻退化成「誰洞府等級高」。
   // 反向那一條擋的是另一件事：競技場永遠打第 1 關，混進深度榜沒有意義。
   const arena = loadout.rules.includes(ARENA_RULE);
-  if (board === 'arena' && !arena) {
+  // 每日榜：只收那一天的每日挑戰，而且只收今天與昨天（換日前一刻打完、上傳慢一點的人）。
+  const dayBoard = dayOfBoard(board);
+  const dayRule = dailyRule(loadout.rules);
+  if (dayBoard !== null || dayRule !== null) {
+    if (dayBoard === null || dayRule !== dayBoard || !arena) {
+      return fail('rejected', env, origin, '每日榜只收當天的每日挑戰');
+    }
+    const today = dayOf(Date.now());
+    if (dayBoard < today - 1 || dayBoard > today) {
+      return fail('rejected', env, origin, '這一天的每日挑戰已經結束了');
+    }
+  } else if (board === 'arena' && !arena) {
     return fail('rejected', env, origin, '競技榜只收試劍台的一場');
-  }
-  if (board !== 'arena' && arena) {
+  } else if (board !== 'arena' && arena) {
     return fail('rejected', env, origin, '試劍台的一場只進競技榜');
   }
 
@@ -381,7 +392,7 @@ export async function submitScore(request: Request, env: Env, origin: string | n
   if (track !== null && claimed !== track) {
     return fail('rejected', env, origin, `這個速通榜只收第 ${track} 關`);
   }
-  const score = track !== null ? elapsed : board === 'arena' ? replayed.clearedStages : claimed;
+  const score = track !== null ? elapsed : board === 'arena' || dayBoard !== null ? replayed.clearedStages : claimed;
 
   const existing = await env.DB.prepare(
     'SELECT score, elapsed_ms FROM board_runs WHERE board = ? AND player_id = ?',

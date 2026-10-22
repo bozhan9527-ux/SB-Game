@@ -107,6 +107,7 @@ import type { ScoreLoadout } from "../net/protocol";
 import { fadeIn, fadeToScene } from "../ui/transition";
 import { platform } from "../platform";
 import { blessingDef, effectiveStars } from "../systems/blessings";
+import { dailyRule } from "../systems/daily";
 
 /** 妖魔的行進區間。上緣是妖魔出場處，下緣就是山門。 */
 const ARENA_TOP = 116;
@@ -3315,6 +3316,7 @@ export class RunScene extends Phaser.Scene {
               actions: this.actions,
               loadout: this.runLoadout,
               arena: this.run.loadout.arena,
+              daily: dailyRule(this.runLoadout.rules),
               tutorial: this.tutorialRun,
               replay: this.replayStage !== null,
             },

@@ -44,8 +44,8 @@ import {
 import { fadeIn, fadeToScene } from "../ui/transition";
 
 const LIST_TOP = 108;
-const CARD_HEIGHT = 132;
-const CARD_GAP = 8;
+const CARD_HEIGHT = 118;
+const CARD_GAP = 6;
 
 export class DungeonScene extends Phaser.Scene {
   constructor() {
@@ -107,14 +107,14 @@ export class DungeonScene extends Phaser.Scene {
       .setStrokeStyle(available ? 2 : 1, available ? hexToNumber(GOLD) : LINE);
 
     this.add
-      .image(left + 42, top + 46, iconTexture(dungeon.icon as IconName))
+      .image(left + 42, top + 42, iconTexture(dungeon.icon as IconName))
       .setDisplaySize(32, 32)
       .setAlpha(available ? 1 : 0.4);
 
     const name = this.add
       .text(
         left + 76,
-        top + 30,
+        top + 26,
         dungeon.name,
         textStyle({ size: 24, color: available ? INK : INK_DIM, bold: true }),
       )
@@ -124,7 +124,7 @@ export class DungeonScene extends Phaser.Scene {
     this.add
       .text(
         name.x + name.width + 12,
-        top + 30,
+        top + 26,
         dungeon.reward,
         textStyle({ size: 17, color: JADE }),
       )
@@ -135,7 +135,7 @@ export class DungeonScene extends Phaser.Scene {
     const desc = this.add
       .text(
         left + 76,
-        top + 64,
+        top + 56,
         dungeonBlurb(dungeon),
         textStyle({ size: 16, color: INK_DIM }),
       )
@@ -152,7 +152,7 @@ export class DungeonScene extends Phaser.Scene {
     this.add
       .text(
         left + 76,
-        top + 98,
+        top + 90,
         progress,
         textStyle({ size: 15, color: upcoming === null ? JADE : INK_DIM }),
       )
@@ -207,13 +207,13 @@ export class DungeonScene extends Phaser.Scene {
     this.add
       .text(
         cx + width / 2 - 20,
-        top + 34,
+        top + 30,
         // 無限副本的深度只是起點，不是終點：寫「第 N 關」會被讀成「這一場就打這關」。
         `${dungeon.endless ? "起於" : ""}第 ${stage} 關 · ${realmTitle(stage)}`,
         textStyle({ size: 14, color: INK_DIM }),
       )
       .setOrigin(1, 0.5);
-    const button = createButton(this, cx + width / 2 - 76, top + 82, {
+    const button = createButton(this, cx + width / 2 - 76, top + 74, {
       width: 128,
       height: 52,
       label: dungeon.repeatable ? "進入" : `第 ${upcoming} 層`,

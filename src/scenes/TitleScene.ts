@@ -17,6 +17,7 @@ import { layerInRun } from '../systems/realmrun';
 import { enterMainline } from './flow';
 import type { Feature } from '../systems/unlocks';
 import { featureHint, featureOpen } from '../systems/unlocks';
+import { dailyDone } from '../systems/daily';
 import { detectAchievements, pendingAchievements } from '../systems/achievements';
 import { cloudEnabled } from '../net/client';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
@@ -384,7 +385,8 @@ export class TitleScene extends Phaser.Scene {
       const button = createButton(this, x, top, {
         width,
         height: 56,
-        label: open || feature === null ? label : featureHint(feature),
+        // 今天還沒打每日挑戰：入口上寫出來，不然沒有人知道有這件事。
+        label: !open && feature !== null ? featureHint(feature) : feature === 'dungeon' && !dailyDone(save) ? '副本・今日' : label,
         fontSize: open ? 18 : 14,
         icon: iconTexture(icon),
         iconSize: 22,

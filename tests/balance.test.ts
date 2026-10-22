@@ -699,3 +699,44 @@ describe('一境一局與機緣', () => {
     }
   }, 600000);
 });
+
+/**
+ * 每日挑戰（第三階段）：每天換一組門派、四張符、機緣與天劫。
+ * 不管哪一天抽到什麼，機器人（每秒一個決定）都要撐得過領獎的第一道門檻（3 波）——
+ * 抽到一組打不動的配置，那一天就沒有人拿得到每日仙緣。
+ */
+describe('每日挑戰', () => {
+  it('連續二十天，每一天都撐得過 3 波', () => {
+    const worst: [number, number][] = [];
+    for (let day = 1000; day < 1020; day += 1) {
+      const loadout = buildLoadoutFromSpec({
+        sectId: 'sword',
+        stage: 1,
+        libraryFloor: 0,
+        talismans: ['sword', 'bolt', 'fan', 'flame'],
+        upgrades: {},
+        karma: {},
+        sectClears: 0,
+        sectDepth: 0,
+        rules: ['arena', `daily:${day}`],
+        goldMultiplier: 1,
+        bankedStage: 0,
+        rebirths: 0,
+        endless: true,
+      });
+      const rng = createRng(day);
+      const state = createDefenseState(loadout, rng);
+      let since = 0;
+      while (state.outcome === 'running' && state.elapsedMs < 30 * 60 * 1000) {
+        tickCombat(state, TICK_MS, rng);
+        since += TICK_MS;
+        while (since >= 1000) {
+          since -= 1000;
+          playOneAction(state, rng);
+        }
+      }
+      worst.push([day, state.clearedStages]);
+    }
+    for (const [day, waves] of worst) expect(waves, `第 ${day} 天只撐 ${waves} 波`).toBeGreaterThanOrEqual(3);
+  }, 600000);
+});

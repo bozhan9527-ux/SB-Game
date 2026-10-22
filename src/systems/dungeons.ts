@@ -21,7 +21,9 @@ import type { DungeonDef, DungeonFloor } from '../data/types';
 import type { SaveData } from '../save/types';
 import type { LoadoutSpec } from './loadout';
 import { dungeonThreatFactor, loadoutSpecOf } from './loadout';
-import { tribulationLevelNames, weekOf, weeklyTribulationLevels } from './tribulations';
+import { tribulationLevelNames, tribulationNames, chosenTribulations, weekOf, weeklyTribulationLevels } from './tribulations';
+import { DAILY_RULE, dailyConfig, dayOf } from './daily';
+import { blessingDef } from './blessings';
 
 /** 每週天劫塔的規則字串（資料裡寫的）。開打時換成 `week:週數`。 */
 export const WEEKLY_RULE = 'weekly';
@@ -42,6 +44,12 @@ export function syncTower(save: SaveData, now: number = Date.now()): boolean {
 
 /** 副本卡片上的說明：每週天劫塔寫出本週是哪一組。 */
 export function dungeonBlurb(dungeon: DungeonDef, now: number = Date.now()): string {
+  if (dungeon.rules.includes(DAILY_RULE)) {
+    const cfg = dailyConfig(dayOf(now));
+    const cards = cfg.talismans.map((id) => CARDS.find((card) => card.id === id)?.name.replace('符', '') ?? id).join('');
+    const bless = Object.keys(cfg.blessings).map((id) => blessingDef(id)?.name ?? id).join('・');
+    return `今日：${cards}・${bless}・${tribulationNames(chosenTribulations(cfg.tribulations))}`;
+  }
   if (!dungeon.rules.includes(WEEKLY_RULE)) return dungeon.desc;
   return `本週天劫：${tribulationLevelNames(weeklyTribulationLevels(weekOf(now)))}`;
 }
@@ -202,7 +210,9 @@ export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number
   return {
     ...loadoutSpecOf(save, floorDepth(save, dungeon, index)),
     // 每週天劫塔：把「這一週」寫進規則，伺服器重播才算得出同一組天劫。
-    rules: dungeon.rules.map((rule) => (rule === WEEKLY_RULE ? `week:${weekOf(now)}` : rule)),
+    rules: dungeon.rules.map((rule) =>
+      rule === WEEKLY_RULE ? `week:${weekOf(now)}` : rule === DAILY_RULE ? `daily:${dayOf(now)}` : rule,
+    ),
     goldMultiplier: dungeon.goldMultiplier,
     endless: dungeon.endless,
     // 轉世的加成已經算進 floorDepth 了，這裡要把主線那條關掉，否則同一件事

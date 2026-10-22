@@ -1,5 +1,27 @@
 [
   {
+    "id": "daily",
+    "name": "每日挑戰",
+    "icon": "trial",
+    "minStage": 1,
+    "desc": "全服同一組配置，每天換",
+    "detail": "今天的門派、四張符、兩張二星機緣與一種天劫由天道決定，全服同一組。規則照試劍台：加成全歸零、從第 1 關一路打到守不住。每天第一次撐過 3 波、10 波各給 1 點仙緣，成績進當日榜。",
+    "reward": "仙緣・每日",
+    "rules": [
+      "arena",
+      "daily"
+    ],
+    "goldMultiplier": 1,
+    "repeatable": true,
+    "floors": [
+      {
+        "stage": 1,
+        "minStage": 1
+      }
+    ],
+    "endless": true
+  },
+  {
     "id": "library",
     "name": "藏經閣",
     "icon": "scroll",

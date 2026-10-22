@@ -340,6 +340,12 @@ const dropSectDepth: Migration = (data) => {
   };
 };
 
+/** v24 → v25：每日挑戰的進度（第三階段）。 */
+const addDaily: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, daily: { day: 0, best: 0 } } };
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -364,6 +370,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addAccount,
   toAscension,
   dropSectDepth,
+  addDaily,
 ];
 
 /**

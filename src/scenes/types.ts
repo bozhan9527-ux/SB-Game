@@ -36,6 +36,8 @@ export interface RunSubmission {
    * 玩家全部的養成，混進競技榜會讓那個榜比錯東西。
    */
   arena: boolean;
+  /** 每日挑戰的那一天（進當日榜）；不是每日挑戰為 null。 */
+  daily?: number | null;
   /**
    * 這一場是不是教學。
    *

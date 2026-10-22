@@ -8,7 +8,7 @@
  * 本檔不 import Phaser。
  */
 import { getSave, putSave, submitScore } from '../net/client';
-import { REPLAY_CONTRACT_VERSION, speedBoard, speedTrackOf } from '../net/protocol';
+import { REPLAY_CONTRACT_VERSION, dailyBoard, speedBoard, speedTrackOf } from '../net/protocol';
 import type { BoardKind, ScoreLoadout } from '../net/protocol';
 import type { SaveData } from '../save/types';
 import type { RunSubmission } from '../scenes/types';
@@ -59,7 +59,9 @@ export function loadoutFor(save: SaveData): ScoreLoadout {
  * 全部的養成——把它的波數丟進競技榜，那個榜就從「誰操作得好」
  * 變成「誰洞府等級高」，而競技場存在的唯一理由正是不比那個。
  */
-export function boardsFor(stage: number, arena: boolean, replay = false): BoardKind[] {
+export function boardsFor(stage: number, arena: boolean, replay = false, daily: number | null = null): BoardKind[] {
+  // 每日挑戰只進當天那個榜：它也是試劍台規則，但比的是「今天這一組」。
+  if (daily !== null) return [dailyBoard(daily)];
   if (arena) return ['arena'];
   // 每一場**同時進兩個榜**：它既是一筆深度成績，也是那一關的一筆秒數成績。
   // 速通是一關一個榜，所以一場只會佔其中一個——同一個榜上大家打的
@@ -201,7 +203,7 @@ export async function submitRun(
 
   // 第一個榜是主榜——它的名次就是要顯示給玩家看的那一個。其餘的
   // （打完主線最後一關那一場同時算速通）在背景送，失敗也不吵他。
-  const boards = boardsFor(stage, submission.arena, submission.replay);
+  const boards = boardsFor(stage, submission.arena, submission.replay, submission.daily ?? null);
   // 沒有任何榜收這一場（重挑一個超出速通榜範圍的關卡）就別打伺服器。
   const primary = boards[0];
   if (primary === undefined) return { kind: 'skipped' };

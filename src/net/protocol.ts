@@ -366,7 +366,7 @@ export interface LeaderboardResult {
  *
  * 速通是**一關一個**（speed1、speed40…），關卡編在榜名裡。
  */
-export type BoardKind = 'depth' | 'arena' | `speed${number}`;
+export type BoardKind = 'depth' | 'arena' | `speed${number}` | `daily${number}`;
 
 /** 速通最後那一條賽道：主線的終點。 */
 export const SPEED_STAGE = 81;
@@ -408,10 +408,22 @@ export function trackOfBoard(board: BoardKind): number | null {
   return speedTrackOf(Number(match[1]));
 }
 
+/** 每日挑戰的當日榜（第三階段）。一天一個榜。 */
+export function dailyBoard(day: number): BoardKind {
+  return `daily${Math.max(0, Math.floor(day))}`;
+}
+
+/** 榜別 → 哪一天的每日榜。不是每日榜就回 null。 */
+export function dayOfBoard(board: BoardKind): number | null {
+  const match = /^daily(\d+)$/.exec(board);
+  return match === null ? null : Number(match[1]);
+}
+
 /** 這個字串是不是一個合法的榜別。**認不得的一律不收**，見 scores.ts 的說明。 */
 export function isBoardKind(raw: unknown): raw is BoardKind {
   if (typeof raw !== 'string') return false;
   if (raw === 'depth' || raw === 'arena') return true;
+  if (dayOfBoard(raw as BoardKind) !== null) return true;
   return trackOfBoard(raw as BoardKind) !== null;
 }
 

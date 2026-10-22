@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 24;
+export const SAVE_VERSION = 25;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -219,6 +219,8 @@ export interface PlayerState {
    * 0 為還沒進去過。
    */
   towerWeek: number;
+  /** 每日挑戰：今天是第幾天、今天最多打到幾波（獎勵看它，換日歸零）。 */
+  daily: { day: number; best: number };
 }
 
 export interface PendingOmen {

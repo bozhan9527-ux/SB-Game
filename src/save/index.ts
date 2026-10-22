@@ -35,6 +35,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       dungeons: {},
       omen: null,
       towerWeek: 0,
+      daily: { day: 0, best: 0 },
       challenges: [],
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0, unlocks: [], dao: false, bestHeaven: 0 },
@@ -271,6 +272,10 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       dungeons,
       omen: normalizeOmen(player['omen']),
       towerWeek: Math.max(0, Math.floor(asNumber(player['towerWeek'], 0))),
+      daily: {
+        day: Math.max(0, Math.floor(asNumber(((player['daily'] ?? {}) as Record<string, unknown>)['day'], 0))),
+        best: Math.max(0, Math.floor(asNumber(((player['daily'] ?? {}) as Record<string, unknown>)['best'], 0))),
+      },
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),
       records: normalizeRecords(player['records']),
