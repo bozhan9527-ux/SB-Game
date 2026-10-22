@@ -117,10 +117,26 @@ export function onStageCleared(save: SaveData, clearedStage: number, survivors: 
  * 回傳退回的關卡。
  */
 export function onStageFailed(save: SaveData): number {
+  if (newbieShield(save)) {
+    // 新手護體：只重打這一關，機緣留著，山門回滿。
+    save.world.realmRun.gate = null;
+    return save.world.stage;
+  }
   const start = Math.min(save.world.realmRun.startStage, save.world.stage);
   save.world.stage = start;
   save.world.realmRun = freshRealmRun(start);
   return start;
+}
+
+/**
+ * 新手護體：第一世的第一個境界（煉氣期）失守不會退回本局第一關。
+ *
+ * 剛學會拖符的人在第 4 關倒下、被丟回第 1 關，學到的只有「這遊戲很不公平」。
+ * 硬派的一境一局從築基期起才生效——那時他已經知道機緣與耐久是怎麼回事。
+ */
+export function newbieShield(save: SaveData): boolean {
+  const first = REALMS[0];
+  return save.player.karma.rebirths === 0 && first !== undefined && save.world.stage <= first.stageTo;
 }
 
 /** 選一張。不在這次候選裡的 id 一律不收。 */

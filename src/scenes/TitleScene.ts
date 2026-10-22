@@ -6,7 +6,7 @@ import { libraryFloor } from '../systems/dungeons';
 import { audio } from '../audio';
 import type { IconName } from '../art';
 import { ART, discipleTexture, glyphTexture, iconTexture } from '../art';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { APP_VERSION, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { storageUnavailable } from '../save/storage';
 import type { SaveData } from '../save/types';
@@ -15,6 +15,8 @@ import { talismanDefs } from '../systems/talismans';
 import { canAscend, heavenName, heavenOf, jieCount, mustAscend } from '../systems/karma';
 import { layerInRun } from '../systems/realmrun';
 import { enterMainline } from './flow';
+import type { Feature } from '../systems/unlocks';
+import { featureHint, featureOpen } from '../systems/unlocks';
 import { detectAchievements, pendingAchievements } from '../systems/achievements';
 import { cloudEnabled } from '../net/client';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
@@ -96,22 +98,24 @@ export class TitleScene extends Phaser.Scene {
 
     // 洞府與符籙譜並排：兩個都是「進場前整備」，同一層級，省下一整排給主視覺。
     y += 36 + 14 + 29;
-    createButton(this, cx - 90, y, {
+    const cave = createButton(this, cx - 90, y, {
       width: 172,
       height: 58,
-      label: '洞府',
-      fontSize: 23,
+      label: featureOpen(save, 'upgrade') ? '洞府' : featureHint('upgrade'),
+      fontSize: featureOpen(save, 'upgrade') ? 23 : 17,
       icon: iconTexture('cave'),
       onClick: () => fadeToScene(this, 'Upgrade'),
     });
-    createButton(this, cx + 90, y, {
+    cave.setEnabled(featureOpen(save, 'upgrade'));
+    const book = createButton(this, cx + 90, y, {
       width: 172,
       height: 58,
-      label: '符籙譜',
-      fontSize: 23,
+      label: featureOpen(save, 'talisman') ? '符籙譜' : featureHint('talisman'),
+      fontSize: featureOpen(save, 'talisman') ? 23 : 17,
       icon: iconTexture('scroll'),
       onClick: () => fadeToScene(this, 'Talisman'),
     });
+    book.setEnabled(featureOpen(save, 'talisman'));
 
     this.buildMenu(y + 29 + 20 + 28, hasSect);
 
@@ -138,7 +142,7 @@ export class TitleScene extends Phaser.Scene {
       .text(
         cx,
         GAME_HEIGHT - 16,
-        `最高境界 ${realmTitle(save.world.highestStage)} · 通關 ${save.world.clears} 次`,
+        `最高境界 ${realmTitle(save.world.highestStage)} · 通關 ${save.world.clears} 次 · ${APP_VERSION}`,
         textStyle({ size: 17, color: INK_DIM }),
       )
       .setOrigin(0.5);
@@ -366,24 +370,27 @@ export class TitleScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     // 榜單只在有設定後端時才出現——一個按了會說「這個版本沒有連線功能」的按鈕，
     // 比沒有那顆按鈕更糟。
-    const items: [string, string, IconName][] = [
-      [hasSect ? '換門派' : '門派', 'Sect', 'sect'],
-      ['副本', 'Dungeon', 'trial'],
+    const save = state();
+    const items: [string, string, IconName, Feature | null][] = [
+      [hasSect ? '換門派' : '門派', 'Sect', 'sect', hasSect ? 'sect' : null],
+      ['副本', 'Dungeon', 'trial', 'dungeon'],
     ];
-    if (cloudEnabled()) items.push(['榜單', 'Leaderboard', 'rank']);
+    if (cloudEnabled()) items.push(['榜單', 'Leaderboard', 'rank', 'leaderboard']);
 
     const width = Math.floor((GAME_WIDTH - 48 - (items.length - 1) * 12) / items.length);
-    items.forEach(([label, target, icon], index) => {
+    items.forEach(([label, target, icon, feature], index) => {
       const x = cx + (index - (items.length - 1) / 2) * (width + 12);
-      createButton(this, x, top, {
+      const open = feature === null || featureOpen(save, feature);
+      const button = createButton(this, x, top, {
         width,
         height: 56,
-        label,
-        fontSize: 18,
+        label: open || feature === null ? label : featureHint(feature),
+        fontSize: open ? 18 : 14,
         icon: iconTexture(icon),
         iconSize: 22,
         onClick: () => fadeToScene(this, target),
       });
+      button.setEnabled(open);
     });
   }
 

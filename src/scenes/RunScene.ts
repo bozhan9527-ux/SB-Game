@@ -442,6 +442,12 @@ export class RunScene extends Phaser.Scene {
     // 不清成 null 的話下一場會拿著空殼去 setText。
     this.dungeonBanner = null;
     this.endlessBanner = null;
+    // 教學面板同理：教學那一場的物件在換場時已經銷毀，下一場（教學已結束）
+    // 若還拿著舊的參照去 setText，整個遊戲會當掉——新玩家打完第一關必經這裡。
+    this.coach = null;
+    this.coachTitle = null;
+    this.coachBody = null;
+    this.coachArrow = null;
   }
 
   create(): void {
@@ -573,7 +579,7 @@ export class RunScene extends Phaser.Scene {
         3000,
       );
     }
-    else this.refreshCoach();
+    if (this.step !== "done") this.refreshCoach();
 
     // 與 stage_end 成對。兩者的差就是中離——沒有它，「第幾關流失」只看得到一半。
     track("stage_start", {

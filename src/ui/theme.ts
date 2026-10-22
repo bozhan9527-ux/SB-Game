@@ -118,7 +118,7 @@ export function textStyle(options: TextStyleOptions): Phaser.Types.GameObjects.T
 export const FULL_WIDTH_EM = 1;
 
 /** 不放在行首的標點（中文排版的「避頭」）。 */
-const NO_LINE_START = /[，。、：；！？）」』》〉,.!?:;)]/;
+const NO_LINE_START = /[，。、：；！？）」』》〉,.!?:;)%％]/;
 const HALF_WIDTH_EM = 0.55;
 
 /** 半形裡比較寬的那幾類：大寫字母與 % + × 這類符號實測約 0.67，不是 0.55。 */

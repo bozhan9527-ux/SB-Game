@@ -155,7 +155,7 @@ export class BlessingScene extends Phaser.Scene {
       this.add.text(cx, y + 178, starLine(nextStars), textStyle({ size: 18, color: '#c98a12' })).setOrigin(0.5);
     }
     this.add
-      .text(cx, y + 200, wrapText(blessingText(def, nextStars), w - 22, 14), textStyle({ size: 14, color: '#4a4036' }))
+      .text(cx, y + 200, wrapText(blessingText(def, nextStars), w - 20, 15), textStyle({ size: 15, color: '#4a4036' }))
       .setOrigin(0.5, 0)
       .setAlign('center')
       .setLineSpacing(4);
@@ -218,8 +218,15 @@ export class BlessingScene extends Phaser.Scene {
       .setOrigin(0.5);
     if (owned.length === 0) {
       this.add
-        .text(cx, top + h / 2 + 10, '還沒有機緣。破境或山門被破時清空。', textStyle({ size: 15, color: INK_DIM }))
-        .setOrigin(0.5);
+        .text(
+          cx,
+          top + h / 2 + 10,
+          '這是本局的第一張機緣。\n本局內一直有效，再選到同一張就升星（最多三星）；\n破境或山門被破時清空。',
+          textStyle({ size: 15, color: INK_DIM }),
+        )
+        .setOrigin(0.5)
+        .setAlign('center')
+        .setLineSpacing(6);
       return;
     }
     const perRow = 4;

@@ -45,7 +45,7 @@ import {
 import type { RunResultData } from "./types";
 import { fadeIn, fadeToScene } from "../ui/transition";
 import { enterMainline } from "./flow";
-import { consumeRevive, onStageCleared, onStageFailed } from "../systems/realmrun";
+import { consumeRevive, newbieShield, onStageCleared, onStageFailed } from "../systems/realmrun";
 import { mustAscend } from "../systems/karma";
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
@@ -120,9 +120,12 @@ export class ResultScene extends Phaser.Scene {
           ? '破境！本局結束，下一境重新開局'
           : `山門 ${outcome.gate ?? result.maxDisciples} / ${result.maxDisciples} 帶進下一關`;
       } else {
-        track("realm_run_end", { stage: result.stage, start_stage: startStage, broke_through: false, blessings: blessCount });
+        const shielded = newbieShield(save);
+        if (!shielded) track("realm_run_end", { stage: result.stage, start_stage: startStage, broke_through: false, blessings: blessCount });
         const back = onStageFailed(save);
-        this.runNote = `本局結束：機緣散去，退回第 ${back} 關重新開局`;
+        this.runNote = shielded
+          ? "新手護體：機緣保留，重打這一關（築基期起被破就要重開本局）"
+          : `本局結束：機緣散去，退回第 ${back} 關重新開局`;
       }
     }
 
@@ -333,7 +336,9 @@ export class ResultScene extends Phaser.Scene {
               ? save.world.realmRun.offer !== null
                 ? "擇一機緣"
                 : "繼續挑戰"
-              : "重新開局"
+              : save.world.realmRun.startStage === save.world.stage && Object.keys(save.world.realmRun.blessings).length === 0
+                ? "重新開局"
+                : "再戰一次"
           : dungeon.endless
             ? `再入${dungeon.name}`
             : upcoming === null
