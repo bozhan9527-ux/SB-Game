@@ -150,7 +150,10 @@ export class Pic {
       // 麥克筆：一筆到底、粗一點、筆頭圓；不描第二次。
       w *= passes > 1 ? 0.95 : 0.9;
       passes = 1;
-      amp *= 1.8;
+      // 長線條放鬆一點；臉、眼、嘴這種小線條要穩，抖了五官就歪
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      const size = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+      amp *= size < 45 ? 0.5 : 1.4;
       if (color === INK) color = '#2b2420';
     }
     for (let p = 0; p < passes; p++) {

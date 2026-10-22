@@ -93,8 +93,8 @@ export function human(p, x, y, f, s = 1, o = {}) {
     if (STYLE === 'marker') {
       // 塗鴉捲髮：沿髮際畫幾個小圈圈
       for (let i = 0; i < 5; i++) {
-        const u = -11 + i * 5.5, v = -72 + Math.abs(u) * 0.12 + J(1);
-        p.ink(spiral(x + u * s, y + v * s, 3 * s, 1.2, i % 2 ? 1 : -1, R() * 6), { w: 1.3, passes: 1, amp: 0.3 });
+        const u = -10 + i * 5, v = -74 + Math.abs(u) * 0.1;
+        p.ink(spiral(x + u * s, y + v * s, 2.4 * s, 1.1, i % 2 ? 1 : -1, R() * 6), { w: 1.1, passes: 1, amp: 0.2 });
       }
     }
   }
