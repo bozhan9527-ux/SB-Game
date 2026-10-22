@@ -32,7 +32,7 @@ export const RARE_LAYER = 5;
 export const RUN_LENGTH = 9;
 
 export function freshRealmRun(startStage: number): RealmRunState {
-  return { startStage: Math.max(1, Math.floor(startStage)), gate: null, blessings: {}, offer: null, rerolls: 0 };
+  return { startStage: Math.max(1, Math.floor(startStage)), gate: null, blessings: {}, offer: null, rerolls: 0, checkpoint: null };
 }
 
 /**
@@ -126,6 +126,8 @@ export function onStageCleared(save: SaveData, clearedStage: number, survivors: 
   const restored = Math.min(maxDisciples, Math.max(1, Math.round(survivors)) + Math.ceil(maxDisciples * GATE_RESTORE));
   run.gate = restored >= maxDisciples ? null : restored;
   run.offer = rollFor(save, layerInRun(clearedStage) === RARE_LAYER);
+  // 稀有機緣那一關過了、而且這次沒有三選一可選：直接在下一關記歇腳點（有得選的話選完才記）
+  if (layerInRun(clearedStage) === RARE_LAYER && run.offer === null) markCheckpoint(save);
   return { brokeThrough: false, gate: run.gate };
 }
 
@@ -133,7 +135,30 @@ export function onStageCleared(save: SaveData, clearedStage: number, survivors: 
  * 主線這一關沒過（山門被破、首領逾時、半途收兵）：本局結束，退回本局第一關。
  * 回傳退回的關卡。
  */
+/** 在現在這一關（第六關）記歇腳點：之後失守從這裡重來，機緣回到此刻這一組。 */
+function markCheckpoint(save: SaveData): void {
+  const run = save.world.realmRun;
+  if (run.checkpoint !== null) return;
+  run.checkpoint = { stage: save.world.stage, blessings: { ...run.blessings } };
+}
+
+/** 失守之後會退回哪一關（結算頁先講，存檔再照做）。 */
+export function retreatStage(save: SaveData): number {
+  if (newbieShield(save)) return save.world.stage;
+  const cp = save.world.realmRun.checkpoint;
+  if (cp !== null && save.world.stage >= cp.stage) return cp.stage;
+  return Math.min(save.world.realmRun.startStage, save.world.stage);
+}
+
 export function onStageFailed(save: SaveData): number {
+  // 中途歇腳：過了第五關之後失守，從第六關重來，機緣回到進第六關時那一組。
+  const cp = save.world.realmRun.checkpoint;
+  if (!newbieShield(save) && cp !== null && save.world.stage >= cp.stage) {
+    const run = save.world.realmRun;
+    save.world.stage = cp.stage;
+    save.world.realmRun = { ...run, gate: null, blessings: { ...cp.blessings }, offer: null };
+    return cp.stage;
+  }
   if (newbieShield(save)) {
     // 新手護體：只重打這一關，機緣留著，山門回滿。
     save.world.realmRun.gate = null;
@@ -151,6 +176,16 @@ export function onStageFailed(save: SaveData): number {
  * 剛學會拖符的人在第 4 關倒下、被丟回第 1 關，學到的只有「這遊戲很不公平」。
  * 硬派的一境一局從築基期起才生效——那時他已經知道機緣與耐久是怎麼回事。
  */
+/**
+ * 屢敗屢戰：主線連續失守時，失守那一場的金幣多給。每多輸一次 +40%，最多 +120%。
+ *
+ * 卡關的人只能靠刷金幣升級，而失守只給通關的三成五——連輸三次還在原地的人最需要這份。
+ * 只加金幣、不加戰力：戰鬥本身不變，排行榜的重播驗證不受影響。過一關就歸零。
+ */
+export function gritBonus(failStreak: number): number {
+  return Math.min(3, Math.max(0, failStreak)) * 0.4;
+}
+
 export function newbieShield(save: SaveData): boolean {
   const first = REALMS[0];
   return save.player.karma.rebirths === 0 && first !== undefined && save.world.stage <= first.stageTo;
@@ -162,6 +197,7 @@ export function pickBlessing(save: SaveData, id: string): boolean {
   if (run.offer === null || !run.offer.ids.includes(id)) return false;
   run.blessings = takeBlessing(run.blessings, id);
   run.offer = null;
+  if (layerInRun(save.world.stage) === RARE_LAYER + 1) markCheckpoint(save);
   // 舊的「關間奇遇」成就沿用這個計數：機緣取代了奇遇，選機緣就是那件事。
   save.player.stats.omensTaken += 1;
   return true;

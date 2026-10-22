@@ -62,7 +62,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
         maxTribulations: 0,
       },
     },
-    world: { stage: 1, highestStage: 1, runs: 0, clears: 0, realmRun: freshRealmRun(1), tribulations: {} },
+    world: { stage: 1, highestStage: 1, runs: 0, clears: 0, realmRun: freshRealmRun(1), tribulations: {}, failStreak: 0 },
     settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1, vibrate: true },
   };
 }
@@ -149,6 +149,13 @@ function normalizeKarma(raw: unknown): KarmaState {
 }
 
 /** 一境一局：壞掉的欄位一律退回「從這一關開新的一局」。 */
+function normalizeCheckpoint(raw: unknown): RealmRunState['checkpoint'] {
+  if (raw === null || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const stage = Math.floor(asNumber(o['stage'], 0));
+  return stage >= 1 ? { stage, blessings: sanitizeBlessings(o['blessings']) } : null;
+}
+
 function normalizeRealmRun(raw: unknown, stage: number): RealmRunState {
   const source = (raw ?? {}) as Record<string, unknown>;
   const offerRaw = source['offer'] as Record<string, unknown> | null | undefined;
@@ -163,6 +170,7 @@ function normalizeRealmRun(raw: unknown, stage: number): RealmRunState {
       blessings: sanitizeBlessings(source['blessings']),
       offer: ids.length > 0 ? { ids, rare: offerRaw?.['rare'] === true } : null,
       rerolls: Math.max(0, Math.floor(asNumber(source['rerolls'], 0))),
+      checkpoint: normalizeCheckpoint(source['checkpoint']),
     },
     stage,
   );
@@ -330,6 +338,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
       realmRun: normalizeRealmRun(world['realmRun'], stage),
       tribulations: sanitizeTribulationLevels(world['tribulations']),
+      failStreak: Math.max(0, Math.min(99, Math.floor(asNumber(world['failStreak'], 0)))),
     },
     settings: {
       sound: settings['sound'] !== false,

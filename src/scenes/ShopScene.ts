@@ -6,7 +6,7 @@
  */
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { composeDisciples, costumePreview, costumePreviewAnim, discipleTierForRealm } from '../art';
+import { composeDisciples, costumePreview, costumePreviewAnim, discipleTierForRealm, ensureCostumeArt } from '../art';
 import { GAME_WIDTH } from '../config';
 import { SHOP } from '../data';
 import type { SectArt } from '../data/types';
@@ -40,6 +40,11 @@ export class ShopScene extends Phaser.Scene {
   init(data?: { selected?: string | null }): void {
     this.selected = data?.selected ?? this.selected ?? null;
     this.busy = false;
+  }
+
+  /** 時裝部件不在開場那一批裡（見 art.ts），進藏寶閣前先確認都到了。 */
+  preload(): void {
+    ensureCostumeArt(this);
   }
 
   create(): void {

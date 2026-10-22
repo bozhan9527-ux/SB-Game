@@ -390,6 +390,13 @@ const addVibrate: Migration = (data) => {
   return { ...data, settings: { ...settings, vibrate: true } };
 };
 
+/** v27 → v28：一境一局的中途歇腳。舊存檔正在打的這一局沒有歇腳點，從下一局開始有。 */
+const addCheckpoint: Migration = (data) => {
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const run = (world['realmRun'] ?? {}) as Record<string, unknown>;
+  return { ...data, world: { ...world, realmRun: { ...run, checkpoint: null }, failStreak: 0 } };
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -417,6 +424,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addDaily,
   addStones,
   addVibrate,
+  addCheckpoint,
 ];
 
 /**

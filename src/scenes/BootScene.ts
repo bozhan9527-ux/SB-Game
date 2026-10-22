@@ -3,6 +3,7 @@ import { composeDisciples, preloadArt } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { hasSave } from '../save';
 import { state } from '../state';
+import { realmForStage } from '../systems/realms';
 import { initState } from '../state';
 import { initTelemetry, setTelemetryEnabled, track } from '../telemetry';
 import { DANGER, EDGE, INK, LACQUER, TALISMAN, textStyle, wrapText } from '../ui/theme';
@@ -69,7 +70,8 @@ export class BootScene extends Phaser.Scene {
     const doors = this.buildDoors();
     const seal = this.buildSeal();
 
-    preloadArt(this);
+    const boot = state();
+    preloadArt(this, realmForStage(boot.world.stage).id, boot.player.stones.equipped);
     this.load.on('progress', (value: number) => seal.progress(value));
     this.load.once('complete', () => {
       // 穿著時裝的話，門人一開始就疊時裝的部件（換裝時藏寶閣會再疊一次）

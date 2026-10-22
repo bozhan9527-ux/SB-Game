@@ -7,7 +7,7 @@
  * 貼圖以遊戲點的兩倍（首領 1.5 倍、背景 1 倍）算圖；顯示倍數記在 art-manifest.json，
  * 其他元件在使用的地方用 setDisplaySize 指定遊戲點大小。
  */
-import { CARDS, REALMS } from './data';
+import { CARDS, ENEMIES, REALMS } from './data';
 import artManifest from './data/art-manifest.json';
 import type { BossArt, MobArt, SectArt } from './data/types';
 
@@ -260,6 +260,9 @@ export function costumePreviewAnim(scene: Phaser.Scene, costume: string, art: Se
 export function createWalkAnimations(scene: Phaser.Scene): void {
   const define = (key: string, frames: string[], frameRate = 8): void => {
     if (scene.anims.exists(key)) return;
+    // 圖是分批載的（見 preloadArt）：還沒載到的先不建，下一次進場再建——
+    // 建了空的動畫會被 exists 擋住，之後圖載好了也不會再補。
+    if (!frames.every((texture) => scene.textures.exists(texture))) return;
     scene.anims.create({
       key,
       frames: frames.map((texture) => ({ key: texture })),
@@ -281,10 +284,69 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
   }
 }
 
-export function preloadArt(scene: Phaser.Scene): void {
+/**
+ * 分批載圖。
+ *
+ * 全部 340 多張一次載完約 3MB，手機網路差的時候開場要等很久，而開場其實只用得到一小部分：
+ * 介面、主畫面、符、戰場、門人的基本部件，加上**現在這個境界**的背景、妖物與首領。
+ * 這些在開場（BootScene）載；其餘進主畫面後在背景慢慢載（loadRemainingArt），
+ * 戰鬥場景開打前再確認一次它要的那一境有沒有到（ensureRealmArt）。
+ */
+const COSTUME_PART = /^(robe-c-|hat-(?!bun$|band$|crown$)|cape-(?!red$))/;
+
+function isCostumePart(file: string): boolean {
+  return file.startsWith('pd-') && COSTUME_PART.test(file.slice(3).replace(/-\d+$/, ''));
+}
+
+function realmFiles(realmId: string): Set<string> {
+  const files = new Set<string>([`bg-${realmId}`]);
+  for (const mob of ENEMIES.mobs) if (mob.realm === realmId) for (const f of WALK_FRAMES) files.add(`enemy-${mob.art}-${f}`);
+  for (const boss of ENEMIES.bosses) if (boss.realm === realmId) for (const f of BOSS_FRAMES) files.add(`boss-${boss.art}-${f}`);
+  return files;
+}
+
+function isRealmFile(file: string): boolean {
+  return file.startsWith('bg-') || file.startsWith('enemy-') || file.startsWith('boss-');
+}
+
+function queue(scene: Phaser.Scene, assets: readonly ArtSpec[]): number {
   // BASE_URL 在 GitHub Pages 上是 /SB-Game/，寫死路徑會 404。
   const base = import.meta.env.BASE_URL;
-  for (const asset of ASSETS) {
+  let n = 0;
+  for (const asset of assets) {
+    if (scene.textures.exists(asset.key)) continue;
     scene.load.image(asset.key, `${base}art/${asset.file}.webp`);
+    n += 1;
   }
+  return n;
+}
+
+/** 開場要的那一批。realmId：玩家現在所在的境界；costume：穿著的時裝（要它的部件才疊得出門人）。 */
+export function preloadArt(scene: Phaser.Scene, realmId: string, costume: string | null = null): void {
+  const realm = realmFiles(realmId);
+  const worn = new Set(costume === null ? [] : Object.entries(MANIFEST.paperdoll?.outfits ?? {}).filter(([k]) => k.startsWith(`${costume}:`)).flatMap(([, parts]) => parts.map((id) => `pd-${id}`)));
+  queue(
+    scene,
+    ASSETS.filter((asset) => {
+      if (isRealmFile(asset.file)) return realm.has(asset.file);
+      if (isCostumePart(asset.file)) return worn.has(asset.file.replace(/-\d+$/, ''));
+      return true;
+    }),
+  );
+}
+
+/** 某一境的背景、妖物與首領（戰鬥開打前確認；無限副本會一路往下打，給 all）。 */
+export function ensureRealmArt(scene: Phaser.Scene, realmIds: readonly string[] | 'all'): number {
+  const wanted = realmIds === 'all' ? null : new Set(realmIds.flatMap((id) => [...realmFiles(id)]));
+  return queue(scene, ASSETS.filter((asset) => isRealmFile(asset.file) && (wanted === null || wanted.has(asset.file))));
+}
+
+/** 時裝部件（藏寶閣用）。 */
+export function ensureCostumeArt(scene: Phaser.Scene): number {
+  return queue(scene, ASSETS.filter((asset) => isCostumePart(asset.file)));
+}
+
+/** 其餘全部，背景慢慢載。主畫面呼叫；中途換場景也沒關係，下次進主畫面會接著載剩下的。 */
+export function loadRemainingArt(scene: Phaser.Scene): void {
+  if (queue(scene, ASSETS) > 0) scene.load.start();
 }

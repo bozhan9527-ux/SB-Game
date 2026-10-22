@@ -5,7 +5,7 @@ import { pixelPanel } from '../ui/panel';
 import { libraryFloor } from '../systems/dungeons';
 import { audio } from '../audio';
 import type { IconName } from '../art';
-import { ART, discipleTexture, glyphTexture, iconTexture } from '../art';
+import { ART, discipleTexture, glyphTexture, iconTexture, loadRemainingArt } from '../art';
 import { APP_VERSION, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { persist, state } from '../state';
 import { storageUnavailable } from '../save/storage';
@@ -149,6 +149,8 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     persist();
+    // 開場只載了現在這一境要的圖，其餘在主畫面時背景慢慢載完
+    loadRemainingArt(this);
   }
 
   /**

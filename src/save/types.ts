@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 27;
+export const SAVE_VERSION = 28;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -80,6 +80,11 @@ export interface RealmRunState {
   offer: { ids: string[]; rare: boolean } | null;
   /** 本局已用過幾次重抽。 */
   rerolls: number;
+  /**
+   * 中途歇腳（v28）：過了稀有機緣那一關、進第六關時記下的關卡與機緣。
+   * 之後在第六～九關失守，就從這裡重來（機緣回到那時的那一組），不必再從第一關打起。
+   */
+  checkpoint: { stage: number; blessings: Record<string, number> } | null;
 }
 
 /**
@@ -271,6 +276,8 @@ export interface WorldState {
   realmRun: RealmRunState;
   /** 這一世背負的天劫（天劫 id → 第幾重）。飛升台上選，整世生效。 */
   tribulations: Record<string, number>;
+  /** 主線連續失守幾次（v28）：屢敗屢戰的金幣加成看它，過一關就歸零。 */
+  failStreak: number;
 }
 
 /** 玩家偏好。不是權威數值，純本機設定。 */

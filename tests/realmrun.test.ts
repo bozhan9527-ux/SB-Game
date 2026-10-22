@@ -69,7 +69,7 @@ describe('一境一局', () => {
     const outcome = clear(save, 3);
     expect(outcome.brokeThrough).toBe(true);
     expect(save.world.stage).toBe(19);
-    expect(save.world.realmRun).toEqual({ startStage: 19, gate: null, blessings: {}, offer: null, rerolls: 0 });
+    expect(save.world.realmRun).toEqual({ startStage: 19, gate: null, blessings: {}, offer: null, rerolls: 0, checkpoint: null });
   });
 
   it('失守：退回本局第一關、機緣散去', () => {
@@ -196,5 +196,50 @@ describe('每日挑戰', () => {
     expect(claimDaily(save, 50, 12)).toBe(1);
     expect(claimDaily(save, 50, 20)).toBe(0);
     expect(claimDaily(save, 51, 12)).toBe(2);
+  });
+});
+
+describe('中途歇腳', () => {
+  it('過了第五關（選完稀有機緣）在第六關記歇腳；之後失守退回第六關、機緣回到那時', () => {
+    const save = at(14); // 第 5 層
+    save.world.realmRun.blessings = { guardian: 1 };
+    clear(save, 40);
+    const offer = save.world.realmRun.offer;
+    expect(offer?.rare).toBe(true);
+    pickBlessing(save, offer!.ids[0]!);
+    const cp = save.world.realmRun.checkpoint;
+    expect(cp?.stage).toBe(15);
+    const snapshot = { ...save.world.realmRun.blessings };
+    // 再往前打一關、多拿一張機緣，然後在第 17 關失守
+    clear(save, 40);
+    pickBlessing(save, save.world.realmRun.offer!.ids[0]!);
+    save.world.stage = 17;
+    expect(onStageFailed(save)).toBe(15);
+    expect(save.world.stage).toBe(15);
+    expect(save.world.realmRun.blessings).toEqual(snapshot);
+    expect(save.world.realmRun.gate).toBeNull();
+  });
+
+  it('還沒到第六關就失守：照舊退回本局第一關', () => {
+    const save = at(13);
+    expect(onStageFailed(save)).toBe(10);
+  });
+
+  it('破境之後歇腳點清掉', () => {
+    const save = at(18);
+    save.world.realmRun.checkpoint = { stage: 15, blessings: {} };
+    clear(save, 3);
+    expect(save.world.realmRun.checkpoint).toBeNull();
+  });
+});
+
+import { gritBonus } from '../src/systems/realmrun';
+
+describe('屢敗屢戰', () => {
+  it('連續失守的金幣加成：每次 +40%，最多 +120%', () => {
+    expect(gritBonus(0)).toBe(0);
+    expect(gritBonus(1)).toBeCloseTo(0.4);
+    expect(gritBonus(3)).toBeCloseTo(1.2);
+    expect(gritBonus(9)).toBeCloseTo(1.2);
   });
 });

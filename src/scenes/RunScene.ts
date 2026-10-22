@@ -15,6 +15,7 @@ import {
   discipleWalkKey,
   enemyTexture,
   enemyWalkKey,
+  ensureRealmArt,
 } from "../art";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { BALANCE, CARDS, ENEMIES, bossSkill } from "../data";
@@ -456,6 +457,22 @@ export class RunScene extends Phaser.Scene {
     this.coachTitle = null;
     this.coachBody = null;
     this.coachArrow = null;
+  }
+
+  /**
+   * 開打前確認這一場要的圖都到了（圖是分批載的，見 art.ts 的 preloadArt）。
+   * 主線與重挑只要那一境；副本的深度另算、無限副本還會一路往下打，乾脆全部確認。
+   */
+  preload(): void {
+    const stage = this.replayStage ?? state().world.stage;
+    const pending = ensureRealmArt(this, this.dungeonRun === null ? [realmForStage(stage).id] : "all");
+    // 還有圖要等（多半是副本、或網路慢）：留一行字，不要讓畫面空白著
+    if (pending > 0) {
+      const label = this.add
+        .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "山門開啟中…", textStyle({ size: 22, color: INK_DIM }))
+        .setOrigin(0.5);
+      this.load.once("complete", () => label.destroy());
+    }
   }
 
   create(): void {

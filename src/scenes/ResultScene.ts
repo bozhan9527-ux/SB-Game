@@ -42,7 +42,7 @@ import {
 import type { RunResultData } from "./types";
 import { fadeIn, fadeToScene } from "../ui/transition";
 import { enterMainline } from "./flow";
-import { consumeRevive, newbieShield, onStageCleared, onStageFailed } from "../systems/realmrun";
+import { consumeRevive, gritBonus, newbieShield, onStageCleared, onStageFailed } from "../systems/realmrun";
 import { DAILY_ID, claimDaily, dayOf } from "../systems/daily";
 import { mustAscend } from "../systems/karma";
 import { grantAfterRun, grantDaily, grantTower } from "../systems/stones";
@@ -92,7 +92,11 @@ export class ResultScene extends Phaser.Scene {
     // **重挑的一場不給金幣。** 見 recordReplay：不擋的話，回頭刷第 5 關
     // 會變成全遊戲最好賺的金幣來源。這件事結算表上要寫出來，
     // 不然玩家看到「金幣 0」只會以為壞掉了。
-    const gold = result.replay ? 0 : result.goldCollected + result.goldReward;
+    // 屢敗屢戰：主線連續失守，失守的金幣多給（見 gritBonus）。過關歸零。
+    const onMainline = !result.replay && result.dungeon === null;
+    const grit = onMainline && !result.victory ? Math.round(result.goldReward * gritBonus(save.world.failStreak)) : 0;
+    if (onMainline) save.world.failStreak = result.victory ? 0 : save.world.failStreak + 1;
+    const gold = result.replay ? 0 : result.goldCollected + result.goldReward + grit;
     const dungeon =
       result.dungeon === null ? null : dungeonById(result.dungeon.id);
     // 關間奇遇（v24 移除）讓位給機緣三選一：兩個三選一疊在同一個結算頁，玩家每過一關要連選兩次。
@@ -122,10 +126,13 @@ export class ResultScene extends Phaser.Scene {
       } else {
         const shielded = newbieShield(save);
         if (!shielded) track("realm_run_end", { stage: result.stage, start_stage: startStage, broke_through: false, blessings: blessCount });
+        const checkpoint = save.world.realmRun.checkpoint;
         const back = onStageFailed(save);
         this.runNote = shielded
           ? "新手護體：機緣保留，重打這一關（築基期起被破就要重開本局）"
-          : `本局結束：機緣散去，退回第 ${back} 關重新開局`;
+          : checkpoint !== null && back === checkpoint.stage
+            ? `中途歇腳：退回第 ${back} 關，機緣回到那時的那一組`
+            : `本局結束：機緣散去，退回第 ${back} 關重新開局`;
       }
     }
 
@@ -142,6 +149,7 @@ export class ResultScene extends Phaser.Scene {
       this.dungeonRewards.push(gained > 0 ? `每日挑戰 仙緣 +${gained}` : `今日最佳 ${save.player.daily.best} 波`);
     }
 
+    if (grit > 0) this.dungeonRewards.unshift(`屢敗屢戰 +${formatNumber(grit)} 金`);
     // 靈石：破境、初斬首領、每日挑戰、天劫塔登頂。和副本回報同一個理由——發放與顯示走同一份資料。
     const stoneGains: StoneGain[] = grantAfterRun(save, {
       victory: result.victory,
