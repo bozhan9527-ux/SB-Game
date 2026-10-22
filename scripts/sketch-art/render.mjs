@@ -20,7 +20,15 @@ export function rasterize(pic, res, { paper = false } = {}) {
     font: { fontFiles: FONT_FILES, loadSystemFonts: false, defaultFontFamily: 'LXGW WenKai TC Medium' },
   });
   const img = r.render();
-  return { data: img.pixels, width: img.width, height: img.height };
+  // resvg 給的是預乘過 alpha 的 RGBA（顏色已經乘上透明度）。直接當一般 RGBA 寫檔的話，
+  // 每個半透明像素都會偏暗偏灰——淡彩、光暈、線條的抗鋸齒邊全部髒掉。寫檔前先還原。
+  const data = img.pixels;
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (a === 0 || a === 255) continue;
+    for (let c = 0; c < 3; c++) data[i + c] = Math.min(255, Math.round((data[i + c] * 255) / a));
+  }
+  return { data, width: img.width, height: img.height };
 }
 
 /** 實際有畫的最上一列（alpha 夠深才算，排線邊緣的淡顆粒不算）。 */

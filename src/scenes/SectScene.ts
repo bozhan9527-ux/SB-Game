@@ -24,6 +24,7 @@ import {
   wrapText,
 } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
+import { enterMainline } from './flow';
 
 interface SectCard {
   sect: Sect;
@@ -83,9 +84,13 @@ export class SectScene extends Phaser.Scene {
         const cost = switchCost(save, target.id);
         if (cost > save.player.wallet.gold) return;
         save.player.wallet.gold -= cost;
+        const first = save.player.sectId === null;
         save.player.sectId = target.id;
         persist();
-        fadeToScene(this, 'Title');
+        // 第一次拜師：直接開打。送回主畫面的話，新玩家還得再找一次「開始挑戰」——
+        // 他剛剛選門派就是為了開始玩。換派的老玩家照舊回主畫面。
+        if (first) enterMainline(this);
+        else fadeToScene(this, 'Title');
       },
     });
     this.confirm = confirm;

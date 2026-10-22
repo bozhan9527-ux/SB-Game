@@ -224,7 +224,9 @@ export class TitleScene extends Phaser.Scene {
       .setStroke('#fdfbf6', 6).setOrigin(0, 0.5);
 
     // 靈石：點了進藏寶閣。和金幣同一列，但它是個入口，所以做成按鈕。
-    createButton(this, GAME_WIDTH - 150, 36, {
+    // 新玩家第一顆靈石要到第一次破境才拿得到；在那之前掛一顆「靈石 0」只是在推銷，先不出現（選單裡仍進得去）。
+    const stones = save.player.stones;
+    if (stones.balance > 0 || stones.costumes.length > 0 || save.player.karma.rebirths > 0) createButton(this, GAME_WIDTH - 150, 36, {
       width: 140,
       height: 44,
       label: `靈石 ${formatNumber(save.player.stones.balance)}`,
@@ -279,7 +281,7 @@ export class TitleScene extends Phaser.Scene {
   ): number {
     const cx = GAME_WIDTH / 2;
     const height = 176;
-    pixelPanel(this, cx, top + height / 2, GAME_WIDTH - 48, height, { alpha: 0.9 });
+    pixelPanel(this, cx, top + height / 2, GAME_WIDTH - 48, height, { alpha: 1 });
 
     this.add
       .text(cx, top + 38, realmTitle(save.world.stage), textStyle({ size: 40, color: realm.color, bold: true }))

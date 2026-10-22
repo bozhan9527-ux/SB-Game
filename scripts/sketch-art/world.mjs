@@ -381,7 +381,7 @@ export function titleKey() {
   pagoda(p, 300, 372, 1.0);
   for (let i = 0; i < 4; i++) p.pencil([[352 + i * 3, 400], [354 + i * 3, 500 + i * 6]], { color: '#7fa6c8', op: 0.7, w: 1.4 });
   peak(p, 205, 600, 70, 190, { op: 0.65 });
-  ruyi(p, 90, 470, 1.1); ruyi(p, 420, 430, 0.9, '#e8dcef'); ruyi(p, 300, 560, 1.4); ruyi(p, 110, 590, 1.2, '#e8dcef', { tail: 0 }); ruyi(p, 470, 600, 1.1);
+  ruyi(p, 90, 470, 1.1); ruyi(p, 420, 430, 0.9, '#e8dcef'); ruyi(p, 300, 560, 1.4); ruyi(p, 110, 590, 1.2, '#e8dcef', { tail: 0 }); ruyi(p, 440, 600, 1.1, undefined, { tail: 0 });
   return p;
 }
 

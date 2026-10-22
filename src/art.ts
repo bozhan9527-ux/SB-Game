@@ -243,6 +243,19 @@ export function costumePreview(scene: Phaser.Scene, costume: string, art: SectAr
   return key;
 }
 
+/** 某套時裝的走路動畫（藏寶閣裡選中的那一套會動，看得出穿上之後走起來的樣子）。 */
+export function costumePreviewAnim(scene: Phaser.Scene, costume: string, art: SectArt, tier: number): string {
+  const key = `preview-walk-${costume}-${art}-t${tier}`;
+  if (scene.anims.exists(key)) return key;
+  const frames = WALK_FRAMES.map((frame) => {
+    const texture = `preview-${costume}-${art}-t${tier}-f${frame}`;
+    if (!scene.textures.exists(texture)) composeOutfit(scene, texture, outfitParts(art, tier, costume), frame);
+    return { key: texture };
+  });
+  scene.anims.create({ key, frames, frameRate: 6, repeat: -1 });
+  return key;
+}
+
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
 export function createWalkAnimations(scene: Phaser.Scene): void {
   const define = (key: string, frames: string[], frameRate = 8): void => {

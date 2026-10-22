@@ -89,6 +89,7 @@ import {
   BG_PANEL,
   DANGER,
   EDGE,
+  FRAME,
   GOLD,
   INK,
   INK_DIM,
@@ -285,6 +286,8 @@ export class RunScene extends Phaser.Scene {
   private run!: DefenseState;
   private rng!: ReturnType<typeof createRng>;
   private over = false;
+  /** 山門兩側的守門弟子（待機呼吸、受擊退縮、斬首領時歡呼）。 */
+  private guards: Phaser.GameObjects.Sprite[] = [];
   /** 這一場已經響過「山門快守不住」的警鑼（只響一次，不然後半場一直在敲）。 */
   private gateWarned = false;
   /** 失守後正在等玩家決定要不要接關（128 平台付費）：戰鬥停住。 */
@@ -682,19 +685,27 @@ export class RunScene extends Phaser.Scene {
     const art = this.run.loadout.sect.art;
     const tier = discipleTierForRealm(realmIndexForStage(this.run.stage));
     const guardScale = discipleArtSize(art).scale;
-    const guard = this.add
-      .sprite(58, 802, discipleTexture(art, tier, 0))
-      .setOrigin(0.5, 1)
-      .setScale(guardScale)
-      .setDepth(29);
-    guard.play(discipleWalkKey(art, tier));
-    const guard2 = this.add
-      .sprite(482, 802, discipleTexture(art, tier, 0))
-      .setOrigin(0.5, 1)
-      .setScale(guardScale)
-      .setDepth(29);
-    guard2.play(discipleWalkKey(art, tier));
-    guard2.anims.setProgress(0.5);
+    // 守門弟子是站崗，不是在走路：原本播走路動畫，看起來像在原地踏步。
+    // 改成待機呼吸（身體一起一伏），山門被撞時退縮、斬首領時跳一下。
+    this.guards = [58, 482].map((x, i) => {
+      const guard = this.add
+        .sprite(x, 802, discipleTexture(art, tier, 0))
+        .setOrigin(0.5, 1)
+        .setScale(guardScale)
+        .setDepth(29)
+        .setData("x", x);
+      this.tweens.add({
+        targets: guard,
+        scaleY: guardScale * 1.03,
+        duration: 1100,
+        delay: i * 550,
+        ease: "Sine.easeInOut",
+        yoyo: true,
+        repeat: -1,
+      });
+      return guard;
+    });
+    void discipleWalkKey;
 
     // 手牌區的托盤：和面板同一套漆木金邊，和戰場明確分開。
     const tray = this.add.graphics({ x: GAME_WIDTH / 2, y: 882 }).setDepth(40);
@@ -799,10 +810,7 @@ export class RunScene extends Phaser.Scene {
       // 無限副本沒有層數可講，改成即時的波數——那是玩家在裡面唯一的進度感。
       // 狀態列正下方一條專用的深色窄帶：直接把字放在 y=106 會和波次進度條、
       // 狀態列底邊、戰場外框與角飾全部疊在一起。
-      this.add
-        .rectangle(GAME_WIDTH / 2, 124, GAME_WIDTH, 21, BG_PANEL, 1)
-        .setStrokeStyle(3, EDGE)
-        .setDepth(52);
+      this.drawStrip();
       this.dungeonBanner = this.add
         .text(
           20,
@@ -823,10 +831,7 @@ export class RunScene extends Phaser.Scene {
     // 一境一局：本局的機緣常駐一行，和副本那一行同一個位置（兩者不會同時出現）。
     const blessings = Object.entries(this.run.loadout.blessings);
     if (dungeon === null && blessings.length > 0) {
-      this.add
-        .rectangle(GAME_WIDTH / 2, 124, GAME_WIDTH, 21, BG_PANEL, 1)
-        .setStrokeStyle(3, EDGE)
-        .setDepth(52);
+      this.drawStrip();
       const names = blessings
         .map(([id, stars]) => {
           const def = blessingDef(id);
@@ -1952,6 +1957,7 @@ export class RunScene extends Phaser.Scene {
     this.flushDamageNumbers();
 
     for (const kill of report.kills) {
+      if (kill.boss) this.guardsCheer();
       const view = this.enemySprites.get(kill.enemyId);
       if (view !== undefined) {
         this.crumble(view.x, view.y, kill.boss ? 36 : 12, kill.boss);
@@ -1992,6 +1998,7 @@ export class RunScene extends Phaser.Scene {
       else {
         audio.play("gateHurt");
         vibrate(leak.boss ? [70, 40, 70] : 45);
+        this.guardsFlinch();
       }
       this.gateBar.setAlpha(1);
       this.tweens.add({ targets: this.gateBar, alpha: 0, duration: 420 });
@@ -2654,6 +2661,36 @@ export class RunScene extends Phaser.Scene {
    * 正在拖的符對不準格子（製作人回報「震動嚴重影響出牌」）。
    * 回饋留在被撞的那個東西上：山門左右晃兩下，加上原本那道紅光與扣耐久的數字。
    */
+  /**
+   * 狀態列下面那條窄帶（副本說明／本局機緣）：紙底、上下兩道手繪的深赭細線。
+   * 原本是 3px 黑色直線方框，在白紙咖啡框的介面裡是唯一一個「電腦畫的框」。
+   */
+  private drawStrip(): void {
+    const g = this.add.graphics().setDepth(52);
+    g.fillStyle(BG_PANEL, 1);
+    g.fillRect(0, 114, GAME_WIDTH, 21);
+    roughLine(g, 6, 114, GAME_WIDTH - 6, 114, { stroke: FRAME, width: 1.6, amp: 0.4, seed: 11 });
+    roughLine(g, 6, 135, GAME_WIDTH - 6, 135, { stroke: FRAME, width: 1.6, amp: 0.4, seed: 12 });
+  }
+
+  /** 山門挨打：守門弟子退縮一下（左右晃、泛紅）。 */
+  private guardsFlinch(): void {
+    for (const guard of this.guards) {
+      const x = guard.getData("x") as number;
+      guard.x = x;
+      guard.setTint(0xf0a8a0);
+      this.tweens.add({ targets: guard, x: x + (x < GAME_WIDTH / 2 ? -5 : 5), duration: 60, yoyo: true, repeat: 1, onComplete: () => { guard.x = x; guard.clearTint(); } });
+    }
+  }
+
+  /** 斬下首領、通關：守門弟子跳兩下。 */
+  private guardsCheer(): void {
+    this.guards.forEach((guard, i) => {
+      guard.y = 802;
+      this.tweens.add({ targets: guard, y: 788, duration: 150, delay: i * 90, ease: "Quad.easeOut", yoyo: true, repeat: 1 });
+    });
+  }
+
   private joltGate(strength: number): void {
     const gate = this.gateImage;
     if (gate === null) return;

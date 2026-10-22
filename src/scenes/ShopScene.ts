@@ -6,7 +6,7 @@
  */
 import Phaser from 'phaser';
 import { audio } from '../audio';
-import { composeDisciples, costumePreview, discipleTierForRealm } from '../art';
+import { composeDisciples, costumePreview, costumePreviewAnim, discipleTierForRealm } from '../art';
 import { GAME_WIDTH } from '../config';
 import { SHOP } from '../data';
 import type { SectArt } from '../data/types';
@@ -95,7 +95,9 @@ export class ShopScene extends Phaser.Scene {
       width: chosen ? 3.4 : 2,
       seed: id.length * 17 + (chosen ? 1 : 0),
     });
-    this.add.image(x, y - 22, costumePreview(this, id, art, tier)).setDisplaySize(96, 134);
+    const figure = this.add.sprite(x, y - 22, costumePreview(this, id, art, tier)).setDisplaySize(96, 134);
+    // 選中的那一套走起來；其他的靜止，一頁六隻一起走會很吵
+    if (chosen) figure.play(costumePreviewAnim(this, id, art, tier));
     this.add.text(x, y + 60, costume.name, textStyle({ size: 18, color: INK })).setOrigin(0.5);
     const status = worn ? '穿著中' : ownsCostume(save, id) ? '已擁有' : `${costume.price.toLocaleString('en-US')} 靈石`;
     this.add.text(x, y + 84, status, textStyle({ size: 15, color: worn ? JADE : ownsCostume(save, id) ? INK_DIM : GOLD })).setOrigin(0.5);

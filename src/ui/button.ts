@@ -165,7 +165,8 @@ export function createButton(
     },
     setEnabled(value: boolean) {
       enabled = value;
-      container.setAlpha(value ? 1 : 0.45);
+      // 停用：整顆淡一點就好，字改淡墨。原本整顆 0.45 透明，「第 2 關開放」這種提示字讀不出來。
+      container.setAlpha(value ? 1 : 0.72);
       text.setColor(value ? textColor : INK_DIM);
     },
     get enabled() {
