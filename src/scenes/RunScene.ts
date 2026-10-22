@@ -728,7 +728,7 @@ export class RunScene extends Phaser.Scene {
         textStyle({ size: 26, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
-      .setStroke("#f5eddb", 7)
+      .setStroke("#fdfbf6", 7)
       .setDepth(46)
       .setAlpha(0);
   }
@@ -1015,7 +1015,7 @@ export class RunScene extends Phaser.Scene {
             this.add
               .text(0, 0, "封", textStyle({ size: 30, color: SEAL_COLOR, bold: true }))
               .setOrigin(0.5)
-              .setStroke("#f5eddb", 6),
+              .setStroke("#fdfbf6", 6),
           ])
           .setDepth(29)
           .setVisible(false),
@@ -1031,7 +1031,7 @@ export class RunScene extends Phaser.Scene {
             this.add
               .text(CARD_WIDTH * 0.26, -CARD_HEIGHT * 0.26, "蝕", textStyle({ size: 20, color: CURSE_COLOR, bold: true }))
               .setOrigin(0.5)
-              .setStroke("#f5eddb", 5),
+              .setStroke("#fdfbf6", 5),
           ])
           .setDepth(29)
           .setVisible(false),
@@ -2337,7 +2337,7 @@ export class RunScene extends Phaser.Scene {
           textStyle({ size: 15, color: mark.color, bold: true }),
         )
         .setOrigin(0, 0.5)
-        .setStroke("#f5eddb", 5);
+        .setStroke("#fdfbf6", 5);
       container.add(label);
       container.setData("mark", label);
     }
@@ -2420,7 +2420,7 @@ export class RunScene extends Phaser.Scene {
         textStyle({ size: 26, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
-      .setStroke("#f5eddb", 6);
+      .setStroke("#fdfbf6", 6);
     const bg = this.add
       .rectangle(cx, 160 + shift, width, 22, 0x2a1216, 1)
       .setStrokeStyle(3, LINE);
@@ -2435,7 +2435,7 @@ export class RunScene extends Phaser.Scene {
     const skillTag = this.add
       .text(cx + name.width / 2 + 10, 128 + shift, `〔${boss.skillName}〕`, textStyle({ size: 15, color: GOLD, bold: true }))
       .setOrigin(0, 0.5)
-      .setStroke("#f5eddb", 5);
+      .setStroke("#fdfbf6", 5);
     this.bossSkillTag = skillTag;
     this.bossShieldBar = this.add
       .rectangle(cx - width / 2, 160 + shift, 0, 18, hexToNumber(GOLD), 0.85)
@@ -2509,7 +2509,7 @@ export class RunScene extends Phaser.Scene {
         textStyle({ size: 44, color: DANGER, bold: true }),
       )
       .setOrigin(0.5)
-      .setStroke("#f5eddb", 8)
+      .setStroke("#fdfbf6", 8)
       .setDepth(48)
       .setScale(1.6)
       .setAlpha(0);
@@ -2833,7 +2833,7 @@ export class RunScene extends Phaser.Scene {
     const label = this.add
       .text(x, y, text, textStyle({ size, color, bold: true }))
       .setOrigin(0.5)
-      .setStroke("#f5eddb", 6)
+      .setStroke("#fdfbf6", 6)
       .setDepth(depth);
     this.tweens.add({
       targets: label,
@@ -3039,12 +3039,12 @@ export class RunScene extends Phaser.Scene {
     const title = this.add
       .text(GAME_WIDTH / 2, titleY, realmTitle(this.run.stage), textStyle({ size: 48, color: accentHex, bold: true }))
       .setOrigin(0.5)
-      .setStroke("#f5eddb", 8)
+      .setStroke("#fdfbf6", 8)
       .setDepth(80);
     const sub = this.add
       .text(GAME_WIDTH / 2, subY, realm.subtitle, textStyle({ size: 20, color: INK_DIM }))
       .setOrigin(0.5)
-      .setStroke("#f5eddb", 6)
+      .setStroke("#fdfbf6", 6)
       .setDepth(80);
     const parts: Phaser.GameObjects.GameObject[] = [title, sub];
     if (!roomForTitle) {
@@ -3058,7 +3058,7 @@ export class RunScene extends Phaser.Scene {
         this.add
           .text(GAME_WIDTH / 2, bottom - 12, "把符拖到陣位；同種同階疊起來可以合成", textStyle({ size: 20, color: INK }))
           .setOrigin(0.5)
-          .setStroke("#f5eddb", 6)
+          .setStroke("#fdfbf6", 6)
           .setDepth(80),
       );
     } else {

@@ -51,7 +51,7 @@ export class AltarScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const editable = altarOpen();
 
-    this.add.text(cx, 52, '飛 升 台', textStyle({ size: 38, color: INK })).setStroke('#f5eddb', 8).setOrigin(0.5);
+    this.add.text(cx, 52, '飛 升 台', textStyle({ size: 38, color: INK })).setStroke('#fdfbf6', 8).setOrigin(0.5);
     this.add
       .text(
         cx,
@@ -59,7 +59,7 @@ export class AltarScene extends Phaser.Scene {
         editable ? `第 ${save.player.karma.rebirths + 1} 世即將開始・勾選這一世要背負的天劫` : '這一世已經開始，天劫要到下一世才能改',
         textStyle({ size: 15, color: INK_DIM }),
       )
-      .setStroke('#f5eddb', 5)
+      .setStroke('#fdfbf6', 5)
       .setOrigin(0.5);
 
     const jie = jieCount(save.world.tribulations);

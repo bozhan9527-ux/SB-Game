@@ -17,7 +17,7 @@ export interface BackdropRealm {
   scenery: Scenery;
 }
 
-const PAPER = 0xefe6d2;
+const PAPER = 0xfbfaf5;
 
 /**
  * 由上而下的紙色淡幕：遠景只在上半部，往下漸漸淡成素紙，

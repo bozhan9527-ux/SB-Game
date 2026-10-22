@@ -54,16 +54,19 @@ export function blush(p, x, y, gap, s = 1) {
  *    sleeves 寬袖、armor 胸甲色、cape 披風色、weaponR / weaponL（函式，在身前畫）。
  */
 export function human(p, x, y, f, s = 1, o = {}) {
+  // 紙娃娃：o.layer 指定時只畫那一層（見 LAYERS）；沒指定就整個人一次畫完（妖物、主畫面用）
+  const on = (name) => !o.layer || o.layer === name;
   const ls0 = p.ls;
   p.ls = ls0 * Math.sqrt(s);
   const b = bob(f);
   y += b;
   const S = (a) => a.map(([u, v]) => [x + u * s, y + v * s]);
   const robe = o.robe ?? C.blue;
-  if (o.behind) o.behind(p, x, y, s);
-  if (o.cape) p.shape(S([[-14, -50], [-26, -10], [-20, -2], [20, -2], [26, -10], [14, -50]]), o.cape, { gap: 2.6, base: 0.45 });
-  if (o.longHair) p.shape(S([[-13, -76], [-16, -58], [-14, -40], [0, -36], [14, -40], [16, -58], [13, -76]]), o.hair ?? HAIR, { base: 0.85, gap: 2.4, ow: 2 });
-  legs(p, x, y - b, 6 * s, 10 * s, f, { w: 2.6, color: o.legColor ?? INK });
+  if (o.behind && on('aura')) o.behind(p, x, y, s);
+  if (o.cape && on('cape')) p.shape(S([[-14, -50], [-26, -10], [-20, -2], [20, -2], [26, -10], [14, -50]]), o.cape, { gap: 2.6, base: 0.45 });
+  if (o.longHair && on('hairback')) p.shape(S([[-13, -76], [-16, -58], [-14, -40], [0, -36], [14, -40], [16, -58], [13, -76]]), o.hair ?? HAIR, { base: 0.85, gap: 2.4, ow: 2 });
+  if (on('legs')) legs(p, x, y - b, 6 * s, 10 * s, f, { w: 2.6, color: o.legColor ?? INK });
+  if (on('outfit')) {
   // 袍身
   const body = S([[-11, -48], [-17, -30], [-19, -12], [-21, -6], [0, -4], [21, -6], [19, -12], [17, -30], [11, -48]]);
   p.shape(body, robe, { gap: 2.6, base: 0.42, paint: o.robePaint ?? null });
@@ -85,10 +88,15 @@ export function human(p, x, y, f, s = 1, o = {}) {
       p.ink(S([[k * 16, -18], [k * 20, -20], [k * 23, -15]]), { w: 1.2, passes: 1 });
     }
   }
-  if (o.weaponR) o.weaponR(p, x + 22 * s, y - 20 * s, s);
-  if (o.weaponL) o.weaponL(p, x - 22 * s, y - 20 * s, s);
+  if (o.front) o.front(p, x, y, s);
+  }
+  if (on('weapon')) {
+    if (o.weaponR) o.weaponR(p, x + 22 * s, y - 20 * s, s);
+    if (o.weaponL) o.weaponL(p, x - 22 * s, y - 20 * s, s);
+  }
   // 頭
   const headY = y - 62 * s;
+  if (on('head')) {
   // 臉：乾淨的圓（不加抖動），描線也幾乎不抖——五官在這裡面，臉型一歪就整張怪
   const face = ellipsePts(x, headY, 13 * s, 13.2 * s, 28, 0, 0);
   p.add(`<path d="${smooth(face, true)}" fill="${o.skin ?? SKIN}"/>`);
@@ -104,15 +112,18 @@ export function human(p, x, y, f, s = 1, o = {}) {
       }
     });
   }
-  if (o.hat) o.hat(p, x, headY, s);
-  else if (o.hairStyle !== 'none') p.solid(x, headY - 17 * s, 5.5 * s, 4.5 * s, o.hair ?? HAIR, { ow: 1.6 });
   if (o.mask) o.mask(p, x, headY, s);
   else {
     eyes(p, x, headY + 1 * s, 5 * s, s, o.face ?? 'dot', o.eyeColor);
     if (o.face !== 'angry' && o.face !== 'glow' && o.blush !== false) blush(p, x, headY + 6 * s, 8 * s, s);
     if (o.mouth !== false) p.ink([[x - 2.2 * s, headY + 7 * s], [x, headY + 8.6 * s], [x + 2.2 * s, headY + 7 * s]], { w: 1.4, passes: 1, amp: 0.05 });
   }
-  if (o.front) o.front(p, x, y, s);
+  }
+  // 頭飾（帽子、頭冠；沒戴就是髮髻）在最上層：換頭飾不用動到臉
+  if (on('hat')) {
+    if (o.hat) o.hat(p, x, headY, s);
+    else if (o.hairStyle !== 'none') p.solid(x, headY - 17 * s, 5.5 * s, 4.5 * s, o.hair ?? HAIR, { ow: 1.6 });
+  }
   p.ls = ls0;
 }
 
@@ -363,28 +374,68 @@ const SECT = {
   alchemy: { robe: '#79c09a', inner: '#e8f6ee', sash: '#a98fd8', weapon: 'gourd' },
 };
 
+const HATS = {
+  bun: null,
+  band: (p, x, hy) => { p.solid(x, hy - 17, 5.5, 4.5, HAIR, { ow: 1.6 }); p.ink([[x - 10, hy - 18], [x + 10, hy - 15]], { w: 1.6, color: '#7a5a2a', passes: 1 }); },
+  crown: (p, x, hy) => { p.solid(x, hy - 17, 5.5, 4.5, HAIR, { ow: 1.6 }); p.shape([[x - 7, hy - 16], [x - 5, hy - 26], [x, hy - 22], [x + 5, hy - 26], [x + 7, hy - 16]], C.gold, { base: 0.6, gap: 2, ow: 1.6 }); p.ink([[x - 12, hy - 18], [x + 12, hy - 15]], { w: 1.6, color: '#7a5a2a', passes: 1 }); },
+};
+
+const WEAPONS = {
+  sword: (p, x, y) => { p.shape([[x - 1.5, y + 4], [x + 1.5, y + 4], [x + 1.5, y - 34], [x, y - 39], [x - 1.5, y - 34]], '#c7d6e0', { base: 0.5, gap: 2, ow: 1.6, sharp: true }); p.ink([[x - 6, y + 4], [x + 6, y + 4]], { w: 2.4 }); p.ink([[x, y + 5], [x, y + 13]], { w: 2.6, color: WOOD }); },
+  fist: (p, x, y) => { p.solid(x - 2, y + 2, 6, 6, SKIN, { ow: 2 }); p.ink([[x - 6, y - 2], [x + 2, y - 2]], { w: 1.4, color: ZHU, passes: 1 }); },
+  fu: (p, x, y) => { p.shape([[x - 6, y - 14], [x + 6, y - 14], [x + 6, y + 10], [x - 6, y + 10]], FU, { base: 0.85, gap: 2.4, ow: 1.6, sharp: true }); p.ink([[x, y - 11], [x - 2, y - 4], [x + 2, y], [x - 1, y + 6]], { w: 1.3, color: ZHU, passes: 1 }); },
+  gourd: (p, x, y) => { p.blob(x, y + 4, 7, 7, '#d8a040', { gap: 2, ow: 1.8 }); p.blob(x, y - 6, 4.5, 4.5, '#d8a040', { gap: 2, ow: 1.8 }); p.ink([[x - 3, y - 1], [x + 3, y - 1]], { w: 1.4, color: ZHU, passes: 1 }); },
+};
+
+const goldTrim = (p, x, y) => { p.ink([[x - 11, y - 47], [x - 17, y - 30]], { w: 1.8, color: C.gold, passes: 1 }); p.ink([[x + 11, y - 47], [x + 17, y - 30]], { w: 1.8, color: C.gold, passes: 1 }); };
+const goldAura = (p, x, y) => { p.wash(ellipsePts(x, y - 60, 26, 26, 18, 0.02), '#f6e7a0', 0.5); p.ink(ellipsePts(x, y - 62, 24, 24, 20, 0.02), { w: 1.4, color: C.gold, passes: 1, closed: true }); };
+
+/**
+ * 紙娃娃部件。每個部件只畫人形的其中一層，全部用同一張 80×112 畫布、同一套走路起伏，
+ * 遊戲裡照 LAYER_ORDER 疊起來就是一個完整的人。
+ *
+ * 換裝（以後的時裝、武器外觀）＝新增部件、在 OUTFITS 換掉那一格，其他層不用重畫。
+ */
+export const PAPERDOLL = { w: 80, h: 112 };
+export const LAYER_ORDER = ['aura', 'cape', 'hairback', 'legs', 'outfit', 'weapon', 'head', 'hat'];
+export const PARTS = {
+  legs: { layer: 'legs', o: {} },
+  head: { layer: 'head', o: {} },
+  'hair-long': { layer: 'hairback', o: { longHair: true } },
+  'cape-red': { layer: 'cape', o: { cape: '#c8372d' } },
+  'aura-gold': { layer: 'aura', o: { behind: goldAura } },
+  ...Object.fromEntries(Object.keys(HATS).map((k) => [`hat-${k}`, { layer: 'hat', o: { hat: HATS[k] } }])),
+  ...Object.fromEntries(Object.keys(WEAPONS).map((k) => [`weapon-${k}`, { layer: 'weapon', o: { weaponR: WEAPONS[k] } }])),
+  ...Object.fromEntries(Object.entries(SECT).flatMap(([sect, d]) => [0, 1].map((t) => [
+    `robe-${sect}-${t}`,
+    { layer: 'outfit', o: { robe: d.robe, inner: d.inner, sash: d.sash, front: t ? goldTrim : undefined } },
+  ]))),
+};
+
+/** 門派 × 階級 → 部件清單（由下往上）。 */
+export function outfitOf(sect, tier) {
+  const d = SECT[sect];
+  return [
+    tier >= 2 && 'aura-gold',
+    tier >= 2 && 'cape-red',
+    tier >= 1 && 'hair-long',
+    'legs',
+    `robe-${sect}-${Math.min(tier, 1)}`,
+    `weapon-${d.weapon}`,
+    'head',
+    ['hat-bun', 'hat-band', 'hat-crown'][tier],
+  ].filter(Boolean);
+}
+
+export function drawPart(id) {
+  const part = PARTS[id];
+  return (p, x, y, f) => human(p, x, y, f, 1, { ...part.o, layer: part.layer });
+}
+
+/** 整個人一次畫完（主畫面、預覽用）：就是把部件照順序疊起來。 */
 export function disciple(sect, tier) {
-  const o = SECT[sect];
   return (p, x, y, f) => {
-    const hat = tier >= 2
-      ? (p, x, hy, s) => { p.solid(x, hy - 17, 5.5, 4.5, HAIR, { ow: 1.6 }); p.shape([[x - 7, hy - 16], [x - 5, hy - 26], [x, hy - 22], [x + 5, hy - 26], [x + 7, hy - 16]], C.gold, { base: 0.6, gap: 2, ow: 1.6 }); p.ink([[x - 12, hy - 18], [x + 12, hy - 15]], { w: 1.6, color: '#7a5a2a', passes: 1 }); }
-      : tier === 1
-        ? (p, x, hy) => { p.solid(x, hy - 17, 5.5, 4.5, HAIR, { ow: 1.6 }); p.ink([[x - 10, hy - 18], [x + 10, hy - 15]], { w: 1.6, color: '#7a5a2a', passes: 1 }); }
-        : null;
-    const weapon = {
-      sword: (p, x, y) => { p.shape([[x - 1.5, y + 4], [x + 1.5, y + 4], [x + 1.5, y - 34], [x, y - 39], [x - 1.5, y - 34]], '#c7d6e0', { base: 0.5, gap: 2, ow: 1.6, sharp: true }); p.ink([[x - 6, y + 4], [x + 6, y + 4]], { w: 2.4 }); p.ink([[x, y + 5], [x, y + 13]], { w: 2.6, color: WOOD }); },
-      fist: (p, x, y) => { p.solid(x - 2, y + 2, 6, 6, SKIN, { ow: 2 }); p.ink([[x - 6, y - 2], [x + 2, y - 2]], { w: 1.4, color: ZHU, passes: 1 }); },
-      fu: (p, x, y) => { p.shape([[x - 6, y - 14], [x + 6, y - 14], [x + 6, y + 10], [x - 6, y + 10]], FU, { base: 0.85, gap: 2.4, ow: 1.6, sharp: true }); p.ink([[x, y - 11], [x - 2, y - 4], [x + 2, y], [x - 1, y + 6]], { w: 1.3, color: ZHU, passes: 1 }); },
-      gourd: (p, x, y) => { p.blob(x, y + 4, 7, 7, '#d8a040', { gap: 2, ow: 1.8 }); p.blob(x, y - 6, 4.5, 4.5, '#d8a040', { gap: 2, ow: 1.8 }); p.ink([[x - 3, y - 1], [x + 3, y - 1]], { w: 1.4, color: ZHU, passes: 1 }); },
-    }[o.weapon];
-    human(p, x, y, f, 1, {
-      robe: o.robe, inner: o.inner, sash: o.sash, hat, longHair: tier >= 1,
-      cape: tier >= 2 ? '#c8372d' : undefined,
-      armor: tier === 1 ? null : null,
-      weaponR: weapon,
-      behind: tier >= 2 ? (p, x, y) => { p.wash(ellipsePts(x, y - 60, 26, 26, 18, 0.02), '#f6e7a0', 0.5); p.ink(ellipsePts(x, y - 62, 24, 24, 20, 0.02).concat([]), { w: 1.4, color: C.gold, passes: 1, closed: true }); } : undefined,
-      front: tier >= 1 ? (p, x, y) => { p.ink([[x - 11, y - 47], [x - 17, y - 30]], { w: 1.8, color: C.gold, passes: 1 }); p.ink([[x + 11, y - 47], [x + 17, y - 30]], { w: 1.8, color: C.gold, passes: 1 }); } : undefined,
-    });
+    for (const id of outfitOf(sect, tier)) drawPart(id)(p, x, y, f);
   };
 }
 

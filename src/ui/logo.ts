@@ -14,7 +14,7 @@ export function applyGoldFace(text: Phaser.GameObjects.Text): Phaser.GameObjects
   const size = text.style.fontSize ? parseInt(String(text.style.fontSize), 10) : 60;
   return text
     .setFill(gradient)
-    .setStroke('#f5eddb', Math.max(6, Math.round(size / 9)))
+    .setStroke('#fdfbf6', Math.max(6, Math.round(size / 9)))
     .setShadow(Math.round(size / 22), Math.round(size / 18), 'rgba(200,55,45,0.45)', 0, false, true);
 }
 

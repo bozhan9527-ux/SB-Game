@@ -21,7 +21,7 @@
   "beastemperor": {
    "w": 330,
    "h": 318,
-   "top": 12,
+   "top": 10,
    "scale": 0.6666666666666666
   },
   "bloodtao": {
@@ -45,13 +45,13 @@
   "celestial": {
    "w": 330,
    "h": 318,
-   "top": 20,
+   "top": 18,
    "scale": 0.6666666666666666
   },
   "corpse": {
    "w": 330,
    "h": 318,
-   "top": 28,
+   "top": 29,
    "scale": 0.6666666666666666
   },
   "demonemperor": {
@@ -63,7 +63,7 @@
   "devourer": {
    "w": 330,
    "h": 318,
-   "top": 17,
+   "top": 16,
    "scale": 0.6666666666666666
   },
   "elder": {
@@ -75,13 +75,13 @@
   "faceless": {
    "w": 330,
    "h": 318,
-   "top": 32,
+   "top": 31,
    "scale": 0.6666666666666666
   },
   "fallen": {
    "w": 330,
    "h": 318,
-   "top": 41,
+   "top": 40,
    "scale": 0.6666666666666666
   },
   "fox": {
@@ -111,7 +111,7 @@
   "puppeteer": {
    "w": 330,
    "h": 318,
-   "top": 60,
+   "top": 59,
    "scale": 0.6666666666666666
   },
   "python": {
@@ -129,7 +129,7 @@
   "soullord": {
    "w": 330,
    "h": 318,
-   "top": 27,
+   "top": 25,
    "scale": 0.6666666666666666
   },
   "spider": {
@@ -153,7 +153,7 @@
   "swordlord": {
    "w": 330,
    "h": 318,
-   "top": 30,
+   "top": 31,
    "scale": 0.6666666666666666
   },
   "swordsea": {
@@ -171,7 +171,7 @@
   "toad": {
    "w": 330,
    "h": 318,
-   "top": 116,
+   "top": 117,
    "scale": 0.6666666666666666
   },
   "tribulord": {
@@ -185,13 +185,13 @@
   "alchemy": {
    "w": 160,
    "h": 224,
-   "top": 34,
+   "top": 35,
    "scale": 0.5
   },
   "body": {
    "w": 160,
    "h": 224,
-   "top": 33,
+   "top": 35,
    "scale": 0.5
   },
   "sword": {
@@ -211,7 +211,7 @@
   "bandit": {
    "w": 176,
    "h": 200,
-   "top": 18,
+   "top": 17,
    "scale": 0.5
   },
   "bat": {
@@ -229,7 +229,7 @@
   "celestial": {
    "w": 184,
    "h": 216,
-   "top": 10,
+   "top": 11,
    "scale": 0.5
   },
   "centipede": {
@@ -253,7 +253,7 @@
   "fox": {
    "w": 208,
    "h": 192,
-   "top": 35,
+   "top": 36,
    "scale": 0.5
   },
   "golem": {
@@ -265,13 +265,13 @@
   "jadeguard": {
    "w": 192,
    "h": 224,
-   "top": 29,
+   "top": 30,
    "scale": 0.5
   },
   "lion": {
    "w": 208,
    "h": 192,
-   "top": 22,
+   "top": 21,
    "scale": 0.5
   },
   "puppet": {
@@ -295,7 +295,7 @@
   "serpent": {
    "w": 200,
    "h": 200,
-   "top": 25,
+   "top": 24,
    "scale": 0.5
   },
   "skeleton": {
@@ -307,7 +307,7 @@
   "spider": {
    "w": 216,
    "h": 168,
-   "top": 57,
+   "top": 56,
    "scale": 0.5
   },
   "toad": {
@@ -319,13 +319,13 @@
   "treant": {
    "w": 200,
    "h": 208,
-   "top": 6,
+   "top": 5,
    "scale": 0.5
   },
   "undead": {
    "w": 192,
    "h": 200,
-   "top": 9,
+   "top": 10,
    "scale": 0.5
   },
   "wisp": {
@@ -345,6 +345,142 @@
    "h": 192,
    "top": 40,
    "scale": 0.5
+  }
+ },
+ "paperdoll": {
+  "order": [
+   "aura",
+   "cape",
+   "hairback",
+   "legs",
+   "outfit",
+   "weapon",
+   "head",
+   "hat"
+  ],
+  "parts": {
+   "legs": "legs",
+   "head": "head",
+   "hair-long": "hairback",
+   "cape-red": "cape",
+   "aura-gold": "aura",
+   "hat-bun": "hat",
+   "hat-band": "hat",
+   "hat-crown": "hat",
+   "weapon-sword": "weapon",
+   "weapon-fist": "weapon",
+   "weapon-fu": "weapon",
+   "weapon-gourd": "weapon",
+   "robe-sword-0": "outfit",
+   "robe-sword-1": "outfit",
+   "robe-body-0": "outfit",
+   "robe-body-1": "outfit",
+   "robe-talisman-0": "outfit",
+   "robe-talisman-1": "outfit",
+   "robe-alchemy-0": "outfit",
+   "robe-alchemy-1": "outfit"
+  },
+  "outfits": {
+   "sword-0": [
+    "legs",
+    "robe-sword-0",
+    "weapon-sword",
+    "head",
+    "hat-bun"
+   ],
+   "sword-1": [
+    "hair-long",
+    "legs",
+    "robe-sword-1",
+    "weapon-sword",
+    "head",
+    "hat-band"
+   ],
+   "sword-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-sword-1",
+    "weapon-sword",
+    "head",
+    "hat-crown"
+   ],
+   "body-0": [
+    "legs",
+    "robe-body-0",
+    "weapon-fist",
+    "head",
+    "hat-bun"
+   ],
+   "body-1": [
+    "hair-long",
+    "legs",
+    "robe-body-1",
+    "weapon-fist",
+    "head",
+    "hat-band"
+   ],
+   "body-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-body-1",
+    "weapon-fist",
+    "head",
+    "hat-crown"
+   ],
+   "talisman-0": [
+    "legs",
+    "robe-talisman-0",
+    "weapon-fu",
+    "head",
+    "hat-bun"
+   ],
+   "talisman-1": [
+    "hair-long",
+    "legs",
+    "robe-talisman-1",
+    "weapon-fu",
+    "head",
+    "hat-band"
+   ],
+   "talisman-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-talisman-1",
+    "weapon-fu",
+    "head",
+    "hat-crown"
+   ],
+   "alchemy-0": [
+    "legs",
+    "robe-alchemy-0",
+    "weapon-gourd",
+    "head",
+    "hat-bun"
+   ],
+   "alchemy-1": [
+    "hair-long",
+    "legs",
+    "robe-alchemy-1",
+    "weapon-gourd",
+    "head",
+    "hat-band"
+   ],
+   "alchemy-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-alchemy-1",
+    "weapon-gourd",
+    "head",
+    "hat-crown"
+   ]
   }
  }
 }

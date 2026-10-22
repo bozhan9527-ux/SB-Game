@@ -71,16 +71,16 @@ export class BlessingScene extends Phaser.Scene {
     const cleared = save.world.stage - 1;
     this.add
       .text(cx, 62, `${realmTitle(cleared)}・通過`, textStyle({ size: 18, color: INK_DIM }))
-      .setStroke('#f5eddb', 6)
+      .setStroke('#fdfbf6', 6)
       .setOrigin(0.5);
     this.add
       .text(cx, 104, offer.rare ? '稀 有 機 緣' : '擇 一 機 緣', textStyle({ size: 38, color: offer.rare ? GOLD : INK }))
-      .setStroke('#f5eddb', 8)
+      .setStroke('#fdfbf6', 8)
       .setOrigin(0.5);
 
     // 山門：帶進下一關的耐久（滿血就不畫，省一行）。
     const gateLine = run.gate === null ? '山門滿血帶進下一關' : `山門 ${run.gate} 帶進下一關（過關回復三成）`;
-    this.add.text(cx, 146, gateLine, textStyle({ size: 16, color: JADE })).setStroke('#f5eddb', 6).setOrigin(0.5);
+    this.add.text(cx, 146, gateLine, textStyle({ size: 16, color: JADE })).setStroke('#fdfbf6', 6).setOrigin(0.5);
 
     const count = offer.ids.length;
     const gap = 10;

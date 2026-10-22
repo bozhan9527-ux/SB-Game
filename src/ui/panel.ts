@@ -8,8 +8,8 @@
  * 名字沿用 pixelPanel／drawPanelFrame：呼叫的地方很多，改名只會製造一大片無關的 diff。
  */
 import Phaser from 'phaser';
-import { BG_PANEL, EDGE, GOLD, LACQUER, hexToNumber } from './theme';
-import { hatchRect, roughLine, roughRect } from './sketch';
+import { BG_PANEL, EDGE, FRAME, GOLD, LACQUER, hexToNumber } from './theme';
+import { roughLine, roughRect } from './sketch';
 
 export interface PixelPanelOptions {
   /** 內框線顏色，預設是淡朱；重要的面板給 GOLD_ACCENT，會改成較深的朱線加角線。 */
@@ -37,16 +37,14 @@ export function drawPanelFrame(
   roughRect(g, -hw + 4, -hh + 5, width, height, { fill: EDGE, fillAlpha: 0.12 * alpha, stroke: null, seed });
   // 紙
   roughRect(g, -hw, -hh, width, height, { fill, fillAlpha: alpha, stroke: null, seed });
-  // 紙紋：很淡的斜排線
-  hatchRect(g, -hw + 4, -hh + 4, width - 8, height - 8, 0xb8a888, { gap: 9, alpha: 0.12 * alpha, width: 1, seed });
-  // 墨框
-  roughRect(g, -hw, -hh, width, height, { stroke: EDGE, width: 2.6, seed });
-  // 朱絲欄內框
+  // 外框：深赭粗筆（白紙雙框的粗框）
+  roughRect(g, -hw, -hh, width, height, { stroke: FRAME, width: 2.8, seed });
+  // 內框：細的一圈
   if (width >= 80 && height >= 60) {
     const inset = 7;
     roughRect(g, -hw + inset, -hh + inset, width - inset * 2, height - inset * 2, {
-      stroke: options.accent !== undefined && !important ? options.accent : LACQUER,
-      strokeAlpha: important ? 0.75 : 0.35,
+      stroke: options.accent !== undefined && !important ? options.accent : important ? LACQUER : FRAME,
+      strokeAlpha: important ? 0.75 : 0.7,
       width: important ? 1.6 : 1.1,
       double: false,
       amp: 0.6,

@@ -73,14 +73,14 @@ export class RebirthScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const karma = save.player.karma;
 
-    this.add.text(cx, 44, '仙　緣', textStyle({ size: 38, color: INK })).setStroke('#f5eddb', 8).setOrigin(0.5);
+    this.add.text(cx, 44, '仙　緣', textStyle({ size: 38, color: INK })).setStroke('#fdfbf6', 8).setOrigin(0.5);
     this.add
       .text(cx, 82, `第 ${karma.rebirths + 1} 世・最高證得${heavenName(karma.bestHeaven)}${karma.dao ? '・已證道' : ''}`, textStyle({ size: 16, color: JADE }))
-      .setStroke('#f5eddb', 6)
+      .setStroke('#fdfbf6', 6)
       .setOrigin(0.5);
     const points = this.add
       .text(cx, 110, `仙緣 ${karma.points} 點`, textStyle({ size: 22, color: GOLD }))
-      .setStroke('#f5eddb', 7)
+      .setStroke('#fdfbf6', 7)
       .setOrigin(0.5);
 
     const tabs: [Tab, string][] = [['blessing', '機緣'], ['tribulation', '天劫'], ['power', '道基']];

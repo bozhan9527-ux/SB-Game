@@ -188,7 +188,7 @@ export class ResultScene extends Phaser.Scene {
         title,
         textStyle({ size: 64, color: titleColor, bold: true }),
       )
-      .setStroke("#f5eddb", 10)
+      .setStroke("#fdfbf6", 10)
       .setOrigin(0.5);
 
     this.add
@@ -199,7 +199,7 @@ export class ResultScene extends Phaser.Scene {
         textStyle({ size: 22, color: INK_DIM }),
       )
       // 結算頁的副標題會疊在明月前面，沒有描邊的話月亮那一段字讀不出來。
-      .setStroke("#f5eddb", 6)
+      .setStroke("#fdfbf6", 6)
       .setOrigin(0.5)
       .setAlign("center");
 
@@ -213,7 +213,7 @@ export class ResultScene extends Phaser.Scene {
           textStyle({ size: 19, color: GOLD }),
         )
         // 這一行落在祥雲帶上，沒有紙色描邊的話字會和雲紋糊在一起。
-        .setStroke("#f5eddb", 6)
+        .setStroke("#fdfbf6", 6)
         .setOrigin(0.5)
         .setAlign("center")
         .setLineSpacing(6);

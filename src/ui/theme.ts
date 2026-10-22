@@ -6,7 +6,7 @@
  */
 import { RENDER_SCALE } from '../config';
 
-// 手繪紙面：宣紙底、墨字、朱砂、石青石綠。整套介面畫在同一張紙上，背景交給各境界的遠景去換景。
+// 手繪紙面：白圖畫紙、深赭雙框、粗筆墨字（marker）、朱砂、石青石綠。整套介面畫在同一張紙上，背景交給各境界的遠景去換景。
 export const INK = '#2a2622';
 // 次要文字：淡墨。要在米黃紙上讀得出來，不能比這更淺。
 export const INK_DIM = '#6a5d4e';
@@ -15,12 +15,16 @@ export const GOLD = '#a8741a';
 export const DANGER = '#c8372d';
 export const JADE = '#2f7a58';
 
-export const BG_DEEP = 0xd9ccb0;
+export const BG_DEEP = 0xe9e3d8;
 /** 面板紙色。 */
-export const BG_PANEL = 0xf5eddb;
-export const BG_PANEL_ALT = 0xebdfc4;
+export const BG_PANEL = 0xfdfbf6;
+export const BG_PANEL_ALT = 0xf3eee4;
 /** 面板與列表的分隔線：淡墨。 */
-export const LINE = 0xa8977c;
+export const LINE = 0xc2ab92;
+/** 紙張外框：深赭（白紙上的雙框）。 */
+export const FRAME = 0x7a4e2e;
+/** 整張畫面的底紙。 */
+export const PAPER = 0xfbfaf5;
 
 /** 墨線：所有面板、按鈕、符牌的外框。 */
 export const EDGE = 0x2a2622;

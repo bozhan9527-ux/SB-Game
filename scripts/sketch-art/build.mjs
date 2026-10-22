@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pic, groundShadow, seedRng } from './lib.mjs';
 import { opaqueTop, rasterize, readImage, writeImage } from './render.mjs';
-import { MOBS, SECTS, disciple } from './chars.mjs';
+import { LAYER_ORDER, MOBS, PAPERDOLL, PARTS, SECTS, drawPart, outfitOf } from './chars.mjs';
 import { BOSSES } from './bosses.mjs';
 import * as W from './world.mjs';
 
@@ -63,11 +63,22 @@ if (only === 'all' || only === 'chars') {
   for (const [art, def] of Object.entries(MOBS)) {
     manifest.enemy[art] = await frames(`enemy-${art}`, def.w, def.h, def.draw, 4, RES.char, def.shadow ?? 0.3);
   }
-  for (const sect of SECTS) {
-    let size = null;
-    for (const tier of [0, 1, 2]) size = await frames(`disciple-${sect}-t${tier}`, 80, 112, disciple(sect, tier), 4, RES.char);
-    manifest.disciple[sect] = size;
+  // 門人是紙娃娃：每個部件各出一組四幀，遊戲開啟時照 outfits 疊成一張（src/art.ts composeDisciples）
+  for (const f of fs.readdirSync(OUT)) if (/^(disciple|pd)-/.test(f)) fs.rmSync(path.join(OUT, f));
+  const partSize = {};
+  for (const id of Object.keys(PARTS)) {
+    partSize[id] = await frames(`pd-${id}`, PAPERDOLL.w, PAPERDOLL.h, drawPart(id), 4, RES.char, id === 'legs' ? 0.3 : 0);
   }
+  const outfits = {};
+  for (const sect of SECTS) {
+    let top = Infinity;
+    for (const tier of [0, 1, 2]) {
+      outfits[`${sect}-${tier}`] = outfitOf(sect, tier);
+      for (const id of outfits[`${sect}-${tier}`]) top = Math.min(top, partSize[id].top);
+    }
+    manifest.disciple[sect] = { ...partSize.legs, top };
+  }
+  manifest.paperdoll = { order: LAYER_ORDER, parts: Object.fromEntries(Object.entries(PARTS).map(([id, p]) => [id, p.layer])), outfits };
   console.log('角色完成');
 }
 
@@ -119,4 +130,4 @@ if (only === 'all' || only === 'title') {
 }
 
 const sortKeys = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
-fs.writeFileSync(MANIFEST, JSON.stringify({ boss: sortKeys(manifest.boss), disciple: sortKeys(manifest.disciple), enemy: sortKeys(manifest.enemy) }, null, 1) + '\n');
+fs.writeFileSync(MANIFEST, JSON.stringify({ boss: sortKeys(manifest.boss), disciple: sortKeys(manifest.disciple), enemy: sortKeys(manifest.enemy), paperdoll: manifest.paperdoll }, null, 1) + '\n');

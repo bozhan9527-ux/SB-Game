@@ -57,7 +57,7 @@ export function floatLabel(scene: Phaser.Scene, x: number, y: number, text: stri
   const label = scene.add
     .text(snap(x), snap(y), text, textStyle({ size, color, bold: true }))
     .setOrigin(0.5)
-    .setStroke('#f5eddb', 6)
+    .setStroke('#fdfbf6', 6)
     .setDepth(1000);
   scene.tweens.add({
     targets: label,

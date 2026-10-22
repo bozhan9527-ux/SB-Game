@@ -66,10 +66,10 @@ export class AscendScene extends Phaser.Scene {
     const gained = ascensionGain(save);
     const dao = heaven >= 9 && !karma.dao;
 
-    this.add.text(cx, 470, '飛　升', textStyle({ size: 64, color: '#b8861c' })).setStroke('#f5eddb', 10).setOrigin(0.5);
+    this.add.text(cx, 470, '飛　升', textStyle({ size: 64, color: '#b8861c' })).setStroke('#fdfbf6', 10).setOrigin(0.5);
     this.add
       .text(cx, 516, `第 ${karma.rebirths + 1} 世・渡劫圓滿・證得${heavenName(heaven)}`, textStyle({ size: 19, color: INK }))
-      .setStroke('#f5eddb', 6)
+      .setStroke('#fdfbf6', 6)
       .setOrigin(0.5);
 
     const top = 546;

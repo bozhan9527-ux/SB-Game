@@ -27,9 +27,9 @@ export const J = (a) => (R() * 2 - 1) * a;
 
 /**
  * 畫風：pencil 彩鉛排線（原本）／marker 麥克筆＋蠟筆（白紙、單筆粗墨線、平塗淡彩略塗出界、沒有鉛筆顆粒）。
- * 用環境變數 SKETCH_STYLE 切換，或在腳本裡 setStyle()。
+ * 預設 marker（2026-10 起）；用環境變數 SKETCH_STYLE=pencil 可算回舊畫風，或在腳本裡 setStyle()。
  */
-export let STYLE = process.env.SKETCH_STYLE ?? 'pencil';
+export let STYLE = process.env.SKETCH_STYLE ?? 'marker';
 export function setStyle(s) {
   STYLE = s;
 }
@@ -248,13 +248,16 @@ export class Pic {
     const L = Math.hypot(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     const ang = angle * 0.25 + J(0.12), ca = Math.cos(ang), sa = Math.sin(ang);
     const bw = Math.max(4, Math.min(14, size * 0.28)) * this.ls;
-    let g = `<g clip-path="url(#${id})">`;
+    // 整組筆觸都落在形狀外的話不輸出：resvg 碰到「剪裁後是空的群組」會整個崩潰
+    let g = `<g clip-path="url(#${id})">`, n = 0;
     for (let t = -L / 2; t < L / 2; t += bw * (1.1 + R() * 0.6)) {
       if (R() < 0.5) continue;
       const ox = cx - sa * t, oy = cy + ca * t;
+      if (oy < y0 - bw || oy > y1 + bw || ox < x0 - bw || ox > x1 + bw) continue;
+      n += 1;
       g += `<path d="M${f1(ox - (ca * L) / 2)},${f1(oy - (sa * L) / 2)}L${f1(ox + (ca * L) / 2 + J(4))},${f1(oy + (sa * L) / 2 + J(4))}" stroke="${shade(color, 0.9)}" stroke-width="${f1(bw)}" opacity="${(0.06 + R() * 0.07).toFixed(2)}" stroke-linecap="round" fill="none"/>`;
     }
-    this.add(g + '</g>');
+    if (n > 0) this.add(g + '</g>');
   }
 
   /** 填色 + 外框。sharp：直邊（先細分再抖）而不是圓滑曲線。 */

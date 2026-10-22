@@ -77,9 +77,9 @@ function ensureStyle(): void {
   padding: 22px 20px 18px;
   border: 2.5px solid #2a2622;
   border-radius: 3px 6px 4px 5px;
-  background: #f5eddb;
+  background: #fdfbf6;
   color: #2a2622;
-  box-shadow: inset 0 0 0 6px #f5eddb, inset 0 0 0 7px rgba(200, 55, 45, 0.45), 4px 5px 0 rgba(42, 38, 34, 0.18);
+  box-shadow: inset 0 0 0 6px #fdfbf6, inset 0 0 0 7px rgba(122, 78, 46, 0.7), 4px 5px 0 rgba(42, 38, 34, 0.18);
   position: relative;
 }
 .sb-form h2 { margin: 0 0 6px; font-size: 24px; color: #2a2622; font-weight: 400; }

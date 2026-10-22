@@ -76,6 +76,7 @@ const MANIFEST = artManifest as {
   enemy: Record<string, ArtSize>;
   boss: Record<string, ArtSize>;
   disciple: Record<string, ArtSize>;
+  paperdoll?: { order: string[]; parts: Record<string, string>; outfits: Record<string, string[]> };
 };
 const FALLBACK: ArtSize = { w: 192, h: 184, top: 0, scale: 0.5 };
 
@@ -165,10 +166,8 @@ const MOB_ARTS: readonly MobArt[] = [
 ];
 
 const ASSETS: readonly ArtSpec[] = [
-  ...SECT_ARTS.flatMap((art) =>
-    DISCIPLE_TIERS.flatMap((tier) =>
-      WALK_FRAMES.map((frame) => ({ key: discipleTexture(art, tier, frame), file: `disciple-${art}-t${tier}-${frame}` })),
-    ),
+  ...Object.keys(MANIFEST.paperdoll?.parts ?? {}).flatMap((id) =>
+    WALK_FRAMES.map((frame) => ({ key: partTexture(id, frame), file: `pd-${id}-${frame}` })),
   ),
   ...MOB_ARTS.flatMap((art) =>
     WALK_FRAMES.map((frame) => ({ key: enemyTexture(art, frame), file: `enemy-${art}-${frame}` })),
@@ -194,6 +193,41 @@ const ASSETS: readonly ArtSpec[] = [
   { key: ART.titleCrane0, file: 'title-crane-0' },
   { key: ART.titleCrane1, file: 'title-crane-1' },
 ];
+
+/**
+ * 門人是分層組成的（paper doll）：雙足、外袍、武器、頭面、頭飾……各是一層（scripts/sketch-art/chars.mjs 的 PARTS），
+ * 同一張畫布、同一套走路起伏。這裡把一套部件照順序畫進同一張畫布，當成一張一般的貼圖用。
+ *
+ * 以後的時裝或武器外觀＝換掉清單裡某一格的部件，再用新的 key 疊一次，其他層不用重畫。
+ */
+export function partTexture(id: string, frame: number): string {
+  return `pd-${id}-${frame}`;
+}
+
+export function outfitParts(art: SectArt, tier: number): readonly string[] {
+  return MANIFEST.paperdoll?.outfits[`${art}-${tier}`] ?? [];
+}
+
+export function composeOutfit(scene: Phaser.Scene, key: string, parts: readonly string[], frame: number): void {
+  if (scene.textures.exists(key)) return;
+  const layers = parts.map((id) => partTexture(id, frame)).filter((k) => scene.textures.exists(k));
+  const first = layers[0];
+  if (first === undefined) return;
+  const src = scene.textures.get(first).getSourceImage() as HTMLImageElement;
+  const canvas = scene.textures.createCanvas(key, src.width, src.height);
+  if (canvas === null) return;
+  for (const layer of layers) canvas.context.drawImage(scene.textures.get(layer).getSourceImage() as HTMLImageElement, 0, 0);
+  canvas.refresh();
+}
+
+/** 預設造型（門派 × 階級）疊成原本的 disciple-* 貼圖 key，場景程式照舊用。 */
+export function composeDisciples(scene: Phaser.Scene): void {
+  for (const art of SECT_ARTS) {
+    for (const tier of DISCIPLE_TIERS) {
+      for (const frame of WALK_FRAMES) composeOutfit(scene, discipleTexture(art, tier, frame), outfitParts(art, tier), frame);
+    }
+  }
+}
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */
 export function createWalkAnimations(scene: Phaser.Scene): void {

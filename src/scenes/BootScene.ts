@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { preloadArt } from '../art';
+import { composeDisciples, preloadArt } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { hasSave } from '../save';
 import { initState } from '../state';
@@ -64,13 +64,14 @@ export class BootScene extends Phaser.Scene {
       return;
     }
 
-    const paper = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xefe6d2).setOrigin(0, 0);
+    const paper = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xfbfaf5).setOrigin(0, 0);
     const doors = this.buildDoors();
     const seal = this.buildSeal();
 
     preloadArt(this);
     this.load.on('progress', (value: number) => seal.progress(value));
     this.load.once('complete', () => {
+      composeDisciples(this);
       seal.progress(1);
       // 進度走滿之後停一下：一閃就開門，玩家看不到「載完了」這件事。
       this.time.delayedCall(260, () => this.openGate(paper, doors, seal.container));
