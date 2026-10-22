@@ -718,7 +718,7 @@ export class RunScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         940,
-        "拖到這裡棄符",
+        this.run.loadout.rules.noDraw ? "定陣：不再抽符，符也不能丟" : "拖到這裡棄符",
         textStyle({ size: 15, color: INK_DIM }),
       )
       .setOrigin(0.5)
@@ -1297,7 +1297,7 @@ export class RunScene extends Phaser.Scene {
     if (source === null || label === undefined) return;
     const card = this.cardAt(source);
     // 棄符優先，和 endDrag 走同一條規則——預覽說的和放手做的必須是同一件事。
-    const discarding = source.where === "hand" && pointer.worldY > DISCARD_Y;
+    const discarding = source.where === "hand" && pointer.worldY > DISCARD_Y && !this.run.loadout.rules.noDraw;
     const target = discarding
       ? null
       : this.slotAt(pointer.worldX, pointer.worldY, card);
@@ -3091,7 +3091,8 @@ export class RunScene extends Phaser.Scene {
     // 這一關該學的那一條掛在境界名底下：規則在它第一次派上用場的當下講，
     // 比塞在一頁說明裡有效得多。
     const lesson =
-      this.step === "done" ? lessonForStage(state(), this.run.stage) : null;
+      // 副本和重播不教主線的課：「九關一局、耐久帶到下一關」在副本裡根本不成立
+      this.step === "done" && this.dungeonRun === null && this.replayStage === null ? lessonForStage(state(), this.run.stage) : null;
 
     // 整組由下往上排，底緣停在最上排符的上方：開場時玩家可能已經在擺符，
     // 境界名與說明框不能蓋住陣位。

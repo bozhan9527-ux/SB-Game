@@ -9,7 +9,7 @@
  * 難度是指數曲線，固定加值在後期會被稀釋到看不見（見 PROGRESS 的 L-05）。
  */
 import { sectUpgradeLevel } from './sect-upgrades';
-import { BALANCE, SECTS } from '../data';
+import { BALANCE, CARDS, SECTS } from '../data';
 import type { CardDef, Sect, TribulationDef } from '../data/types';
 import type { SaveData } from '../save/types';
 import { karmaAmountOf } from './karma';
@@ -35,6 +35,8 @@ export interface RunRules {
   noMerge: boolean;
   /** 漏掉任何一隻立刻失守，不是扣耐久。 */
   suddenDeath: boolean;
+  /** 不抽符（問心崖・定陣）：整場就只有開場給定的那幾張。 */
+  noDraw: boolean;
   /** 首領時限倍率。 */
   bossTimeMultiplier: number;
 }
@@ -42,6 +44,7 @@ export interface RunRules {
 export const NO_RULES: RunRules = {
   noMerge: false,
   suddenDeath: false,
+  noDraw: false,
   bossTimeMultiplier: 1,
 };
 
@@ -133,6 +136,8 @@ export interface Loadout {
   startDisciples: number | null;
   /** 吃不吃前段血量加成（BALANCE.wave.earlyHp）。主線吃，副本與試劍台不吃。 */
   earlyHp: boolean;
+  /** 問心崖・定陣：開場就擺好的符（先填場上、剩下的進手牌），整場不再抽。null 為一般抽符。 */
+  preset: { type: string; tier: number }[] | null;
 }
 
 /**
@@ -307,12 +312,26 @@ export function buildLoadoutFromSpec(rawSpec: LoadoutSpec): Loadout {
     {
       noMerge: has('noMerge'),
       suddenDeath: has('noLeak'),
+      noDraw: false,
       bossTimeMultiplier: has('hasteBoss') ? 0.5 : 1,
     },
     // 仙緣從 v23 起只留一條很小的傷害線，其餘改成解鎖（見 ROGUELITE_DESIGN.md）。
     // 舊的金幣、耐久、階數三條已經退點，不再生效。
     { ...NO_KARMA, damage: karmaAmountOf(spec.karma, 'karmaPower') / 100 },
   );
+  // 問心崖・定陣：規則字串裡帶著這一層給定的符（dungeonSpecOf 從資料展開）。
+  const presetRule = spec.rules.find((rule) => rule.startsWith('preset:'));
+  if (presetRule !== undefined) {
+    loadout.preset = presetRule
+      .slice('preset:'.length)
+      .split(',')
+      .map((entry) => {
+        const [type, tier] = entry.split(':');
+        return { type: type ?? 'sword', tier: Math.max(1, Number(tier) || 1) };
+      })
+      .filter((card) => CARDS.some((def) => def.id === card.type));
+    loadout.rules = { ...loadout.rules, noDraw: true };
+  }
   // 孤身守門：容錯幾乎歸零。放在這裡而不是 RunRules 裡，
   // 是因為它改的是一個既有的起始值，不是一條新規則。
   if (has('thinGate')) {
@@ -498,5 +517,6 @@ export function buildLoadoutFor(
     blessings: NO_BLESSINGS,
     startDisciples: null,
     earlyHp: true,
+    preset: null,
   };
 }

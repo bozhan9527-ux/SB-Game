@@ -701,6 +701,13 @@ export function parseDungeons(raw: unknown, path = 'dungeons.json'): DungeonDef[
       if (typeof floor['stage'] === 'number') out.stage = floor['stage'];
       if (typeof floor['stageRatio'] === 'number') out.stageRatio = floor['stageRatio'];
       if (typeof floor['talisman'] === 'string') out.talisman = floor['talisman'];
+      if (Array.isArray(floor['preset'])) {
+        out.preset = (floor['preset'] as unknown[]).map((entry, i) => {
+          const m = typeof entry === 'string' ? /^([a-z]+):(\d+)$/.exec(entry) : null;
+          if (m === null) throw new DataError(`${fp}.preset[${i}]`, '要寫成「符:階」，例如 sword:3');
+          return entry as string;
+        });
+      }
       if (typeof floor['mastery'] === 'number') out.mastery = floor['mastery'];
       if (typeof floor['karma'] === 'number') out.karma = floor['karma'];
       if (typeof floor['minStage'] === 'number') out.minStage = floor['minStage'];

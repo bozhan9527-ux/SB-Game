@@ -123,34 +123,86 @@
     "name": "問心崖",
     "icon": "record",
     "minStage": 28,
-    "desc": "整場不能合成",
-    "detail": "拿掉這個遊戲唯一的指數成長。沒有合成，輸出只能靠格位數與陣法堆出來——所以它的關卡刻意開得比你現在的進度淺得多，難的不是深度，是打法。",
+    "desc": "不抽新符：開場給一組固定的符，排陣定勝負",
+    "detail": "整場不再抽符，只有開場給定的那一組。要合成衝高階、還是留著湊滿同種的整列整行吃陣法加成？符一合就少一張，格子空著也不會有人補——每一層都是一道排陣的題，難的不是深度，是想清楚。",
     "reward": "門派修為",
     "rules": [
-      "noMerge"
+      "preset"
     ],
     "goldMultiplier": 1.8,
     "repeatable": false,
     "floors": [
       {
-        "stage": 8,
+        "stage": 16,
         "minStage": 28,
-        "mastery": 3
+        "mastery": 3,
+        "preset": [
+          "sword:3",
+          "sword:3",
+          "sword:3",
+          "sword:3",
+          "bolt:3",
+          "bolt:3",
+          "bolt:3",
+          "fan:3",
+          "fan:3",
+          "fan:3"
+        ]
       },
       {
-        "stage": 18,
+        "stage": 27,
         "minStage": 45,
-        "mastery": 3
+        "mastery": 3,
+        "preset": [
+          "sword:6",
+          "sword:6",
+          "sword:6",
+          "flame:6",
+          "flame:6",
+          "flame:6",
+          "frost:6",
+          "frost:6",
+          "frost:6",
+          "bolt:5",
+          "bolt:5"
+        ]
       },
       {
-        "stage": 26,
+        "stage": 36,
         "minStage": 64,
-        "mastery": 3
+        "mastery": 3,
+        "preset": [
+          "sword:8",
+          "sword:8",
+          "sword:7",
+          "sword:7",
+          "bolt:8",
+          "bolt:8",
+          "bolt:8",
+          "fan:7",
+          "fan:7",
+          "fan:7",
+          "fan:7"
+        ]
       },
       {
-        "stage": 32,
+        "stage": 44,
         "minStage": 81,
-        "mastery": 3
+        "mastery": 3,
+        "preset": [
+          "pierce:10",
+          "pierce:10",
+          "pierce:10",
+          "flame:10",
+          "flame:10",
+          "flame:10",
+          "frost:9",
+          "frost:9",
+          "frost:9",
+          "frost:9",
+          "bolt:10",
+          "bolt:10"
+        ]
       }
     ],
     "endless": false

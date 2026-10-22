@@ -549,11 +549,21 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
   const slots: (Card | null)[] = new Array<Card | null>(
     loadout.fieldSlots,
   ).fill(null);
-  for (let i = 0; i < field.startingField && i < slots.length; i += 1) {
-    slots[i] = drawCard(loadout, loadout.threat, rng);
-  }
-  for (let i = 0; i < field.startingHand && i < hand.length; i += 1) {
-    hand[i] = drawCard(loadout, loadout.threat, rng);
+  if (loadout.preset !== null) {
+    // 定陣：給定的符先擺上場（由上往下、由左往右），擺不下的進手牌。之後不再抽。
+    const cards = loadout.preset.map((card) => ({ ...card }));
+    const onField = Math.max(0, cards.length - hand.length);
+    cards.slice(0, Math.min(onField, slots.length)).forEach((card, i) => (slots[i] = card));
+    cards.slice(Math.min(onField, slots.length)).forEach((card, i) => {
+      if (i < hand.length) hand[i] = card;
+    });
+  } else {
+    for (let i = 0; i < field.startingField && i < slots.length; i += 1) {
+      slots[i] = drawCard(loadout, loadout.threat, rng);
+    }
+    for (let i = 0; i < field.startingHand && i < hand.length; i += 1) {
+      hand[i] = drawCard(loadout, loadout.threat, rng);
+    }
   }
 
   const state: DefenseState = {
@@ -747,6 +757,8 @@ export function swapCards(
 /** 棄掉手牌的一張符。手牌塞滿低階符時的最後手段。 */
 export function discardHand(state: DefenseState, handIndex: number): boolean {
   if (state.hand[handIndex] == null) return false;
+  // 定陣不抽符：丟掉就永遠少一張，這裡直接不讓丟，免得手一滑整題作廢。
+  if (state.loadout.rules.noDraw) return false;
   state.hand[handIndex] = null;
   // 斷捨離：棄一張，下一張符立刻往前推一截。
   const letGo = state.bless["letGo"] ?? 0;
@@ -1177,7 +1189,7 @@ export function tickCombat(
     state.loadout.drawSpeedMultiplier *
     passives.drawSpeedMultiplier *
     (state.confusedUntil > state.elapsedMs ? state.confuseMultiplier : 1);
-  state.drawTimer -= deltaMs;
+  if (!state.loadout.rules.noDraw) state.drawTimer -= deltaMs;
   while (state.drawTimer <= 0) {
     state.drawTimer += fieldCfg.drawIntervalMs / drawSpeed;
     const slot = state.hand.indexOf(null);

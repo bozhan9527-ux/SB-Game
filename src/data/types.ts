@@ -832,6 +832,8 @@ export interface DungeonFloor {
    */
   minStage?: number;
   talisman?: string;
+  /** 問心崖（定陣）：開場就給定的符，寫成「符:階」。有這一項的層不抽符。 */
+  preset?: string[];
   mastery?: number;
   karma?: number;
 }

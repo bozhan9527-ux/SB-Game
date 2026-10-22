@@ -211,7 +211,13 @@ export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number
     ...loadoutSpecOf(save, floorDepth(save, dungeon, index)),
     // 每週天劫塔：把「這一週」寫進規則，伺服器重播才算得出同一組天劫。
     rules: dungeon.rules.map((rule) =>
-      rule === WEEKLY_RULE ? `week:${weekOf(now)}` : rule === DAILY_RULE ? `daily:${dayOf(now)}` : rule,
+      rule === WEEKLY_RULE
+        ? `week:${weekOf(now)}`
+        : rule === DAILY_RULE
+          ? `daily:${dayOf(now)}`
+          : rule === 'preset'
+            ? `preset:${(floorAt(dungeon, index)?.preset ?? []).join(',')}`
+            : rule,
     ),
     goldMultiplier: dungeon.goldMultiplier,
     endless: dungeon.endless,
