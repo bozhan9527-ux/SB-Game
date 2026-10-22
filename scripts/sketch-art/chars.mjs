@@ -380,6 +380,44 @@ const HATS = {
   crown: (p, x, hy) => { p.solid(x, hy - 17, 5.5, 4.5, HAIR, { ow: 1.6 }); p.shape([[x - 7, hy - 16], [x - 5, hy - 26], [x, hy - 22], [x + 5, hy - 26], [x + 7, hy - 16]], C.gold, { base: 0.6, gap: 2, ow: 1.6 }); p.ink([[x - 12, hy - 18], [x + 12, hy - 15]], { w: 1.6, color: '#7a5a2a', passes: 1 }); },
 };
 
+// ---------- 時裝用的頭飾 ----------
+const bun = (p, x, hy) => p.solid(x, hy - 17, 5.5, 4.5, HAIR, { ow: 1.6 });
+Object.assign(HATS, {
+  // 玉簪：髮髻上橫插一根青玉簪，尾端垂一顆珠
+  jadepin: (p, x, hy) => { bun(p, x, hy); p.shape([[x - 13, hy - 19], [x + 12, hy - 15], [x + 12, hy - 13], [x - 13, hy - 17]], '#7cc4a0', { base: 0.8, ow: 1.4, sharp: true }); p.dot(x + 13, hy - 14, 2.2, '#2f8462'); p.ink([[x - 13, hy - 17], [x - 15, hy - 9]], { w: 1, color: '#2f8462', passes: 1 }); p.dot(x - 15, hy - 8, 1.6, '#e8b33c'); },
+  // 方巾：書生的黑色軟帽，後面垂兩條帶子
+  scholar: (p, x, hy) => { p.shape([[x - 13, hy - 10], [x - 11, hy - 23], [x - 4, hy - 27], [x + 4, hy - 27], [x + 11, hy - 23], [x + 13, hy - 10], [x, hy - 12]], '#3a3f48', { base: 0.9, ow: 1.8, amp: 0.3 }); p.ink([[x - 12, hy - 11], [x + 12, hy - 11]], { w: 1.4, color: '#c9a64a', passes: 1 }); for (const k of [-1, 1]) p.ink([[x + k * 11, hy - 13], [x + k * 15, hy - 18], [x + k * 19, hy - 21]], { w: 2.2, color: '#3a3f48', passes: 1, amp: 0.2 }); },
+  // 花冠：髮髻四周一圈桃花
+  flower: (p, x, hy) => { bun(p, x, hy); for (const [u, v, r] of [[-11, -14, 4], [-5, -21, 4.4], [5, -21, 4.4], [11, -14, 4], [0, -24, 3.4]]) { for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; p.blob(x + u + Math.cos(a) * r * 0.55, hy + v + Math.sin(a) * r * 0.55, r * 0.55, r * 0.55, '#f6a9bd', { ow: 0.9, base: 0.9, n: 10 }); } p.dot(x + u, hy + v, r * 0.3, '#e8b33c'); } },
+  // 紅纓額帶：赤色額帶，正中一簇火焰紅纓
+  flameband: (p, x, hy) => { bun(p, x, hy); p.shape([[x - 13, hy - 12], [x + 13, hy - 12], [x + 13, hy - 8], [x - 13, hy - 8]], '#c8372d', { base: 0.8, ow: 1.4, sharp: true }); p.dot(x, hy - 10, 2.2, '#e8b33c'); flame(p, x, hy - 22, 0.45, '#e8434f', '#f0a050', 1); },
+  // 冰晶冠：銀白冠座，三片冰晶往上
+  icecrown: (p, x, hy) => { bun(p, x, hy); for (const [u, h] of [[-6, 10], [0, 15], [6, 10]]) p.shape([[x + u - 3, hy - 16], [x + u, hy - 16 - h], [x + u + 3, hy - 16]], '#cfe8f6', { base: 0.9, ow: 1.4, sharp: true }); p.ink([[x - 12, hy - 15], [x + 12, hy - 15]], { w: 2, color: '#9fb8c8', passes: 1 }); },
+  // 金龍冠：高金冠、兩側龍角、正中紅寶
+  dragoncrown: (p, x, hy) => { bun(p, x, hy); p.shape([[x - 9, hy - 14], [x - 8, hy - 28], [x - 3, hy - 24], [x, hy - 31], [x + 3, hy - 24], [x + 8, hy - 28], [x + 9, hy - 14]], C.gold, { base: 0.85, ow: 1.6, sharp: true }); for (const k of [-1, 1]) p.ink([[x + k * 9, hy - 18], [x + k * 15, hy - 24], [x + k * 14, hy - 31]], { w: 2.2, color: '#a8741a', passes: 1 }); p.dot(x, hy - 21, 2.4, '#c8372d'); },
+});
+
+// ---------- 時裝的衣袍紋樣（畫在外袍那一層，跟著衣服走） ----------
+const hemTrim = (color) => (p, x, y) => { p.ink([[x - 19, y - 10], [x - 10, y - 8], [x, y - 7], [x + 10, y - 8], [x + 19, y - 10]], { w: 2, color, passes: 1 }); for (const k of [-1, 1]) p.ink([[x + k * 17, y - 19], [x + k * 23, y - 17]], { w: 1.8, color, passes: 1 }); };
+const cloudPattern = (color) => (p, x, y) => { for (const [u, v] of [[-12, -16], [11, -14]]) p.ink(spiral(x + u, y + v, 3, 1.2, u < 0 ? 1 : -1, 0), { w: 1.2, color, passes: 1, amp: 0.1 }); };
+const bambooPattern = (p, x, y) => { for (const u of [-13, 12]) { p.ink([[x + u, y - 8], [x + u + 1, y - 22]], { w: 1.4, color: '#2f5a3a', passes: 1 }); p.ink([[x + u, y - 15], [x + u + 5, y - 19]], { w: 1.2, color: '#2f5a3a', passes: 1 }); } };
+const petals = (p, x, y) => { for (const [u, v] of [[-14, -12], [-8, -18], [13, -10], [9, -20], [0, -12]]) p.blob(x + u, y + v, 1.6, 1.2, '#e86a8a', { ow: 0, base: 0.9, n: 8 }); };
+const flameHem = (p, x, y) => { for (let i = -2; i <= 2; i++) p.shape([[x + i * 8 - 4, y - 7], [x + i * 8, y - 15], [x + i * 8 + 4, y - 7]], '#f0a050', { base: 0.8, ow: 1, amp: 0.2 }); };
+const both = (...fs) => (p, x, y, s) => fs.forEach((f) => f(p, x, y, s));
+
+/**
+ * 時裝：只換外觀（外袍、頭飾、披風、光暈），武器仍跟著門派走——武器外觀以後另外賣。
+ * 每套時裝在 PARTS 裡生出 robe-c-<id>，頭飾、披風共用 hat-*、cape-*。
+ */
+export const COSTUMES = {
+  moonwhite: { name: '月白道袍', robe: '#e6ecf2', inner: '#ffffff', sash: '#7cc4a0', hat: 'jadepin', front: both(hemTrim('#7cc4a0'), cloudPattern('#8fb3c8')) },
+  scholar: { name: '墨竹書生', robe: '#5f8a6a', inner: '#eef3ea', sash: '#3a3f48', hat: 'scholar', front: both(hemTrim('#2f5a3a'), bambooPattern) },
+  peach: { name: '桃夭', robe: '#f3b8c8', inner: '#fff1f4', sash: '#c8372d', hat: 'flower', front: both(hemTrim('#e86a8a'), petals) },
+  crimson: { name: '赤焰戰袍', robe: '#c8463a', inner: '#f3d9b0', sash: '#3a2a22', hat: 'flameband', cape: '#7a1a2a', front: both(flameHem, hemTrim('#e8b33c')) },
+  frost: { name: '玄冰劍客', robe: '#a9d2ea', inner: '#f2fbff', sash: '#5a7d98', hat: 'icecrown', cape: '#e9f4fb', front: both(hemTrim('#ffffff'), cloudPattern('#ffffff')) },
+  dragon: { name: '金龍太子', robe: '#e8c04a', inner: '#fff6d8', sash: '#c8372d', hat: 'dragoncrown', cape: '#c8372d', aura: true, front: both(hemTrim('#c8372d'), cloudPattern('#a8741a')) },
+};
+
 const WEAPONS = {
   sword: (p, x, y) => { p.shape([[x - 1.5, y + 4], [x + 1.5, y + 4], [x + 1.5, y - 34], [x, y - 39], [x - 1.5, y - 34]], '#c7d6e0', { base: 0.5, gap: 2, ow: 1.6, sharp: true }); p.ink([[x - 6, y + 4], [x + 6, y + 4]], { w: 2.4 }); p.ink([[x, y + 5], [x, y + 13]], { w: 2.6, color: WOOD }); },
   fist: (p, x, y) => { p.solid(x - 2, y + 2, 6, 6, SKIN, { ow: 2 }); p.ink([[x - 6, y - 2], [x + 2, y - 2]], { w: 1.4, color: ZHU, passes: 1 }); },
@@ -406,6 +444,8 @@ export const PARTS = {
   'aura-gold': { layer: 'aura', o: { behind: goldAura } },
   ...Object.fromEntries(Object.keys(HATS).map((k) => [`hat-${k}`, { layer: 'hat', o: { hat: HATS[k] } }])),
   ...Object.fromEntries(Object.keys(WEAPONS).map((k) => [`weapon-${k}`, { layer: 'weapon', o: { weaponR: WEAPONS[k] } }])),
+  ...Object.fromEntries(Object.entries(COSTUMES).map(([id, c]) => [`robe-c-${id}`, { layer: 'outfit', o: { robe: c.robe, inner: c.inner, sash: c.sash, front: c.front } }])),
+  ...Object.fromEntries([...new Set(Object.values(COSTUMES).map((c) => c.cape).filter(Boolean))].map((col) => [`cape-${col.slice(1)}`, { layer: 'cape', o: { cape: col } }])),
   ...Object.fromEntries(Object.entries(SECT).flatMap(([sect, d]) => [0, 1].map((t) => [
     `robe-${sect}-${t}`,
     { layer: 'outfit', o: { robe: d.robe, inner: d.inner, sash: d.sash, front: t ? goldTrim : undefined } },
@@ -424,6 +464,21 @@ export function outfitOf(sect, tier) {
     `weapon-${d.weapon}`,
     'head',
     ['hat-bun', 'hat-band', 'hat-crown'][tier],
+  ].filter(Boolean);
+}
+
+/** 穿上時裝：外袍、頭飾、披風換掉，長髮與武器照門派與階級。 */
+export function costumeOutfit(sect, tier, id) {
+  const c = COSTUMES[id];
+  return [
+    (c.aura || tier >= 2) && 'aura-gold',
+    c.cape ? `cape-${c.cape.slice(1)}` : tier >= 2 && 'cape-red',
+    tier >= 1 && 'hair-long',
+    'legs',
+    `robe-c-${id}`,
+    `weapon-${SECT[sect].weapon}`,
+    'head',
+    `hat-${c.hat}`,
   ].filter(Boolean);
 }
 
