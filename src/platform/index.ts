@@ -2,7 +2,7 @@
  * 128 合 1 平台橋接。
  *
  * `arcade128.js` 是平台提供的原檔（不要改它），這裡只負責：判斷是不是被平台框架嵌著、
- * 找出平台的來源網域、建立橋接，並包成遊戲用得到的三件事——接關付費、回報結束。
+ * 找出平台的來源網域、建立橋接，並包成遊戲用得到的幾件事——接關付費、靈石與月卡付費、回報結束。
  *
  * 不在平台裡（直接開 github.io、本機開發）時什麼都不做，`available()` 回 false，
  * 遊戲照舊：失守就直接結算，不會出現接關。
@@ -85,6 +85,11 @@ export const platform = {
   purchaseContinue(): Promise<PurchaseResult> {
     if (bridge === null) return Promise.resolve({ ok: false, reason: "unavailable" });
     return bridge.purchase(CONTINUE_ITEM).catch(() => ({ ok: false, reason: "error" }));
+  },
+  /** 買一樣商品（靈石包、月卡）。商品代號要先在 128 平台後台建好，見 data/shop.json。 */
+  purchase(item: string): Promise<PurchaseResult> {
+    if (bridge === null) return Promise.resolve({ ok: false, reason: "unavailable" });
+    return bridge.purchase(item).catch(() => ({ ok: false, reason: "error" }));
   },
   /** 這一場確定結束（失守不接、放棄、逾時）。 */
   gameOver(): void {

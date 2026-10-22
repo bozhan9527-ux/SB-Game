@@ -5,6 +5,7 @@
  * 而不是一個「你的進度要被砍了」的確認框。所以順序是：先演、再列這一世的成果、
  * 最後才寫清楚會拿到什麼、留下什麼。按下去之後到飛升台選下一世的天劫。
  */
+import { grantAscension } from '../systems/stones';
 import Phaser from 'phaser';
 import { audio } from '../audio';
 import { ART } from '../art';
@@ -23,7 +24,7 @@ import {
 import { track } from '../telemetry';
 import { drawBackdrop } from '../ui/backdrop';
 import { createButton } from '../ui/button';
-import { burstPixels } from '../ui/effects';
+import { burstPixels, floatLabel } from '../ui/effects';
 import { pixelPanel } from '../ui/panel';
 import { GOLD, INK, INK_DIM, JADE, hexToNumber, textStyle, wrapText } from '../ui/theme';
 import { fadeIn, fadeToScene } from '../ui/transition';
@@ -106,10 +107,12 @@ export class AscendScene extends Phaser.Scene {
       onClick: () => {
         const lives = save.player.karma.rebirths + 1;
         const got = ascend(save);
+        const stones = grantAscension(save);
         persist();
+        floatLabel(this, cx, 230, `靈石 +${stones.amount}（${stones.label}）`, GOLD, 24);
         track('ascend', { lives, jie, heaven, gained: got });
         burstPixels(this, cx, 270, GOLD, 16);
-        this.time.delayedCall(300, () => fadeToScene(this, 'Altar'));
+        this.time.delayedCall(1100, () => fadeToScene(this, 'Altar'));
       },
     });
   }

@@ -223,6 +223,16 @@ export class TitleScene extends Phaser.Scene {
       )
       .setOrigin(0, 0.5);
 
+    // 靈石：點了進藏寶閣。和金幣同一列，但它是個入口，所以做成按鈕。
+    createButton(this, GAME_WIDTH - 150, 36, {
+      width: 140,
+      height: 44,
+      label: `靈石 ${formatNumber(save.player.stones.balance)}`,
+      fontSize: 16,
+      textColor: GOLD,
+      onClick: () => fadeToScene(this, 'Shop'),
+    });
+
     const x = GAME_WIDTH - 46;
     const y = 36;
     // 三條線自己畫，不做成一張圖：它就是三條線，而多一個要預載的貼圖
@@ -246,6 +256,7 @@ export class TitleScene extends Phaser.Scene {
           scene: 'Achievements',
           ...(pending > 0 ? { badge: `${pending} 可領取` } : {}),
         },
+        { label: '藏寶閣', icon: 'scroll', scene: 'Shop' },
         { label: '存　檔', icon: 'save', scene: 'Archive' },
         { label: '玩法說明', icon: 'help', scene: 'Help' },
       ]);

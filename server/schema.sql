@@ -148,3 +148,19 @@ CREATE TABLE IF NOT EXISTS server_secrets (
   name  TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- 靈石的購買紀錄（v26）。
+--
+-- 128 平台只在遊戲那一端回報「付款成功」，伺服器查證不了；靈石入帳跟著存檔走。
+-- 這張表是**對帳用的副本**：存檔會被下一次上傳整份覆蓋，玩家說「我買了沒拿到」
+-- 或帳對不起來的時候，這裡還留著每一筆是誰、什麼時候、買了什麼。
+CREATE TABLE IF NOT EXISTS purchases (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id  TEXT NOT NULL,
+  item       TEXT NOT NULL,
+  stones     INTEGER NOT NULL,
+  at         INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS purchases_player ON purchases (player_id, at);

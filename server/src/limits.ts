@@ -33,6 +33,8 @@ export const LIMITS = {
   scoreIp: { limit: 60, windowMs: 5 * MINUTE },
   /** 上傳存檔。它是取得身分的唯一入口，所以它決定了偽造身分有多便宜。 */
   saveIp: { limit: 60, windowMs: 5 * MINUTE },
+  /** 購買紀錄（照 IP 算）。真人一次付款送一筆。 */
+  purchaseIp: { limit: 20, windowMs: 5 * MINUTE },
   /** 註冊。真人一輩子做一次。 */
   registerIp: { limit: 5, windowMs: 60 * MINUTE },
   /** 登入。線上猜密碼唯一的煞車（離線猜要先破 PBKDF2，不走這裡）。 */

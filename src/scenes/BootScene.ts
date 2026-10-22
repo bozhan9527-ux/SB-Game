@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { composeDisciples, preloadArt } from '../art';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { hasSave } from '../save';
+import { state } from '../state';
 import { initState } from '../state';
 import { initTelemetry, setTelemetryEnabled, track } from '../telemetry';
 import { DANGER, EDGE, INK, LACQUER, TALISMAN, textStyle, wrapText } from '../ui/theme';
@@ -71,7 +72,8 @@ export class BootScene extends Phaser.Scene {
     preloadArt(this);
     this.load.on('progress', (value: number) => seal.progress(value));
     this.load.once('complete', () => {
-      composeDisciples(this);
+      // 穿著時裝的話，門人一開始就疊時裝的部件（換裝時藏寶閣會再疊一次）
+      composeDisciples(this, state().player.stones.equipped);
       seal.progress(1);
       // 進度走滿之後停一下：一閃就開門，玩家看不到「載完了」這件事。
       this.time.delayedCall(260, () => this.openGate(paper, doors, seal.container));

@@ -1,14 +1,14 @@
 /**
  * 存檔的讀寫與變更。所有會動到金幣、升級等級、關卡進度的操作都集中在這裡。
  */
-import { DUNGEONS, KARMA, SECTS, UPGRADES } from '../data';
+import { DUNGEONS, KARMA, SECTS, SHOP, UPGRADES } from '../data';
 import { sanitizeChallenges } from '../systems/challenges';
 import { sanitizeTalismans, starterTalismans } from '../systems/talismans';
 import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { CloudIdentity, DistributionCache, KarmaState, PendingOmen, RealmRunState, RecordsState, SaveData } from './types';
+import type { CloudIdentity, DistributionCache, KarmaState, PendingOmen, RealmRunState, RecordsState, SaveData, StoneState } from './types';
 import { blessingDef, sanitizeBlessings } from '../systems/blessings';
 import { freshRealmRun, sanitizeRealmRun } from '../systems/realmrun';
 import { sanitizeTribulationLevels } from '../systems/tribulations';
@@ -36,6 +36,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       omen: null,
       towerWeek: 0,
       daily: { day: 0, best: 0 },
+      stones: { balance: 0, claimed: [], dailyDay: 0, towerWeek: 0, cardUntil: 0, cardDay: 0, costumes: [], equipped: null, ledger: [] },
       challenges: [],
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0, unlocks: [], dao: false, bestHeaven: 0 },
@@ -63,6 +64,32 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0, realmRun: freshRealmRun(1), tribulations: {} },
     settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1 },
+  };
+}
+
+function normalizeStones(raw: unknown): StoneState {
+  const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const int = (v: unknown): number => Math.max(0, Math.floor(asNumber(v, 0)));
+  const known = new Set(SHOP.costumes.map((c) => c.id));
+  const costumes = strings(o['costumes']).filter((id) => known.has(id));
+  const equipped = typeof o['equipped'] === 'string' && costumes.includes(o['equipped']) ? o['equipped'] : null;
+  const ledger = Array.isArray(o['ledger'])
+    ? (o['ledger'] as unknown[])
+        .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null && typeof (e as Record<string, unknown>)['item'] === 'string')
+        .map((e) => ({ item: String(e['item']).slice(0, 40), stones: int(e['stones']), at: int(e['at']) }))
+        .slice(-100)
+    : [];
+  return {
+    balance: int(o['balance']),
+    claimed: [...new Set(strings(o['claimed']))],
+    dailyDay: int(o['dailyDay']),
+    towerWeek: int(o['towerWeek']),
+    cardUntil: int(o['cardUntil']),
+    cardDay: int(o['cardDay']),
+    costumes: [...new Set(costumes)],
+    equipped,
+    ledger,
   };
 }
 
@@ -276,6 +303,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
         day: Math.max(0, Math.floor(asNumber(((player['daily'] ?? {}) as Record<string, unknown>)['day'], 0))),
         best: Math.max(0, Math.floor(asNumber(((player['daily'] ?? {}) as Record<string, unknown>)['best'], 0))),
       },
+      stones: normalizeStones(player['stones']),
       challenges: sanitizeChallenges(strings(player['challenges']), highestStage),
       challengesDone: strings(player['challengesDone']),
       records: normalizeRecords(player['records']),

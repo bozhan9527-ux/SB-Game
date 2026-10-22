@@ -20,6 +20,7 @@ import bossSkillsJson from '../../data/boss-skills.json';
 import omensJson from '../../data/omens.json';
 import tribulationsJson from '../../data/tribulations.json';
 import blessingsJson from '../../data/blessings.json';
+import shopJson from '../../data/shop.json';
 
 import { BOSS_ART_NAMES, ICON_NAMES } from './types';
 import type {
@@ -857,3 +858,48 @@ for (const blessing of BLESSINGS) {
     throw new DataError('blessings.json', `${blessing.id} 的門派「${blessing.sect}」不存在`);
   }
 }
+
+/** 藏寶閣：靈石包、月卡、時裝售價與免費靈石的發放量（見 src/systems/stones.ts）。 */
+export interface ShopPack { id: string; name: string; stones: number; price: number }
+export interface ShopCostume { id: string; name: string; price: number; desc: string }
+export interface ShopData {
+  packs: ShopPack[];
+  monthCard: ShopPack & { daily: number; days: number };
+  costumes: ShopCostume[];
+  grants: {
+    firstBreak: number; realm: number; boss: number; firstAscend: number; ascend: number;
+    daily: number; dailyWaves: number; tower: number;
+    /** 成就的靈石：[金幣獎勵未滿這個數, 給幾顆]，最後一格的門檻寫 0 表示其餘全部。 */
+    achievement: [number, number][];
+  };
+}
+
+export function parseShop(raw: unknown, path = 'shop.json'): ShopData {
+  const pack = (item: unknown, p: string): ShopPack => ({ id: str(item, 'id', p), name: str(item, 'name', p), stones: num(item, 'stones', p), price: num(item, 'price', p) });
+  const rec = raw as Record<string, unknown>;
+  const card = rec['monthCard'];
+  const g = (rec['grants'] ?? {}) as Record<string, unknown>;
+  const grants = {
+    firstBreak: num(g, 'firstBreak', `${path}.grants`),
+    realm: num(g, 'realm', `${path}.grants`),
+    boss: num(g, 'boss', `${path}.grants`),
+    firstAscend: num(g, 'firstAscend', `${path}.grants`),
+    ascend: num(g, 'ascend', `${path}.grants`),
+    daily: num(g, 'daily', `${path}.grants`),
+    dailyWaves: num(g, 'dailyWaves', `${path}.grants`),
+    tower: num(g, 'tower', `${path}.grants`),
+    achievement: list(g['achievement'], `${path}.grants.achievement`, (pair, p) => {
+      if (!Array.isArray(pair) || pair.length !== 2 || !pair.every((v) => typeof v === 'number')) throw new DataError(p, '要是 [門檻, 靈石]');
+      return [pair[0] as number, pair[1] as number] as [number, number];
+    }),
+  };
+  const costumes = list(rec['costumes'], `${path}.costumes`, (item, p) => ({ id: str(item, 'id', p), name: str(item, 'name', p), price: num(item, 'price', p), desc: str(item, 'desc', p) }));
+  return {
+    packs: list(rec['packs'], `${path}.packs`, pack),
+    monthCard: { ...pack(card, `${path}.monthCard`), daily: num(card, 'daily', `${path}.monthCard`), days: num(card, 'days', `${path}.monthCard`) },
+    costumes,
+    grants,
+  };
+}
+
+export const SHOP: ShopData = parseShop(shopJson);

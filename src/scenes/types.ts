@@ -60,6 +60,8 @@ export interface RunResultData {
   victory: boolean;
   stage: number;
   bossName: string;
+  /** 關底首領的 id（第一次擊敗給靈石，見 systems/stones.ts）。 */
+  bossId: string;
   /** 關底首領的招式種類。斬過哪幾種記進成就。 */
   bossSkill: string;
   /** 這一場帶著幾重天劫。 */

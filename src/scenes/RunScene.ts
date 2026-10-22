@@ -3278,6 +3278,7 @@ export class RunScene extends Phaser.Scene {
       diagnosis: victory ? null : this.diagnose(reason),
       stage: this.run.stage,
       bossName: this.run.bossDef.name,
+      bossId: this.run.bossDef.id,
       bossSkill: this.run.bossDef.skill,
       tribulations: this.run.loadout.tribulations.length,
       survivors: Math.max(0, this.run.disciples),

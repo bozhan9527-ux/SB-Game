@@ -17,7 +17,7 @@ import {
   resetByAnswer,
   setRecoveryQuestion,
 } from './accounts';
-import { getSave, putSave } from './saves';
+import { getSave, logPurchase, putSave } from './saves';
 import { leaderboard, submitScore } from './scores';
 import { API_VERSION } from '../../src/net/protocol';
 
@@ -68,6 +68,9 @@ export default {
       }
       if (path === `/${API_VERSION}/save/get` && request.method === 'POST') {
         return await getSave(request, env, origin);
+      }
+      if (path === `/${API_VERSION}/purchase` && request.method === 'POST') {
+        return await logPurchase(request, env, origin);
       }
       if (path === `/${API_VERSION}/score` && request.method === 'POST') {
         return await submitScore(request, env, origin);

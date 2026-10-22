@@ -117,6 +117,18 @@ export interface TelemetryEvents {
     heaven: number;
     gained: number;
   };
+
+  /** 用靈石買時裝。回答「哪一套賣得動」。 */
+  costume_buy: {
+    id: string;
+    price: number;
+  };
+
+  /** 平台付款成功、靈石入帳。 */
+  stones_purchase: {
+    item: string;
+    stones: number;
+  };
 }
 
 export type TelemetryEventName = keyof TelemetryEvents;

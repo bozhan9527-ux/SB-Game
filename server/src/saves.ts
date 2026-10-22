@@ -98,3 +98,33 @@ export async function getSave(request: Request, env: Env, origin: string | null)
 
   return json<SaveGetResult>({ ok: true, blob: row.blob, savedAt: row.saved_at }, env, origin);
 }
+
+/**
+ * 記一筆購買（對帳用，見 schema.sql 的 purchases）。
+ * 身分要對得上已經上傳過的存檔；還沒上傳過的就先收下（第一次付款常常比第一次雲端存檔早）。
+ */
+export async function logPurchase(request: Request, env: Env, origin: string | null): Promise<Response> {
+  await sweep(env);
+  const blocked = await take(env, `purchase:${ipKey(request)}`, LIMITS.purchaseIp.limit, LIMITS.purchaseIp.windowMs);
+  if (blocked !== null) return tooMany(blocked, env, origin);
+  const body = await readJson(request);
+  if (body === 'tooLarge') return fail('tooLarge', env, origin);
+  if (body === 'badRequest') return fail('badRequest', env, origin);
+  const identity = identityOf(body);
+  if (identity === null) return fail('badRequest', env, origin, '缺少 playerId 或 secret');
+  const record = body as Record<string, unknown>;
+  const item = record['item'];
+  const stones = record['stones'];
+  const at = record['at'];
+  if (!isNonEmptyString(item, 40)) return fail('badRequest', env, origin, 'item 不合法');
+  if (typeof stones !== 'number' || !Number.isFinite(stones) || stones < 0 || stones > 100000) return fail('badRequest', env, origin, 'stones 不合法');
+  if (typeof at !== 'number' || !Number.isFinite(at)) return fail('badRequest', env, origin, 'at 不合法');
+
+  const row = await env.DB.prepare('SELECT secret_hash FROM saves WHERE player_id = ?').bind(identity.playerId).first<{ secret_hash: string }>();
+  if (row !== null && !timingSafeEqual(row.secret_hash, await sha256(identity.secret))) return fail('unauthorized', env, origin);
+
+  await env.DB.prepare('INSERT INTO purchases (player_id, item, stones, at, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(identity.playerId, item, Math.floor(stones), Math.floor(at), Date.now())
+    .run();
+  return json<{ ok: true }>({ ok: true }, env, origin);
+}

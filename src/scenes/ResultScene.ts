@@ -45,6 +45,10 @@ import { enterMainline } from "./flow";
 import { consumeRevive, newbieShield, onStageCleared, onStageFailed } from "../systems/realmrun";
 import { DAILY_ID, claimDaily, dayOf } from "../systems/daily";
 import { mustAscend } from "../systems/karma";
+import { grantAfterRun, grantDaily, grantTower } from "../systems/stones";
+import type { StoneGain } from "../systems/stones";
+import { TOWER_ID } from "../systems/dungeons";
+import { weekOf } from "../systems/tribulations";
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
 export class ResultScene extends Phaser.Scene {
@@ -101,12 +105,14 @@ export class ResultScene extends Phaser.Scene {
     // 一境一局（主線才有）：過關帶耐久、抽下一次三選一；沒過就退回本局第一關。
     const mainline = !result.replay && result.dungeon === null;
     this.runNote = null;
+    let brokeThrough = false;
     if (mainline) {
       if (result.reviveUsed) consumeRevive(save);
       const blessCount = Object.keys(save.world.realmRun.blessings).length;
       const startStage = save.world.realmRun.startStage;
       if (result.victory) {
         const outcome = onStageCleared(save, result.stage, result.survivors, result.maxDisciples);
+        brokeThrough = outcome.brokeThrough;
         if (outcome.brokeThrough) {
           track("realm_run_end", { stage: result.stage, start_stage: startStage, broke_through: true, blessings: blessCount });
         }
@@ -134,6 +140,29 @@ export class ResultScene extends Phaser.Scene {
     if (dungeon !== null && dungeon.id === DAILY_ID && result.endlessCleared !== null) {
       const gained = claimDaily(save, result.submission?.daily ?? dayOf(Date.now()), result.endlessCleared);
       this.dungeonRewards.push(gained > 0 ? `每日挑戰 仙緣 +${gained}` : `今日最佳 ${save.player.daily.best} 波`);
+    }
+
+    // 靈石：破境、初斬首領、每日挑戰、天劫塔登頂。和副本回報同一個理由——發放與顯示走同一份資料。
+    const stoneGains: StoneGain[] = grantAfterRun(save, {
+      victory: result.victory,
+      stage: result.stage,
+      mainline,
+      brokeThrough,
+      bossId: result.bossId,
+      bossName: result.bossName,
+      bossKilled: result.bossKilled,
+      replay: result.replay,
+    });
+    if (!result.replay && dungeon !== null && dungeon.id === DAILY_ID && result.endlessCleared !== null) {
+      stoneGains.push(...grantDaily(save, result.submission?.daily ?? dayOf(Date.now()), result.endlessCleared));
+    }
+    if (!result.replay && result.victory && dungeon !== null && result.dungeon !== null && dungeon.id === TOWER_ID && result.dungeon.floor >= dungeon.floors.length) {
+      const top = grantTower(save, weekOf(Date.now()));
+      if (top !== null) stoneGains.push(top);
+    }
+    if (stoneGains.length > 0) {
+      const total = stoneGains.reduce((sum, g) => sum + g.amount, 0);
+      this.dungeonRewards.unshift(`靈石 +${total}（${stoneGains.map((g) => g.label).join('、')}）`);
     }
 
     const beaten = updateRecords(save, {

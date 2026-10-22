@@ -204,29 +204,43 @@ export function partTexture(id: string, frame: number): string {
   return `pd-${id}-${frame}`;
 }
 
-export function outfitParts(art: SectArt, tier: number): readonly string[] {
-  return MANIFEST.paperdoll?.outfits[`${art}-${tier}`] ?? [];
+/** 一個門派、一階的部件清單；穿著時裝的話換成那套時裝的（沒有這套時裝的圖就退回門派原本的）。 */
+export function outfitParts(art: SectArt, tier: number, costume: string | null = null): readonly string[] {
+  const outfits = MANIFEST.paperdoll?.outfits ?? {};
+  return (costume !== null ? outfits[`${costume}:${art}-${tier}`] : undefined) ?? outfits[`${art}-${tier}`] ?? [];
 }
 
+/**
+ * 把一組部件畫進 key 這張畫布貼圖。已經存在就擦掉重畫（換裝走這條）——
+ * 沿用同一張貼圖物件，走路動畫和場上的門人不用重建就會換上新衣服。
+ */
 export function composeOutfit(scene: Phaser.Scene, key: string, parts: readonly string[], frame: number): void {
-  if (scene.textures.exists(key)) return;
   const layers = parts.map((id) => partTexture(id, frame)).filter((k) => scene.textures.exists(k));
   const first = layers[0];
   if (first === undefined) return;
   const src = scene.textures.get(first).getSourceImage() as HTMLImageElement;
-  const canvas = scene.textures.createCanvas(key, src.width, src.height);
+  const existing = scene.textures.exists(key) ? scene.textures.get(key) : null;
+  const canvas = existing instanceof Phaser.Textures.CanvasTexture ? existing : existing === null ? scene.textures.createCanvas(key, src.width, src.height) : null;
   if (canvas === null) return;
+  canvas.context.clearRect(0, 0, canvas.width, canvas.height);
   for (const layer of layers) canvas.context.drawImage(scene.textures.get(layer).getSourceImage() as HTMLImageElement, 0, 0);
   canvas.refresh();
 }
 
-/** 預設造型（門派 × 階級）疊成原本的 disciple-* 貼圖 key，場景程式照舊用。 */
-export function composeDisciples(scene: Phaser.Scene): void {
+/** 門人（門派 × 階級）疊成 disciple-* 貼圖 key，場景程式照舊用。穿著時裝就疊時裝的部件。 */
+export function composeDisciples(scene: Phaser.Scene, costume: string | null = null): void {
   for (const art of SECT_ARTS) {
     for (const tier of DISCIPLE_TIERS) {
-      for (const frame of WALK_FRAMES) composeOutfit(scene, discipleTexture(art, tier, frame), outfitParts(art, tier), frame);
+      for (const frame of WALK_FRAMES) composeOutfit(scene, discipleTexture(art, tier, frame), outfitParts(art, tier, costume), frame);
     }
   }
+}
+
+/** 某套時裝穿在某派某階身上的預覽貼圖（藏寶閣用），第 0 幀。 */
+export function costumePreview(scene: Phaser.Scene, costume: string, art: SectArt, tier: number): string {
+  const key = `preview-${costume}-${art}-t${tier}`;
+  if (!scene.textures.exists(key)) composeOutfit(scene, key, outfitParts(art, tier, costume), 0);
+  return key;
 }
 
 /** 建立走路與首領待機動畫。動畫由兩張獨立貼圖組成，Phaser 允許 frames 直接列貼圖 key。 */

@@ -91,8 +91,10 @@ export class AchievementScene extends Phaser.Scene {
         textColor: GOLD,
         strokeColor: hexToNumber(GOLD),
         onClick: () => {
+          const before = save.player.stones.balance;
           const gold = claimReward(save, item.id);
           if (gold <= 0) return;
+          const stones = save.player.stones.balance - before;
           addGold(save, gold);
           persist();
           audio.play('gold');
@@ -100,7 +102,7 @@ export class AchievementScene extends Phaser.Scene {
           // 按鈕在捲動清單裡，位置要加上清單目前的位移。
           const at = list.y + y;
           burstPixels(this, button.container.x, at, GOLD, 8);
-          floatLabel(this, button.container.x - 70, at - 10, `+${formatNumber(gold)} 金`, GOLD);
+          floatLabel(this, button.container.x - 70, at - 10, `+${formatNumber(gold)} 金${stones > 0 ? `・靈石 +${stones}` : ''}`, GOLD);
         },
       });
       list.add(button.container);
@@ -128,14 +130,16 @@ export class AchievementScene extends Phaser.Scene {
       textColor: '#12181f',
       onClick: () => {
         let total = 0;
+        const before = save.player.stones.balance;
         for (const item of pendingAchievements(save)) total += claimReward(save, item.id);
         if (total <= 0) return;
+        const stones = save.player.stones.balance - before;
         addGold(save, total);
         persist();
         audio.play('gold');
         this.refresh();
         burstPixels(this, cx, GAME_HEIGHT - 128, GOLD, 12);
-        floatLabel(this, cx, GAME_HEIGHT - 178, `+${formatNumber(total)} 金`, GOLD, 26);
+        floatLabel(this, cx, GAME_HEIGHT - 178, `+${formatNumber(total)} 金${stones > 0 ? `・靈石 +${stones}` : ''}`, GOLD, 26);
       },
     });
 

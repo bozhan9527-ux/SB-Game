@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pic, groundShadow, seedRng } from './lib.mjs';
 import { opaqueTop, rasterize, readImage, writeImage } from './render.mjs';
-import { LAYER_ORDER, MOBS, PAPERDOLL, PARTS, SECTS, drawPart, outfitOf } from './chars.mjs';
+import { COSTUMES, LAYER_ORDER, MOBS, PAPERDOLL, PARTS, SECTS, costumeOutfit, drawPart, outfitOf } from './chars.mjs';
 import { BOSSES } from './bosses.mjs';
 import * as W from './world.mjs';
 
@@ -75,6 +75,11 @@ if (only === 'all' || only === 'chars') {
     for (const tier of [0, 1, 2]) {
       outfits[`${sect}-${tier}`] = outfitOf(sect, tier);
       for (const id of outfits[`${sect}-${tier}`]) top = Math.min(top, partSize[id].top);
+      // 時裝：key 是「時裝:門派-階級」，部件照 costumeOutfit 疊
+      for (const c of Object.keys(COSTUMES)) {
+        outfits[`${c}:${sect}-${tier}`] = costumeOutfit(sect, tier, c);
+        for (const id of outfits[`${c}:${sect}-${tier}`]) top = Math.min(top, partSize[id].top);
+      }
     }
     manifest.disciple[sect] = { ...partSize.legs, top };
   }

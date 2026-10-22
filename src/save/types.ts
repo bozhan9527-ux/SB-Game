@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 25;
+export const SAVE_VERSION = 26;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -134,6 +134,35 @@ export interface StatsState {
   maxTribulations: number;
 }
 
+/**
+ * 靈石（v26）：第二種貨幣，只買外觀（時裝），不影響任何數值與排行榜。
+ *
+ * 跟著存檔走、輪迴不歸零。免費的部分都是「歷代第一次」或「每天／每週一次」，
+ * 一次性的記在 claimed（例如 realm:foundation、boss:b_unity_3、ach:first_clear），
+ * 每天、每週的只記最後一次領的是第幾天／第幾週——不然清單會一天長一格。
+ */
+export interface StoneState {
+  balance: number;
+  claimed: string[];
+  /** 每日挑戰撐過門檻那一份，最後一次是第幾天。 */
+  dailyDay: number;
+  /** 天劫塔打通那一份，最後一次是第幾週。 */
+  towerWeek: number;
+  /** 月卡到第幾天為止（不含）；0 為沒買過。 */
+  cardUntil: number;
+  /** 月卡每日那一份最後一次是第幾天。 */
+  cardDay: number;
+  /** 擁有的時裝 id。 */
+  costumes: string[];
+  /** 穿著的時裝；null 是門派原本的衣服。 */
+  equipped: string | null;
+  /**
+   * 購買流水（平台付款成功才記）。平台只在遊戲這一端回報成功，伺服器無從查證，
+   * 所以每一筆都留下來，有爭議時拿來對帳。只留最近 100 筆。
+   */
+  ledger: { item: string; stones: number; at: number }[];
+}
+
 export interface PlayerState {
   /** 尚未選擇門派時為 null。 */
   sectId: string | null;
@@ -221,6 +250,7 @@ export interface PlayerState {
   towerWeek: number;
   /** 每日挑戰：今天是第幾天、今天最多打到幾波（獎勵看它，換日歸零）。 */
   daily: { day: number; best: number };
+  stones: StoneState;
 }
 
 export interface PendingOmen {

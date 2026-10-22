@@ -172,6 +172,11 @@ export function getSave(body: Identity): Promise<ApiResponse<SaveGetResult>> {
   return call<SaveGetResult>('/save/get', body);
 }
 
+/** 付款成功後留一份購買紀錄在伺服器（對帳用；失敗不影響入帳）。 */
+export function logPurchase(body: Identity & { item: string; stones: number; at: number }): Promise<ApiResponse<Record<string, never>>> {
+  return call('/purchase', body);
+}
+
 export function submitScore(body: ScoreSubmitRequest): Promise<ApiResponse<ScoreSubmitResult>> {
   return call<ScoreSubmitResult>('/score', body);
 }

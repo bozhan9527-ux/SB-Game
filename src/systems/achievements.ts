@@ -4,6 +4,7 @@
  * 條件只看存檔裡的原始事實（最高關卡、累計通關、單場最高人數…），
  * 不存衍生值，日後要調門檻只要改 data/achievements.json。
  */
+import { grantAchievement } from './stones';
 import { ACHIEVEMENTS, SECTS } from '../data';
 import type { Achievement } from '../data/types';
 import type { SaveData } from '../save/types';
@@ -91,12 +92,13 @@ export function pendingAchievements(save: SaveData): Achievement[] {
   return ACHIEVEMENTS.filter((item) => isUnlocked(save, item.id) && !isClaimed(save, item.id));
 }
 
-/** 領走一條的獎勵。回傳實際入帳的金幣（已領過或還沒達成回 0）。 */
+/** 領走一條的獎勵。回傳實際入帳的金幣（已領過或還沒達成回 0）；靈石同時入帳（見 systems/stones.ts）。 */
 export function claimReward(save: SaveData, id: string): number {
   const item = ACHIEVEMENTS.find((entry) => entry.id === id);
   if (item === undefined) return 0;
   if (!isUnlocked(save, id) || isClaimed(save, id)) return 0;
   save.player.achievementsClaimed.push(id);
+  grantAchievement(save, item.id, item.reward, item.name);
   return item.reward;
 }
 

@@ -15,6 +15,7 @@ import { AchievementScene } from './scenes/AchievementScene';
 import { HelpScene } from './scenes/HelpScene';
 import { ArchiveScene } from './scenes/ArchiveScene';
 import { RebirthScene } from './scenes/RebirthScene';
+import { ShopScene } from './scenes/ShopScene';
 import { LeaderboardScene } from './scenes/LeaderboardScene';
 import { SplashScene } from './scenes/SplashScene';
 import { DungeonScene } from './scenes/DungeonScene';
@@ -93,7 +94,7 @@ const game = new Phaser.Game({
     width: GAME_WIDTH * RENDER_SCALE,
     height: GAME_HEIGHT * RENDER_SCALE,
   },
-  scene: [BootScene, SplashScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene, TalismanScene, DungeonScene, ArchiveScene, RebirthScene, LeaderboardScene, BlessingScene, AscendScene, AltarScene],
+  scene: [BootScene, SplashScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene, TalismanScene, DungeonScene, ArchiveScene, RebirthScene, LeaderboardScene, BlessingScene, AscendScene, AltarScene, ShopScene],
 });
 
 // 開發用：讓瀏覽器自動化腳本讀得到遊戲（幀率、目前場景）。正式版不掛。

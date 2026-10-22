@@ -6,7 +6,8 @@
  */
 import { CARDS } from '../data';
 import { legacyKarmaRefund } from '../systems/karma';
-import { SECT_UPGRADES } from '../data';
+import { ACHIEVEMENTS, REALMS, SECT_UPGRADES, SHOP } from '../data';
+import { achievementStones } from '../systems/stones';
 
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
@@ -346,6 +347,43 @@ const addDaily: Migration = (data) => {
   return { ...data, player: { ...player, daily: { day: 0, best: 0 } } };
 };
 
+/**
+ * v25 → v26：靈石與時裝。
+ *
+ * 舊玩家已經做到的「歷代第一次」當場補發：打過的境界、飛升過的次數、已經領過獎的成就。
+ * 首領沒有逐隻記過擊敗紀錄，從現在開始算——這是唯一補不回來的一項。
+ */
+const addStones: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const stones = emptyStones() as { balance: number; claimed: string[] };
+  const give = (key: string, amount: number): void => {
+    stones.claimed.push(key);
+    stones.balance += amount;
+  };
+  const highest = typeof world['highestStage'] === 'number' ? world['highestStage'] : 1;
+  const passed = Math.min(REALMS.length, Math.floor((highest - 1) / 9));
+  if (passed > 0) give('break:first', SHOP.grants.firstBreak);
+  for (let i = 0; i < passed; i += 1) give(`realm:${REALMS[i]!.id}`, SHOP.grants.realm);
+  const karma = (player['karma'] ?? {}) as Record<string, unknown>;
+  const rebirths = typeof karma['rebirths'] === 'number' ? Math.max(0, Math.floor(karma['rebirths'])) : 0;
+  if (rebirths > 0) {
+    stones.claimed.push('ascend:first');
+    stones.balance += SHOP.grants.firstAscend + (rebirths - 1) * SHOP.grants.ascend;
+  }
+  const claimedAch = Array.isArray(player['achievementsClaimed']) ? (player['achievementsClaimed'] as unknown[]) : [];
+  for (const id of claimedAch) {
+    const item = ACHIEVEMENTS.find((a) => a.id === id);
+    if (item !== undefined) give(`ach:${item.id}`, achievementStones(item.reward));
+  }
+  return { ...data, player: { ...player, stones } };
+};
+
+
+export function emptyStones(): Record<string, unknown> {
+  return { balance: 0, claimed: [], dailyDay: 0, towerWeek: 0, cardUntil: 0, cardDay: 0, costumes: [], equipped: null, ledger: [] };
+}
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -371,6 +409,7 @@ export const MIGRATIONS: readonly Migration[] = [
   toAscension,
   dropSectDepth,
   addDaily,
+  addStones,
 ];
 
 /**

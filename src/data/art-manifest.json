@@ -185,25 +185,25 @@
   "alchemy": {
    "w": 160,
    "h": 224,
-   "top": 35,
+   "top": 13,
    "scale": 0.5
   },
   "body": {
    "w": 160,
    "h": 224,
-   "top": 35,
+   "top": 13,
    "scale": 0.5
   },
   "sword": {
    "w": 160,
    "h": 224,
-   "top": 35,
+   "top": 13,
    "scale": 0.5
   },
   "talisman": {
    "w": 160,
    "h": 224,
-   "top": 35,
+   "top": 13,
    "scale": 0.5
   }
  },
@@ -367,10 +367,25 @@
    "hat-bun": "hat",
    "hat-band": "hat",
    "hat-crown": "hat",
+   "hat-jadepin": "hat",
+   "hat-scholar": "hat",
+   "hat-flower": "hat",
+   "hat-flameband": "hat",
+   "hat-icecrown": "hat",
+   "hat-dragoncrown": "hat",
    "weapon-sword": "weapon",
    "weapon-fist": "weapon",
    "weapon-fu": "weapon",
    "weapon-gourd": "weapon",
+   "robe-c-moonwhite": "outfit",
+   "robe-c-scholar": "outfit",
+   "robe-c-peach": "outfit",
+   "robe-c-crimson": "outfit",
+   "robe-c-frost": "outfit",
+   "robe-c-dragon": "outfit",
+   "cape-7a1a2a": "cape",
+   "cape-e9f4fb": "cape",
+   "cape-c8372d": "cape",
    "robe-sword-0": "outfit",
    "robe-sword-1": "outfit",
    "robe-body-0": "outfit",
@@ -388,6 +403,52 @@
     "head",
     "hat-bun"
    ],
+   "moonwhite:sword-0": [
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-sword",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:sword-0": [
+    "legs",
+    "robe-c-scholar",
+    "weapon-sword",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:sword-0": [
+    "legs",
+    "robe-c-peach",
+    "weapon-sword",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:sword-0": [
+    "cape-7a1a2a",
+    "legs",
+    "robe-c-crimson",
+    "weapon-sword",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:sword-0": [
+    "cape-e9f4fb",
+    "legs",
+    "robe-c-frost",
+    "weapon-sword",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:sword-0": [
+    "aura-gold",
+    "cape-c8372d",
+    "legs",
+    "robe-c-dragon",
+    "weapon-sword",
+    "head",
+    "hat-dragoncrown"
+   ],
    "sword-1": [
     "hair-long",
     "legs",
@@ -395,6 +456,58 @@
     "weapon-sword",
     "head",
     "hat-band"
+   ],
+   "moonwhite:sword-1": [
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-sword",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:sword-1": [
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-sword",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:sword-1": [
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-sword",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:sword-1": [
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-sword",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:sword-1": [
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-sword",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:sword-1": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-sword",
+    "head",
+    "hat-dragoncrown"
    ],
    "sword-2": [
     "aura-gold",
@@ -406,12 +519,118 @@
     "head",
     "hat-crown"
    ],
+   "moonwhite:sword-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-sword",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:sword-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-sword",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:sword-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-sword",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:sword-2": [
+    "aura-gold",
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-sword",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:sword-2": [
+    "aura-gold",
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-sword",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:sword-2": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-sword",
+    "head",
+    "hat-dragoncrown"
+   ],
    "body-0": [
     "legs",
     "robe-body-0",
     "weapon-fist",
     "head",
     "hat-bun"
+   ],
+   "moonwhite:body-0": [
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-fist",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:body-0": [
+    "legs",
+    "robe-c-scholar",
+    "weapon-fist",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:body-0": [
+    "legs",
+    "robe-c-peach",
+    "weapon-fist",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:body-0": [
+    "cape-7a1a2a",
+    "legs",
+    "robe-c-crimson",
+    "weapon-fist",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:body-0": [
+    "cape-e9f4fb",
+    "legs",
+    "robe-c-frost",
+    "weapon-fist",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:body-0": [
+    "aura-gold",
+    "cape-c8372d",
+    "legs",
+    "robe-c-dragon",
+    "weapon-fist",
+    "head",
+    "hat-dragoncrown"
    ],
    "body-1": [
     "hair-long",
@@ -420,6 +639,58 @@
     "weapon-fist",
     "head",
     "hat-band"
+   ],
+   "moonwhite:body-1": [
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-fist",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:body-1": [
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-fist",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:body-1": [
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-fist",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:body-1": [
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-fist",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:body-1": [
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-fist",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:body-1": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-fist",
+    "head",
+    "hat-dragoncrown"
    ],
    "body-2": [
     "aura-gold",
@@ -431,12 +702,118 @@
     "head",
     "hat-crown"
    ],
+   "moonwhite:body-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-fist",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:body-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-fist",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:body-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-fist",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:body-2": [
+    "aura-gold",
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-fist",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:body-2": [
+    "aura-gold",
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-fist",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:body-2": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-fist",
+    "head",
+    "hat-dragoncrown"
+   ],
    "talisman-0": [
     "legs",
     "robe-talisman-0",
     "weapon-fu",
     "head",
     "hat-bun"
+   ],
+   "moonwhite:talisman-0": [
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-fu",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:talisman-0": [
+    "legs",
+    "robe-c-scholar",
+    "weapon-fu",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:talisman-0": [
+    "legs",
+    "robe-c-peach",
+    "weapon-fu",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:talisman-0": [
+    "cape-7a1a2a",
+    "legs",
+    "robe-c-crimson",
+    "weapon-fu",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:talisman-0": [
+    "cape-e9f4fb",
+    "legs",
+    "robe-c-frost",
+    "weapon-fu",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:talisman-0": [
+    "aura-gold",
+    "cape-c8372d",
+    "legs",
+    "robe-c-dragon",
+    "weapon-fu",
+    "head",
+    "hat-dragoncrown"
    ],
    "talisman-1": [
     "hair-long",
@@ -445,6 +822,58 @@
     "weapon-fu",
     "head",
     "hat-band"
+   ],
+   "moonwhite:talisman-1": [
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-fu",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:talisman-1": [
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-fu",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:talisman-1": [
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-fu",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:talisman-1": [
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-fu",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:talisman-1": [
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-fu",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:talisman-1": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-fu",
+    "head",
+    "hat-dragoncrown"
    ],
    "talisman-2": [
     "aura-gold",
@@ -456,12 +885,118 @@
     "head",
     "hat-crown"
    ],
+   "moonwhite:talisman-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-fu",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:talisman-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-fu",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:talisman-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-fu",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:talisman-2": [
+    "aura-gold",
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-fu",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:talisman-2": [
+    "aura-gold",
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-fu",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:talisman-2": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-fu",
+    "head",
+    "hat-dragoncrown"
+   ],
    "alchemy-0": [
     "legs",
     "robe-alchemy-0",
     "weapon-gourd",
     "head",
     "hat-bun"
+   ],
+   "moonwhite:alchemy-0": [
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-gourd",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:alchemy-0": [
+    "legs",
+    "robe-c-scholar",
+    "weapon-gourd",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:alchemy-0": [
+    "legs",
+    "robe-c-peach",
+    "weapon-gourd",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:alchemy-0": [
+    "cape-7a1a2a",
+    "legs",
+    "robe-c-crimson",
+    "weapon-gourd",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:alchemy-0": [
+    "cape-e9f4fb",
+    "legs",
+    "robe-c-frost",
+    "weapon-gourd",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:alchemy-0": [
+    "aura-gold",
+    "cape-c8372d",
+    "legs",
+    "robe-c-dragon",
+    "weapon-gourd",
+    "head",
+    "hat-dragoncrown"
    ],
    "alchemy-1": [
     "hair-long",
@@ -470,6 +1005,58 @@
     "weapon-gourd",
     "head",
     "hat-band"
+   ],
+   "moonwhite:alchemy-1": [
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-gourd",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:alchemy-1": [
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-gourd",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:alchemy-1": [
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-gourd",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:alchemy-1": [
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-gourd",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:alchemy-1": [
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-gourd",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:alchemy-1": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-gourd",
+    "head",
+    "hat-dragoncrown"
    ],
    "alchemy-2": [
     "aura-gold",
@@ -480,6 +1067,66 @@
     "weapon-gourd",
     "head",
     "hat-crown"
+   ],
+   "moonwhite:alchemy-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-moonwhite",
+    "weapon-gourd",
+    "head",
+    "hat-jadepin"
+   ],
+   "scholar:alchemy-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-scholar",
+    "weapon-gourd",
+    "head",
+    "hat-scholar"
+   ],
+   "peach:alchemy-2": [
+    "aura-gold",
+    "cape-red",
+    "hair-long",
+    "legs",
+    "robe-c-peach",
+    "weapon-gourd",
+    "head",
+    "hat-flower"
+   ],
+   "crimson:alchemy-2": [
+    "aura-gold",
+    "cape-7a1a2a",
+    "hair-long",
+    "legs",
+    "robe-c-crimson",
+    "weapon-gourd",
+    "head",
+    "hat-flameband"
+   ],
+   "frost:alchemy-2": [
+    "aura-gold",
+    "cape-e9f4fb",
+    "hair-long",
+    "legs",
+    "robe-c-frost",
+    "weapon-gourd",
+    "head",
+    "hat-icecrown"
+   ],
+   "dragon:alchemy-2": [
+    "aura-gold",
+    "cape-c8372d",
+    "hair-long",
+    "legs",
+    "robe-c-dragon",
+    "weapon-gourd",
+    "head",
+    "hat-dragoncrown"
    ]
   }
  }
