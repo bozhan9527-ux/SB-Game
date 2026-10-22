@@ -42,4 +42,4 @@ export function aspectRatio(width: number, height: number): number {
  * 版本標示。測試期間寫在主畫面最下面：玩家回報問題時要說得出是哪一版，
  * 而截圖是他們最常給的東西。
  */
-export const APP_VERSION = '測試版 0.9.8';
+export const APP_VERSION = '測試版 0.9.9';

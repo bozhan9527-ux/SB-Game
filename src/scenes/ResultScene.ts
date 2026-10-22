@@ -233,8 +233,10 @@ export class ResultScene extends Phaser.Scene {
       .setAlign("center");
 
     // 失敗診斷：告訴玩家這場輸在哪、下次該補什麼，而不是只丟一句「道消」。
+    // 它可能折成兩行，所以記下它的下緣：成績表不能比它高（副本的表多一列，最容易撞到）。
+    let headerBottom = 250;
     if (result.diagnosis !== null) {
-      this.add
+      const diagnosis = this.add
         .text(
           cx,
           286,
@@ -246,6 +248,7 @@ export class ResultScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setAlign("center")
         .setLineSpacing(6);
+      headerBottom = diagnosis.y + diagnosis.height / 2;
     }
 
     if (breakthrough) {
@@ -280,6 +283,7 @@ export class ResultScene extends Phaser.Scene {
       breakthrough ? 520 : 480,
       result,
       save.player.wallet.gold,
+      headerBottom + 10,
     );
 
     // 破紀錄與試煉達成合成一行，寫在結算表**下面**。
@@ -573,6 +577,7 @@ export class ResultScene extends Phaser.Scene {
     cy: number,
     result: RunResultData,
     totalGold: number,
+    minTop = 0,
   ): number {
     const width = GAME_WIDTH - 64;
     const rows: [string, string, string][] = [
@@ -620,11 +625,14 @@ export class ResultScene extends Phaser.Scene {
         string,
       ][]),
     );
-    const height = rows.length * 40 + 24;
+    // 副本（無限模式）多一列：列高收一點，表才不會往上撞到診斷、往下擠到按鈕
+    const rowHeight = rows.length > 7 ? 36 : 40;
+    const height = rows.length * rowHeight + 24;
+    cy = Math.max(cy, minTop + height / 2);
 
     pixelPanel(this, cx, cy, width, height);
     rows.forEach((row, index) => {
-      const y = cy - height / 2 + 32 + index * 40;
+      const y = cy - height / 2 + 30 + index * rowHeight;
       this.add
         .text(
           cx - width / 2 + 24,

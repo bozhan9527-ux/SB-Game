@@ -35,12 +35,14 @@ import {
   GOLD,
   INK,
   INK_DIM,
+  FRAME,
   JADE,
-  LINE,
   fitText,
   hexToNumber,
   textStyle,
+  wrapText,
 } from "../ui/theme";
+import { roughRect } from "../ui/sketch";
 import { fadeIn, fadeToScene } from "../ui/transition";
 
 const LIST_TOP = 108;
@@ -95,16 +97,16 @@ export class DungeonScene extends Phaser.Scene {
     const upcoming = nextFloor(save, dungeon);
     const cleared = clearedFloors(save, dungeon.id);
 
-    this.add
-      .rectangle(
-        cx,
-        top + CARD_HEIGHT / 2,
-        width,
-        CARD_HEIGHT,
-        BG_PANEL,
-        available ? 0.92 : 0.6,
-      )
-      .setStrokeStyle(available ? 2 : 1, available ? hexToNumber(GOLD) : LINE);
+    // 卡片：不透明的紙、手繪框（開放的用金框）。半透明的話背景的竹子會從字底下透出來。
+    const card = this.add.graphics();
+    roughRect(card, left + 3, top + 4, width, CARD_HEIGHT, { fill: 0x2a2622, fillAlpha: 0.08, stroke: null, seed: top });
+    roughRect(card, left, top, width, CARD_HEIGHT, {
+      fill: available ? BG_PANEL : BG_PANEL_ALT,
+      fillAlpha: 1,
+      stroke: available ? hexToNumber(GOLD) : FRAME,
+      width: available ? 2.4 : 1.6,
+      seed: top + 1,
+    });
 
     this.add
       .image(left + 42, top + 42, iconTexture(dungeon.icon as IconName))
@@ -132,15 +134,22 @@ export class DungeonScene extends Phaser.Scene {
 
     // 說明與進度都對齊名字，不對齊卡片左緣——圖示佔了左邊 56px，
     // 從卡片左緣起排的話文字會從圖示底下鑽出來。
+    // 說明太長就折成兩行（每日挑戰要列出當天的四張符與天劫），不要硬縮成看不見的小字。
+    const descWidth = width - 76 - 164;
+    const blurb = dungeonBlurb(dungeon);
+    const oneLine = this.add.text(0, 0, blurb, textStyle({ size: 16 })).setVisible(false);
+    const fits = oneLine.width <= descWidth;
+    oneLine.destroy();
     const desc = this.add
       .text(
         left + 76,
-        top + 56,
-        dungeonBlurb(dungeon),
-        textStyle({ size: 16, color: INK_DIM }),
+        top + 58,
+        fits ? blurb : wrapText(blurb, descWidth, 14),
+        textStyle({ size: fits ? 16 : 14, color: INK_DIM }),
       )
-      .setOrigin(0, 0.5);
-    fitText(desc, width - 76 - 164);
+      .setOrigin(0, 0.5)
+      .setLineSpacing(2);
+    fitText(desc, descWidth);
 
     const progress = dungeon.endless
       ? "無限波次 · 打到守不住為止"
@@ -152,7 +161,7 @@ export class DungeonScene extends Phaser.Scene {
     this.add
       .text(
         left + 76,
-        top + 90,
+        top + 96,
         progress,
         textStyle({ size: 15, color: upcoming === null ? JADE : INK_DIM }),
       )
