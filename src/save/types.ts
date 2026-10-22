@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 26;
+export const SAVE_VERSION = 27;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -303,6 +303,8 @@ export interface SettingsState {
    */
   sfxVolume: number;
   musicVolume: number;
+  /** 山門被撞時手機震動（v27）。只有支援的裝置會震，其他裝置這個開關沒有作用。 */
+  vibrate: boolean;
 }
 
 export interface SaveData {

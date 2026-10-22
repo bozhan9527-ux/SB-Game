@@ -384,6 +384,12 @@ export function emptyStones(): Record<string, unknown> {
   return { balance: 0, claimed: [], dailyDay: 0, towerWeek: 0, cardUntil: 0, cardDay: 0, costumes: [], equipped: null, ledger: [] };
 }
 
+/** v26 → v27：山門被撞時的手機震動開關，預設開。 */
+const addVibrate: Migration = (data) => {
+  const settings = (data['settings'] ?? {}) as Record<string, unknown>;
+  return { ...data, settings: { ...settings, vibrate: true } };
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -410,6 +416,7 @@ export const MIGRATIONS: readonly Migration[] = [
   dropSectDepth,
   addDaily,
   addStones,
+  addVibrate,
 ];
 
 /**

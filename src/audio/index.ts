@@ -34,6 +34,8 @@ export type SfxName =
   | 'hit'
   | 'bossHit'
   | 'bossAttack'
+  | 'gateHurt'
+  | 'gateDanger'
   | 'bossRoar'
   | 'victory'
   | 'defeat'
@@ -296,6 +298,17 @@ class AudioEngine {
           rate: 0.9 + Math.random() * 0.25,
         });
         this.emit(this.buffer('thud-bosshit', (c) => renderThud(c, 160, 70, 0.14)), this.sfxBus, { gain: 0.22 });
+        break;
+      case 'gateHurt':
+        // 山門被撞：木門的悶響加一聲木頭裂開的脆響，跟符打中妖怪的聲音分得開
+        this.emit(this.buffer('thud-gate', (c) => renderThud(c, 95, 42, 0.42)), this.sfxBus, { gain: 0.8 });
+        this.emit(this.buffer('snap-gate', (c) => renderSnap(c, 0.07)), this.sfxBus, { gain: 0.45, filter: { from: 2400, to: 700 } });
+        this.emit(this.buffer('crackle-gate', (c) => renderCrackle(c, 0.16, 70)), this.sfxBus, { gain: 0.18 });
+        break;
+      case 'gateDanger':
+        // 山門快守不住：連敲兩下警鑼
+        this.emit(this.buffer('gong-danger', (c) => renderGong(c, 330, 1.2)), this.sfxBus, { gain: 0.5 });
+        this.emit(this.buffer('gong-danger', (c) => renderGong(c, 330, 1.2)), this.sfxBus, { gain: 0.42, when: (this.ctx?.currentTime ?? 0) + 0.28 });
         break;
       case 'bossAttack':
         this.emit(this.buffer('thud-boss', (c) => renderThud(c, 120, 38, 0.6)), this.sfxBus, { gain: 0.75 });

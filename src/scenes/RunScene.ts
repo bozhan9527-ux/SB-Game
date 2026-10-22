@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { vibrate } from "../haptics";
 import { drawPanelFrame, pixelPanel } from "../ui/panel";
 import { audio } from "../audio";
 import {
@@ -284,6 +285,8 @@ export class RunScene extends Phaser.Scene {
   private run!: DefenseState;
   private rng!: ReturnType<typeof createRng>;
   private over = false;
+  /** 這一場已經響過「山門快守不住」的警鑼（只響一次，不然後半場一直在敲）。 */
+  private gateWarned = false;
   /** 失守後正在等玩家決定要不要接關（128 平台付費）：戰鬥停住。 */
   private continueOverlay: Phaser.GameObjects.Container | null = null;
   /** 這一場接關了幾次。接過關就不上排行榜：耐久是付費補回來的，伺服器重播不出來。 */
@@ -422,6 +425,7 @@ export class RunScene extends Phaser.Scene {
    * 停掉主線進度，而畫面上完全看不出原因。
    */
   init(data?: RunEntryData): void {
+    this.gateWarned = false;
     const id = data?.dungeonId;
     const floor = data?.floor;
     this.dungeonRun =
@@ -892,7 +896,7 @@ export class RunScene extends Phaser.Scene {
     const veil = this.add
       .rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xe6dcc4, 0.8)
       .setInteractive();
-    const panel = pixelPanel(this, cx, GAME_HEIGHT / 2, GAME_WIDTH - 96, 320, {
+    const panel = pixelPanel(this, cx, GAME_HEIGHT / 2 + 30, GAME_WIDTH - 96, 390, {
       accent: hexToNumber(GOLD),
       alpha: 0.98,
     });
@@ -930,7 +934,22 @@ export class RunScene extends Phaser.Scene {
       },
     });
 
-    const abandon = createButton(this, cx, GAME_HEIGHT / 2 + 100, {
+    const vibrateLabel = (): string =>
+      save.settings.vibrate ? "震動 開" : "震動 關";
+    const shake = createButton(this, cx, GAME_HEIGHT / 2 + 94, {
+      width: 260,
+      height: 56,
+      label: vibrateLabel(),
+      fontSize: 22,
+      onClick: () => {
+        save.settings.vibrate = !save.settings.vibrate;
+        persist();
+        shake.setLabel(vibrateLabel());
+        if (save.settings.vibrate) vibrate(60, 0);
+      },
+    });
+
+    const abandon = createButton(this, cx, GAME_HEIGHT / 2 + 164, {
       width: 260,
       height: 56,
       label: "放棄本場",
@@ -946,6 +965,7 @@ export class RunScene extends Phaser.Scene {
         title,
         resume.container,
         sound.container,
+        shake.container,
         abandon.container,
       ])
       .setDepth(95)
@@ -1967,7 +1987,12 @@ export class RunScene extends Phaser.Scene {
         this.enemySprites.delete(leak.enemyId);
       }
       this.joltGate(leak.boss ? 7 : 4);
-      audio.play("bossAttack");
+      // 撞門有自己的聲音（木門悶響＋裂開聲），手機同時震一下：盯著手牌的時候也知道門在挨打
+      if (leak.immune) audio.play("bossAttack");
+      else {
+        audio.play("gateHurt");
+        vibrate(leak.boss ? [70, 40, 70] : 45);
+      }
       this.gateBar.setAlpha(1);
       this.tweens.add({ targets: this.gateBar, alpha: 0, duration: 420 });
       // 釘在被撞的那段橫梁上、原地淡出：往上飄會飄進最下排的符，
@@ -1990,6 +2015,12 @@ export class RunScene extends Phaser.Scene {
         0,
       );
       if (leak.boss) this.warnGateSiege();
+    }
+    // 山門剩不到三成：敲兩下警鑼、震長一點。一場只提醒一次。
+    if (report.leaks.length > 0 && !this.gateWarned && this.run.disciples > 0 && this.run.disciples <= this.run.maxDisciples * 0.3) {
+      this.gateWarned = true;
+      audio.play("gateDanger");
+      vibrate([120, 80, 120], 0);
     }
 
     if (report.bossSpawned) {

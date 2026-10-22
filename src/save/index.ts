@@ -63,7 +63,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       },
     },
     world: { stage: 1, highestStage: 1, runs: 0, clears: 0, realmRun: freshRealmRun(1), tribulations: {} },
-    settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1 },
+    settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1, vibrate: true },
   };
 }
 
@@ -338,6 +338,7 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       telemetry: settings['telemetry'] !== false,
       sfxVolume: clamp01(asNumber(settings['sfxVolume'], 1)),
       musicVolume: clamp01(asNumber(settings['musicVolume'], 1)),
+      vibrate: settings['vibrate'] !== false,
     },
   };
 }
