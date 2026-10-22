@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 28;
+export const SAVE_VERSION = 29;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -161,6 +161,14 @@ export interface StoneState {
   costumes: string[];
   /** 穿著的時裝；null 是門派原本的衣服。 */
   equipped: string | null;
+  /** 擁有的武器外觀 id（v29）。 */
+  weapons: string[];
+  /** 每一種武器（sword／fist／fu／gourd）配的外觀；沒有的就是原本的樣子（v29）。 */
+  weaponOn: Record<string, string>;
+  /** 擁有的符紙紋樣 id（v29）。 */
+  papers: string[];
+  /** 用的符紙；null 是原本的黃符紙（v29）。 */
+  paper: string | null;
   /**
    * 購買流水（平台付款成功才記）。平台只在遊戲這一端回報成功，伺服器無從查證，
    * 所以每一筆都留下來，有爭議時拿來對帳。只留最近 100 筆。

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { composeDisciples, preloadArt } from '../art';
+import { composeDisciples, preloadArt, setCardPaper } from '../art';
+import { lookOf } from '../systems/stones';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { hasSave } from '../save';
 import { state } from '../state';
@@ -71,11 +72,12 @@ export class BootScene extends Phaser.Scene {
     const seal = this.buildSeal();
 
     const boot = state();
-    preloadArt(this, realmForStage(boot.world.stage).id, boot.player.stones.equipped);
+    preloadArt(this, realmForStage(boot.world.stage).id, lookOf(boot), boot.player.stones.paper);
     this.load.on('progress', (value: number) => seal.progress(value));
     this.load.once('complete', () => {
       // 穿著時裝的話，門人一開始就疊時裝的部件（換裝時藏寶閣會再疊一次）
-      composeDisciples(this, state().player.stones.equipped);
+      composeDisciples(this, lookOf(state()));
+      setCardPaper(state().player.stones.paper);
       seal.progress(1);
       // 進度走滿之後停一下：一閃就開門，玩家看不到「載完了」這件事。
       this.time.delayedCall(260, () => this.openGate(paper, doors, seal.container));

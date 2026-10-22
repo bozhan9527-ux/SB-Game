@@ -7,7 +7,7 @@
  * 貼圖以遊戲點的兩倍（首領 1.5 倍、背景 1 倍）算圖；顯示倍數記在 art-manifest.json，
  * 其他元件在使用的地方用 setDisplaySize 指定遊戲點大小。
  */
-import { CARDS, ENEMIES, REALMS } from './data';
+import { CARDS, ENEMIES, REALMS, SHOP } from './data';
 import artManifest from './data/art-manifest.json';
 import type { BossArt, MobArt, SectArt } from './data/types';
 
@@ -76,7 +76,7 @@ const MANIFEST = artManifest as {
   enemy: Record<string, ArtSize>;
   boss: Record<string, ArtSize>;
   disciple: Record<string, ArtSize>;
-  paperdoll?: { order: string[]; parts: Record<string, string>; outfits: Record<string, string[]> };
+  paperdoll?: { order: string[]; parts: Record<string, string>; outfits: Record<string, string[]>; weaponSkins?: Record<string, string> };
 };
 const FALLBACK: ArtSize = { w: 192, h: 184, top: 0, scale: 0.5 };
 
@@ -165,6 +165,9 @@ const MOB_ARTS: readonly MobArt[] = [
   'fox', 'toad', 'bat', 'skeleton', 'puppet', 'spider', 'lion', 'crane', 'raiju', 'jadeguard',
 ];
 
+/** 符紙紋樣（藏寶閣賣的），從 shop.json 推得。 */
+const PAPER_SKINS: readonly string[] = SHOP.papers.map((p) => p.id);
+
 const ASSETS: readonly ArtSpec[] = [
   ...Object.keys(MANIFEST.paperdoll?.parts ?? {}).flatMap((id) =>
     WALK_FRAMES.map((frame) => ({ key: partTexture(id, frame), file: `pd-${id}-${frame}` })),
@@ -185,6 +188,7 @@ const ASSETS: readonly ArtSpec[] = [
   { key: ART.arena, file: 'arena' },
   { key: ART.gate, file: 'gate' },
   { key: ART.cardPaper, file: 'card-paper' },
+  ...PAPER_SKINS.map((id) => ({ key: `card-paper-${id}`, file: `card-paper-${id}` })),
   { key: ART.slot, file: 'slot' },
   { key: ART.titleKey, file: 'title-key' },
   { key: ART.titleLogo, file: 'title-logo' },
@@ -204,10 +208,26 @@ export function partTexture(id: string, frame: number): string {
   return `pd-${id}-${frame}`;
 }
 
-/** 一個門派、一階的部件清單；穿著時裝的話換成那套時裝的（沒有這套時裝的圖就退回門派原本的）。 */
-export function outfitParts(art: SectArt, tier: number, costume: string | null = null): readonly string[] {
+/**
+ * 門人的外觀：穿哪一套時裝、每一種武器配哪個外觀（藏寶閣買的）。
+ * weapons 的 key 是武器種類（sword／fist／fu／gourd），值是外觀 id。
+ */
+export interface Look {
+  costume: string | null;
+  weapons: Readonly<Record<string, string>>;
+}
+
+export const PLAIN_LOOK: Look = { costume: null, weapons: {} };
+
+/** 一個門派、一階的部件清單；穿著時裝的話換成那套時裝的（沒有這套時裝的圖就退回門派原本的）。武器配了外觀就換掉武器那一格。 */
+export function outfitParts(art: SectArt, tier: number, look: Look = PLAIN_LOOK): readonly string[] {
   const outfits = MANIFEST.paperdoll?.outfits ?? {};
-  return (costume !== null ? outfits[`${costume}:${art}-${tier}`] : undefined) ?? outfits[`${art}-${tier}`] ?? [];
+  const costume = look.costume;
+  const parts = (costume !== null ? outfits[`${costume}:${art}-${tier}`] : undefined) ?? outfits[`${art}-${tier}`] ?? [];
+  return parts.map((id) => {
+    const skin = id.startsWith('weapon-') ? look.weapons[id.slice(7)] : undefined;
+    return skin !== undefined && MANIFEST.paperdoll?.weaponSkins?.[skin] === id.slice(7) ? `weapon-s-${skin}` : id;
+  });
 }
 
 /**
@@ -227,29 +247,33 @@ export function composeOutfit(scene: Phaser.Scene, key: string, parts: readonly 
   canvas.refresh();
 }
 
-/** 門人（門派 × 階級）疊成 disciple-* 貼圖 key，場景程式照舊用。穿著時裝就疊時裝的部件。 */
-export function composeDisciples(scene: Phaser.Scene, costume: string | null = null): void {
+/** 門人（門派 × 階級）疊成 disciple-* 貼圖 key，場景程式照舊用。穿著時裝、配了武器外觀就疊那些部件。 */
+export function composeDisciples(scene: Phaser.Scene, look: Look = PLAIN_LOOK): void {
   for (const art of SECT_ARTS) {
     for (const tier of DISCIPLE_TIERS) {
-      for (const frame of WALK_FRAMES) composeOutfit(scene, discipleTexture(art, tier, frame), outfitParts(art, tier, costume), frame);
+      for (const frame of WALK_FRAMES) composeOutfit(scene, discipleTexture(art, tier, frame), outfitParts(art, tier, look), frame);
     }
   }
 }
 
-/** 某套時裝穿在某派某階身上的預覽貼圖（藏寶閣用），第 0 幀。 */
-export function costumePreview(scene: Phaser.Scene, costume: string, art: SectArt, tier: number): string {
-  const key = `preview-${costume}-${art}-t${tier}`;
-  if (!scene.textures.exists(key)) composeOutfit(scene, key, outfitParts(art, tier, costume), 0);
+function lookKey(look: Look): string {
+  return `${look.costume ?? 'plain'}~${Object.entries(look.weapons).sort().map(([k, v]) => `${k}.${v}`).join('.')}`;
+}
+
+/** 某個外觀穿在某派某階身上的預覽貼圖（藏寶閣用），第 0 幀。 */
+export function costumePreview(scene: Phaser.Scene, look: Look, art: SectArt, tier: number): string {
+  const key = `preview-${lookKey(look)}-${art}-t${tier}`;
+  if (!scene.textures.exists(key)) composeOutfit(scene, key, outfitParts(art, tier, look), 0);
   return key;
 }
 
-/** 某套時裝的走路動畫（藏寶閣裡選中的那一套會動，看得出穿上之後走起來的樣子）。 */
-export function costumePreviewAnim(scene: Phaser.Scene, costume: string, art: SectArt, tier: number): string {
-  const key = `preview-walk-${costume}-${art}-t${tier}`;
+/** 某個外觀的走路動畫（藏寶閣裡選中的那一件會動，看得出穿上之後走起來的樣子）。 */
+export function costumePreviewAnim(scene: Phaser.Scene, look: Look, art: SectArt, tier: number): string {
+  const key = `preview-walk-${lookKey(look)}-${art}-t${tier}`;
   if (scene.anims.exists(key)) return key;
   const frames = WALK_FRAMES.map((frame) => {
-    const texture = `preview-${costume}-${art}-t${tier}-f${frame}`;
-    if (!scene.textures.exists(texture)) composeOutfit(scene, texture, outfitParts(art, tier, costume), frame);
+    const texture = `preview-${lookKey(look)}-${art}-t${tier}-f${frame}`;
+    if (!scene.textures.exists(texture)) composeOutfit(scene, texture, outfitParts(art, tier, look), frame);
     return { key: texture };
   });
   scene.anims.create({ key, frames, frameRate: 6, repeat: -1 });
@@ -292,9 +316,11 @@ export function createWalkAnimations(scene: Phaser.Scene): void {
  * 這些在開場（BootScene）載；其餘進主畫面後在背景慢慢載（loadRemainingArt），
  * 戰鬥場景開打前再確認一次它要的那一境有沒有到（ensureRealmArt）。
  */
-const COSTUME_PART = /^(robe-c-|hat-(?!bun$|band$|crown$)|cape-(?!red$))/;
+const COSTUME_PART = /^(robe-c-|hat-(?!bun$|band$|crown$)|cape-(?!red$)|weapon-s-)/;
 
+/** 藏寶閣賣的東西（時裝部件、武器外觀、符紙紋樣）：沒穿沒用的不在開場那一批。 */
 function isCostumePart(file: string): boolean {
+  if (file.startsWith('card-paper-')) return true;
   return file.startsWith('pd-') && COSTUME_PART.test(file.slice(3).replace(/-\d+$/, ''));
 }
 
@@ -321,10 +347,13 @@ function queue(scene: Phaser.Scene, assets: readonly ArtSpec[]): number {
   return n;
 }
 
-/** 開場要的那一批。realmId：玩家現在所在的境界；costume：穿著的時裝（要它的部件才疊得出門人）。 */
-export function preloadArt(scene: Phaser.Scene, realmId: string, costume: string | null = null): void {
+/** 開場要的那一批。realmId：玩家現在所在的境界；look：穿著的外觀（要它的部件才疊得出門人）；paper：用的符紙。 */
+export function preloadArt(scene: Phaser.Scene, realmId: string, look: Look = PLAIN_LOOK, paper: string | null = null): void {
   const realm = realmFiles(realmId);
+  const costume = look.costume;
   const worn = new Set(costume === null ? [] : Object.entries(MANIFEST.paperdoll?.outfits ?? {}).filter(([k]) => k.startsWith(`${costume}:`)).flatMap(([, parts]) => parts.map((id) => `pd-${id}`)));
+  for (const skin of Object.values(look.weapons)) worn.add(`pd-weapon-s-${skin}`);
+  if (paper !== null) worn.add(cardPaperTexture(paper));
   queue(
     scene,
     ASSETS.filter((asset) => {
@@ -339,6 +368,24 @@ export function preloadArt(scene: Phaser.Scene, realmId: string, costume: string
 export function ensureRealmArt(scene: Phaser.Scene, realmIds: readonly string[] | 'all'): number {
   const wanted = realmIds === 'all' ? null : new Set(realmIds.flatMap((id) => [...realmFiles(id)]));
   return queue(scene, ASSETS.filter((asset) => isRealmFile(asset.file) && (wanted === null || wanted.has(asset.file))));
+}
+
+/** 符紙紋樣的貼圖 key（null 是原本的黃符紙）。 */
+export function cardPaperTexture(paper: string | null): string {
+  return paper === null ? ART.cardPaper : `card-paper-${paper}`;
+}
+
+let currentPaper: string | null = null;
+
+/** 換符紙：之後新建的符牌都用這張（ui/card.ts 讀 cardPaperKey）。 */
+export function setCardPaper(paper: string | null): void {
+  currentPaper = paper;
+}
+
+/** 現在該用的符紙；還沒載到就先用原本的。 */
+export function cardPaperKey(scene: Phaser.Scene): string {
+  const key = cardPaperTexture(currentPaper);
+  return scene.textures.exists(key) ? key : ART.cardPaper;
 }
 
 /** 時裝部件（藏寶閣用）。 */

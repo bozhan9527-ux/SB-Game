@@ -1,16 +1,63 @@
 {
   "packs": [
-    { "id": "stones_600", "name": "一袋靈石", "stones": 600, "price": 30 },
-    { "id": "stones_3300", "name": "一匣靈石", "stones": 3300, "price": 150 }
+    {
+      "id": "stones_600",
+      "name": "一袋靈石",
+      "stones": 600,
+      "price": 30
+    },
+    {
+      "id": "stones_3300",
+      "name": "一匣靈石",
+      "stones": 3300,
+      "price": 150
+    }
   ],
-  "monthCard": { "id": "month_card", "name": "月卡・仙府供奉", "price": 90, "stones": 1000, "daily": 100, "days": 30 },
+  "monthCard": {
+    "id": "month_card",
+    "name": "月卡・仙府供奉",
+    "price": 90,
+    "stones": 1000,
+    "daily": 100,
+    "days": 30
+  },
   "costumes": [
-    { "id": "moonwhite", "name": "月白道袍", "price": 360, "desc": "月白長袍、青玉簪，衣擺繡雲紋。" },
-    { "id": "scholar", "name": "墨竹書生", "price": 360, "desc": "竹青長衫、方巾，衣擺兩枝墨竹。" },
-    { "id": "peach", "name": "桃夭", "price": 360, "desc": "桃紅衣裙、一圈花冠，衣上落著花瓣。" },
-    { "id": "crimson", "name": "赤焰戰袍", "price": 360, "desc": "赤紅戰袍、紅纓額帶，衣擺燒著火紋，配暗紅披風。" },
-    { "id": "frost", "name": "玄冰劍客", "price": 360, "desc": "冰藍衣袍、冰晶冠，雪白披風。" },
-    { "id": "dragon", "name": "金龍太子", "price": 600, "desc": "金袍金冠、龍角紅寶，朱紅披風、背後一圈金光。" }
+    {
+      "id": "moonwhite",
+      "name": "月白道袍",
+      "price": 360,
+      "desc": "月白長袍、青玉簪，衣擺繡雲紋。"
+    },
+    {
+      "id": "scholar",
+      "name": "墨竹書生",
+      "price": 360,
+      "desc": "竹青長衫、方巾，衣擺兩枝墨竹。"
+    },
+    {
+      "id": "peach",
+      "name": "桃夭",
+      "price": 360,
+      "desc": "桃紅衣裙、一圈花冠，衣上落著花瓣。"
+    },
+    {
+      "id": "crimson",
+      "name": "赤焰戰袍",
+      "price": 360,
+      "desc": "赤紅戰袍、紅纓額帶，衣擺燒著火紋，配暗紅披風。"
+    },
+    {
+      "id": "frost",
+      "name": "玄冰劍客",
+      "price": 360,
+      "desc": "冰藍衣袍、冰晶冠，雪白披風。"
+    },
+    {
+      "id": "dragon",
+      "name": "金龍太子",
+      "price": 600,
+      "desc": "金袍金冠、龍角紅寶，朱紅披風、背後一圈金光。"
+    }
   ],
   "grants": {
     "firstBreak": 60,
@@ -21,6 +68,103 @@
     "daily": 10,
     "dailyWaves": 10,
     "tower": 30,
-    "achievement": [[10000, 10], [1000000, 20], [0, 40]]
-  }
+    "achievement": [
+      [
+        10000,
+        10
+      ],
+      [
+        1000000,
+        20
+      ],
+      [
+        0,
+        40
+      ]
+    ]
+  },
+  "weapons": [
+    {
+      "id": "peachwood",
+      "name": "桃木劍",
+      "weapon": "sword",
+      "price": 240,
+      "desc": "劍修用。桃木劍身、劍柄繫紅穗。"
+    },
+    {
+      "id": "azure",
+      "name": "青龍劍",
+      "weapon": "sword",
+      "price": 240,
+      "desc": "劍修用。青綠劍身、龍首護手。"
+    },
+    {
+      "id": "iron",
+      "name": "鐵拳套",
+      "weapon": "fist",
+      "price": 240,
+      "desc": "體修用。灰鐵護手、一排鉚釘。"
+    },
+    {
+      "id": "tiger",
+      "name": "虎爪",
+      "weapon": "fist",
+      "price": 240,
+      "desc": "體修用。三道彎爪。"
+    },
+    {
+      "id": "goldfu",
+      "name": "金符",
+      "weapon": "fu",
+      "price": 240,
+      "desc": "符修用。金箔符紙、朱砂符文。"
+    },
+    {
+      "id": "bloodfu",
+      "name": "血符",
+      "weapon": "fu",
+      "price": 240,
+      "desc": "符修用。深紅符紙、墨色符文。"
+    },
+    {
+      "id": "jadegourd",
+      "name": "玉葫蘆",
+      "weapon": "gourd",
+      "price": 240,
+      "desc": "丹修用。青玉葫蘆、金繩。"
+    },
+    {
+      "id": "censer",
+      "name": "紫金爐",
+      "weapon": "gourd",
+      "price": 240,
+      "desc": "丹修用。三足小香爐，冒一縷煙。"
+    }
+  ],
+  "papers": [
+    {
+      "id": "gold",
+      "name": "金箔符紙",
+      "price": 180,
+      "desc": "戰場上每一張符換成亮金底、灑金箔。"
+    },
+    {
+      "id": "bamboo",
+      "name": "竹簡",
+      "price": 180,
+      "desc": "五根竹片並排、兩道麻繩。"
+    },
+    {
+      "id": "star",
+      "name": "星圖",
+      "price": 180,
+      "desc": "深藍底、星點與連線。"
+    },
+    {
+      "id": "blood",
+      "name": "硃砂血符",
+      "price": 180,
+      "desc": "暗紅底、黑框、四角金色捲紋。"
+    }
+  ]
 }

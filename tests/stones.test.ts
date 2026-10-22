@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { SHOP } from '../src/data';
-import { createDefaultSave } from '../src/save';
+// @ts-expect-error -- node:fs 沒有型別（見 tsconfig 的 types），只在 vitest 的 node 底下跑。
+import { existsSync } from 'node:fs';
+import { outfitParts } from '../src/art';
+import { adoptSave, createDefaultSave } from '../src/save';
+import { createMemoryStorage } from '../src/save/storage';
 import { migrate } from '../src/save/migrations';
 import {
   achievementStones,
   buyCostume,
+  buyPaper,
+  buyWeaponSkin,
+  equipPaper,
+  equipWeaponSkin,
   cardActive,
   cardDaysLeft,
   creditPurchase,
@@ -132,5 +140,58 @@ describe('v26 轉換', () => {
     expect(stones.balance).toBe(expected);
     expect(stones.claimed).toContain('ascend:first');
     expect(stones.claimed).toContain('ach:first_clear');
+  });
+});
+
+describe('武器外觀與符紙紋樣', () => {
+  it('武器外觀買了直接配在那一種武器上，卸下回原本的樣子', () => {
+    const save = createDefaultSave(1);
+    const skin = SHOP.weapons.find((w) => w.id === 'peachwood')!;
+    expect(buyWeaponSkin(save, 'peachwood')).toBe('short');
+    save.player.stones.balance = skin.price;
+    expect(buyWeaponSkin(save, 'peachwood')).toBe('ok');
+    expect(save.player.stones.balance).toBe(0);
+    expect(save.player.stones.weaponOn).toEqual({ sword: 'peachwood' });
+    expect(buyWeaponSkin(save, 'peachwood')).toBe('owned');
+    // 沒買的配不上
+    expect(equipWeaponSkin(save, 'azure', true)).toBe(false);
+    expect(equipWeaponSkin(save, 'peachwood', false)).toBe(true);
+    expect(save.player.stones.weaponOn).toEqual({});
+  });
+
+  it('外觀會換掉門人部件裡的武器那一格，別的武器不受影響', () => {
+    const plain = outfitParts('sword', 0);
+    expect(plain).toContain('weapon-sword');
+    const skinned = outfitParts('sword', 0, { costume: null, weapons: { sword: 'azure', fist: 'tiger' } });
+    expect(skinned).toContain('weapon-s-azure');
+    expect(skinned).not.toContain('weapon-sword');
+    expect(outfitParts('body', 0, { costume: null, weapons: { sword: 'azure' } })).toContain('weapon-fist');
+  });
+
+  it('符紙買了直接換上，可以換回黃符紙', () => {
+    const save = createDefaultSave(1);
+    save.player.stones.balance = 1000;
+    expect(buyPaper(save, 'star')).toBe('ok');
+    expect(save.player.stones.paper).toBe('star');
+    expect(equipPaper(save, 'gold')).toBe(false);
+    expect(equipPaper(save, null)).toBe(true);
+    expect(save.player.stones.paper).toBeNull();
+  });
+
+  it('每一個商品都有圖', () => {
+    for (const w of SHOP.weapons) expect(existsSync(`public/art/pd-weapon-s-${w.id}-0.webp`)).toBe(true);
+    for (const p of SHOP.papers) expect(existsSync(`public/art/card-paper-${p.id}.webp`)).toBe(true);
+  });
+
+  it('v29 轉換：舊存檔補上空的欄位；被改過的存檔配不上沒買或不對種類的外觀', () => {
+    const next = migrate({ version: 28, player: { stones: { balance: 5 } } }, 29) as Record<string, any>;
+    expect(next['player']['stones']).toMatchObject({ weapons: [], weaponOn: {}, papers: [], paper: null, balance: 5 });
+    const save = createDefaultSave(1);
+    const raw = JSON.parse(JSON.stringify(save));
+    raw.player.stones = { ...raw.player.stones, weapons: ['azure', 'bogus'], weaponOn: { sword: 'azure', fist: 'azure', fu: 'goldfu' }, papers: ['star'], paper: 'gold' };
+    const loaded = adoptSave(raw, createMemoryStorage());
+    expect(loaded.player.stones.weapons).toEqual(['azure']);
+    expect(loaded.player.stones.weaponOn).toEqual({ sword: 'azure' });
+    expect(loaded.player.stones.paper).toBeNull();
   });
 });

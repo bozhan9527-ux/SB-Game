@@ -226,6 +226,21 @@ export function cardPaper() {
   return p;
 }
 
+/**
+ * 符紙紋樣（藏寶閣）：換掉戰場上每一張符的底紙。72×88，和 cardPaper 同尺寸、同樣的雙框位置，
+ * 符紋與階數疊上去不會跑位。
+ */
+export const PAPER_SKINS = {
+  // 金箔：亮金底、細碎金箔點、金框
+  gold: () => { const p = new Pic(72, 88); p.tile(1, 1, 70, 86, { fill: '#f6d978', shadow: false, ow: 2.2, grainTint: null }); for (let i = 0; i < 26; i++) p.dot(6 + R() * 60, 6 + R() * 76, 0.8 + R() * 1.4, R() < 0.5 ? '#fff4c0' : '#e0a83a'); const fr = (m, ww, c) => p.ink([[m, m], [72 - m, m], [72 - m, 88 - m], [m, 88 - m], [m, m]], { w: ww, color: c, amp: 0.3, passes: 1 }); fr(5, 1.8, '#b8862a'); fr(8, 0.8, '#b8862a'); return p; },
+  // 竹簡：五根竹片並排、兩道繩
+  bamboo: () => { const p = new Pic(72, 88); for (let i = 0; i < 5; i++) p.shape([[3 + i * 13.4, 2], [15 + i * 13.4, 2], [15 + i * 13.4, 86], [3 + i * 13.4, 86]], '#d8c08a', { base: 0.9, ow: 1.4, sharp: true }); for (const yy of [16, 72]) p.ink([[2, yy], [70, yy + 1]], { w: 1.8, color: '#7a4e2e', passes: 1 }); return p; },
+  // 星圖：深藍底、星點與連線
+  star: () => { const p = new Pic(72, 88); p.tile(1, 1, 70, 86, { fill: '#2f3f6a', shadow: false, ow: 2.2, grainTint: null }); const stars = [[16, 18], [30, 12], [46, 22], [58, 14], [20, 44], [38, 50], [54, 40], [26, 70], [48, 74]]; p.ink(stars.slice(0, 4), { w: 0.8, color: '#9fb8e8', passes: 1 }); p.ink([stars[4], stars[5], stars[6]], { w: 0.8, color: '#9fb8e8', passes: 1 }); for (const [x, y] of stars) p.dot(x, y, 1.6, '#fff4c0'); const fr = (m, ww) => p.ink([[m, m], [72 - m, m], [72 - m, 88 - m], [m, 88 - m], [m, m]], { w: ww, color: '#e8c46a', amp: 0.3, passes: 1 }); fr(5, 1.6); fr(8, 0.8); return p; },
+  // 硃砂血符：暗紅底、黑框、四角符咒捲紋
+  blood: () => { const p = new Pic(72, 88); p.tile(1, 1, 70, 86, { fill: '#c0453a', shadow: false, ow: 2.2, grainTint: null }); const fr = (m, ww) => p.ink([[m, m], [72 - m, m], [72 - m, 88 - m], [m, 88 - m], [m, m]], { w: ww, color: '#2a1a18', amp: 0.3, passes: 1 }); fr(5, 1.6); fr(8, 0.8); for (const [x, y, d] of [[14, 14, 1], [58, 14, -1], [14, 74, -1], [58, 74, 1]]) p.ink(spiral(x, y, 4, 1.2, d), { w: 1.2, color: '#f3c84a', passes: 1 }); return p; },
+};
+
 /** 雲（遊戲會染色）：白底祥雲。120×40。 */
 export function cloud() {
   const p = new Pic(120, 44);

@@ -9,7 +9,7 @@
  * 本檔不 import Phaser，全部是純函式。
  */
 import { SHOP } from '../data';
-import type { ShopCostume, ShopPack } from '../data';
+import type { ShopCostume, ShopPack, ShopPaper, ShopWeapon } from '../data';
 import type { SaveData } from '../save/types';
 import { realmForStage } from './realms';
 
@@ -173,4 +173,62 @@ export function equipCostume(save: SaveData, id: string | null): boolean {
   if (id !== null && !ownsCostume(save, id)) return false;
   save.player.stones.equipped = id;
   return true;
+}
+
+// ---------- 武器外觀與符紙紋樣 ----------
+
+export function weaponSkinById(id: string): ShopWeapon | undefined {
+  return SHOP.weapons.find((w) => w.id === id);
+}
+
+export function paperById(id: string): ShopPaper | undefined {
+  return SHOP.papers.find((p) => p.id === id);
+}
+
+/** 用靈石買武器外觀；買到就直接配在那一種武器上。 */
+export function buyWeaponSkin(save: SaveData, id: string): BuyResult {
+  const skin = weaponSkinById(id);
+  if (skin === undefined) return 'unknown';
+  const stones = save.player.stones;
+  if (stones.weapons.includes(id)) return 'owned';
+  if (stones.balance < skin.price) return 'short';
+  stones.balance -= skin.price;
+  stones.weapons.push(id);
+  stones.weaponOn[skin.weapon] = id;
+  return 'ok';
+}
+
+/** 配上（或 on 為 false 時卸下、換回原本的樣子）。沒有的外觀配不上。 */
+export function equipWeaponSkin(save: SaveData, id: string, on: boolean): boolean {
+  const skin = weaponSkinById(id);
+  const stones = save.player.stones;
+  if (skin === undefined || !stones.weapons.includes(id)) return false;
+  if (on) stones.weaponOn[skin.weapon] = id;
+  else if (stones.weaponOn[skin.weapon] === id) delete stones.weaponOn[skin.weapon];
+  return true;
+}
+
+/** 用靈石買符紙紋樣；買到就直接換上。 */
+export function buyPaper(save: SaveData, id: string): BuyResult {
+  const paper = paperById(id);
+  if (paper === undefined) return 'unknown';
+  const stones = save.player.stones;
+  if (stones.papers.includes(id)) return 'owned';
+  if (stones.balance < paper.price) return 'short';
+  stones.balance -= paper.price;
+  stones.papers.push(id);
+  stones.paper = id;
+  return 'ok';
+}
+
+/** 換符紙（null 是原本的黃符紙）。 */
+export function equipPaper(save: SaveData, id: string | null): boolean {
+  if (id !== null && !save.player.stones.papers.includes(id)) return false;
+  save.player.stones.paper = id;
+  return true;
+}
+
+/** 存檔裡的外觀（給 art.ts 疊門人用）。 */
+export function lookOf(save: SaveData): { costume: string | null; weapons: Record<string, string> } {
+  return { costume: save.player.stones.equipped, weapons: { ...save.player.stones.weaponOn } };
 }

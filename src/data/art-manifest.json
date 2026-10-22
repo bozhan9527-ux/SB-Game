@@ -377,6 +377,14 @@
    "weapon-fist": "weapon",
    "weapon-fu": "weapon",
    "weapon-gourd": "weapon",
+   "weapon-s-peachwood": "weapon",
+   "weapon-s-azure": "weapon",
+   "weapon-s-iron": "weapon",
+   "weapon-s-tiger": "weapon",
+   "weapon-s-goldfu": "weapon",
+   "weapon-s-bloodfu": "weapon",
+   "weapon-s-jadegourd": "weapon",
+   "weapon-s-censer": "weapon",
    "robe-c-moonwhite": "outfit",
    "robe-c-scholar": "outfit",
    "robe-c-peach": "outfit",
@@ -1128,6 +1136,16 @@
     "head",
     "hat-dragoncrown"
    ]
+  },
+  "weaponSkins": {
+   "peachwood": "sword",
+   "azure": "sword",
+   "iron": "fist",
+   "tiger": "fist",
+   "goldfu": "fu",
+   "bloodfu": "fu",
+   "jadegourd": "gourd",
+   "censer": "gourd"
   }
  }
 }

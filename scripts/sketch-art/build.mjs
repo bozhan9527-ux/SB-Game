@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pic, groundShadow, seedRng } from './lib.mjs';
 import { opaqueTop, rasterize, readImage, writeImage } from './render.mjs';
-import { COSTUMES, LAYER_ORDER, MOBS, PAPERDOLL, PARTS, SECTS, costumeOutfit, drawPart, outfitOf } from './chars.mjs';
+import { COSTUMES, LAYER_ORDER, MOBS, PAPERDOLL, PARTS, SECTS, WEAPON_SKINS, costumeOutfit, drawPart, outfitOf } from './chars.mjs';
 import { BOSSES } from './bosses.mjs';
 import * as W from './world.mjs';
 
@@ -83,7 +83,9 @@ if (only === 'all' || only === 'chars') {
     }
     manifest.disciple[sect] = { ...partSize.legs, top };
   }
-  manifest.paperdoll = { order: LAYER_ORDER, parts: Object.fromEntries(Object.entries(PARTS).map(([id, p]) => [id, p.layer])), outfits };
+  // 武器外觀：外觀 id → 它換掉的那一種武器（遊戲照門派的武器找得到能穿的外觀）
+  const weaponSkins = Object.fromEntries(Object.entries(WEAPON_SKINS).map(([id, w]) => [id, w.weapon]));
+  manifest.paperdoll = { order: LAYER_ORDER, parts: Object.fromEntries(Object.entries(PARTS).map(([id, p]) => [id, p.layer])), outfits, weaponSkins };
   console.log('角色完成');
 }
 
@@ -110,6 +112,7 @@ if (only === 'all' || only === 'world') {
   await one('gate-post', W.gatePost);
   await one('slot', W.slot);
   await one('card-paper', W.cardPaper);
+  for (const [id, make] of Object.entries(W.PAPER_SKINS)) await one(`card-paper-${id}`, make);
   await one('cloud', W.cloud);
   await one('slash', W.slash);
   for (const g of W.GLYPH_NAMES) await one(`glyph-${g}`, () => W.glyph(g));

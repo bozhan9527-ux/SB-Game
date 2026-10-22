@@ -869,10 +869,16 @@ for (const blessing of BLESSINGS) {
 /** 藏寶閣：靈石包、月卡、時裝售價與免費靈石的發放量（見 src/systems/stones.ts）。 */
 export interface ShopPack { id: string; name: string; stones: number; price: number }
 export interface ShopCostume { id: string; name: string; price: number; desc: string }
+/** 武器外觀：只換某一種武器（劍、拳、符、葫蘆）的樣子，同一種武器的門派都看得到。 */
+export interface ShopWeapon extends ShopCostume { weapon: string }
+/** 符紙紋樣：戰場上每一張符的底紙。 */
+export type ShopPaper = ShopCostume;
 export interface ShopData {
   packs: ShopPack[];
   monthCard: ShopPack & { daily: number; days: number };
   costumes: ShopCostume[];
+  weapons: ShopWeapon[];
+  papers: ShopPaper[];
   grants: {
     firstBreak: number; realm: number; boss: number; firstAscend: number; ascend: number;
     daily: number; dailyWaves: number; tower: number;
@@ -900,11 +906,16 @@ export function parseShop(raw: unknown, path = 'shop.json'): ShopData {
       return [pair[0] as number, pair[1] as number] as [number, number];
     }),
   };
-  const costumes = list(rec['costumes'], `${path}.costumes`, (item, p) => ({ id: str(item, 'id', p), name: str(item, 'name', p), price: num(item, 'price', p), desc: str(item, 'desc', p) }));
+  const good = (item: unknown, p: string): ShopCostume => ({ id: str(item, 'id', p), name: str(item, 'name', p), price: num(item, 'price', p), desc: str(item, 'desc', p) });
+  const costumes = list(rec['costumes'], `${path}.costumes`, good);
+  const weapons = list(rec['weapons'] ?? [], `${path}.weapons`, (item, p) => ({ ...good(item, p), weapon: str(item, 'weapon', p) }));
+  const papers = list(rec['papers'] ?? [], `${path}.papers`, good);
   return {
     packs: list(rec['packs'], `${path}.packs`, pack),
     monthCard: { ...pack(card, `${path}.monthCard`), daily: num(card, 'daily', `${path}.monthCard`), days: num(card, 'days', `${path}.monthCard`) },
     costumes,
+    weapons,
+    papers,
     grants,
   };
 }

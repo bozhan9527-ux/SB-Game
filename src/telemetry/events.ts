@@ -118,10 +118,12 @@ export interface TelemetryEvents {
     gained: number;
   };
 
-  /** 用靈石買時裝。回答「哪一套賣得動」。 */
+  /** 用靈石買外觀（時裝、武器外觀、符紙）。回答「哪一件賣得動」。 */
   costume_buy: {
     id: string;
     price: number;
+    /** costume／weapon／paper（v0.10.3 起才有）。 */
+    kind?: string;
   };
 
   /** 平台付款成功、靈石入帳。 */

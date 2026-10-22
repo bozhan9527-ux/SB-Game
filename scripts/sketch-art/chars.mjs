@@ -425,6 +425,29 @@ const WEAPONS = {
   gourd: (p, x, y) => { p.blob(x, y + 4, 7, 7, '#d8a040', { gap: 2, ow: 1.8 }); p.blob(x, y - 6, 4.5, 4.5, '#d8a040', { gap: 2, ow: 1.8 }); p.ink([[x - 3, y - 1], [x + 3, y - 1]], { w: 1.4, color: ZHU, passes: 1 }); },
 };
 
+/**
+ * 武器外觀：同一派的武器換個樣子（劍還是劍、符還是符）。key 是外觀 id，weapon 是它換掉的那一種。
+ * 和 WEAPONS 同一個錨點（右手、腰帶高度），換上去位置不會跑。
+ */
+export const WEAPON_SKINS = {
+  // 桃木劍：木色劍身、劍柄繫紅穗
+  peachwood: { weapon: 'sword', draw: (p, x, y) => { p.shape([[x - 2, y + 4], [x + 2, y + 4], [x + 2, y - 33], [x, y - 39], [x - 2, y - 33]], '#c98a56', { base: 0.8, ow: 1.6, sharp: true }); for (const yy of [-28, -18, -8]) p.ink([[x - 1.2, y + yy], [x + 1.2, y + yy - 2]], { w: 1, color: '#7a4a2a', passes: 1 }); p.ink([[x - 6, y + 4], [x + 6, y + 4]], { w: 2.6, color: '#7a4a2a' }); p.ink([[x, y + 5], [x, y + 12]], { w: 2.6, color: WOOD }); ribbon(p, [[x, y + 11], [x - 3, y + 14], [x - 2, y + 18]], 2.4, ZHU, { ow: 0.8, passes: 1, base: 0.9, taper: 0.4 }); } },
+  // 青龍劍：青綠劍身、龍首護手
+  azure: { weapon: 'sword', draw: (p, x, y) => { p.shape([[x - 2, y + 3], [x + 2, y + 3], [x + 2.4, y - 34], [x, y - 41], [x - 2.4, y - 34]], '#6fc4b0', { base: 0.75, ow: 1.6, sharp: true }); p.ink([[x, y - 36], [x, y - 2]], { w: 0.9, color: '#ffffff', passes: 1, op: 0.8 }); p.shape([[x - 8, y + 2], [x - 4, y - 1], [x + 4, y - 1], [x + 8, y + 2], [x + 4, y + 6], [x - 4, y + 6]], '#2f8462', { base: 0.8, ow: 1.4 }); p.dot(x - 5, y + 2, 1, '#e8b33c'); p.ink([[x, y + 6], [x, y + 13]], { w: 2.6, color: '#2f5a3a' }); } },
+  // 鐵拳套：灰鐵護手、鉚釘
+  iron: { weapon: 'fist', draw: (p, x, y) => { p.solid(x - 2, y + 2, 7, 7, '#9aa4ae', { ow: 2 }); for (const dx of [-5, -1, 3]) p.dot(x + dx - 2, y - 2, 1.1, '#4a4f56'); p.ink([[x - 8, y + 6], [x + 4, y + 6]], { w: 1.6, color: '#4a4f56', passes: 1 }); } },
+  // 虎爪：三道彎爪
+  tiger: { weapon: 'fist', draw: (p, x, y) => { p.solid(x - 2, y + 2, 6, 6, SKIN, { ow: 2 }); for (const dx of [-5, -1, 3]) p.shape([[x + dx - 1.5, y - 3], [x + dx + 1.5, y - 3], [x + dx + 3, y - 13], [x + dx, y - 10]], '#f0e2c0', { base: 0.9, ow: 1.2 }); p.ink([[x - 7, y + 5], [x + 4, y + 5]], { w: 2, color: '#e8a040', passes: 1 }); } },
+  // 金符：金箔符紙、朱砂符文
+  goldfu: { weapon: 'fu', draw: (p, x, y) => { p.shape([[x - 6, y - 14], [x + 6, y - 14], [x + 6, y + 10], [x - 6, y + 10]], '#f2c84a', { base: 0.95, ow: 1.6, sharp: true }); p.ink([[x - 4, y - 11], [x + 4, y - 11]], { w: 0.9, color: '#a8741a', passes: 1 }); p.ink([[x, y - 9], [x - 2, y - 3], [x + 2, y + 1], [x - 1, y + 7]], { w: 1.4, color: ZHU, passes: 1 }); p.dot(x + 3, y - 6, 1, '#ffffff'); } },
+  // 血符：深紅符紙、墨色符文
+  bloodfu: { weapon: 'fu', draw: (p, x, y) => { p.shape([[x - 6, y - 14], [x + 6, y - 14], [x + 6, y + 10], [x - 6, y + 10]], '#b8352c', { base: 0.95, ow: 1.6, sharp: true }); p.ink([[x, y - 11], [x + 2, y - 4], [x - 2, y], [x + 1, y + 6]], { w: 1.4, color: '#2a1a18', passes: 1 }); p.ink(spiral(x, y + 2, 3, 1, 1), { w: 0.9, color: '#f3c84a', passes: 1 }); } },
+  // 玉葫蘆：青玉色、金繩
+  jadegourd: { weapon: 'gourd', draw: (p, x, y) => { p.blob(x, y + 4, 7, 7, '#8fd4b0', { gap: 2, ow: 1.8 }); p.blob(x, y - 6, 4.5, 4.5, '#8fd4b0', { gap: 2, ow: 1.8 }); p.ink([[x - 3, y - 1], [x + 3, y - 1]], { w: 1.6, color: C.gold, passes: 1 }); p.dot(x + 3, y + 1, 1.2, '#ffffff'); } },
+  // 紫金爐：三足小香爐、冒一縷煙
+  censer: { weapon: 'gourd', draw: (p, x, y) => { p.shape([[x - 8, y - 2], [x + 8, y - 2], [x + 6, y + 8], [x - 6, y + 8]], '#8a5ab8', { base: 0.85, ow: 1.6 }); p.ink([[x - 9, y - 2], [x + 9, y - 2]], { w: 2, color: C.gold, passes: 1 }); for (const dx of [-5, 0, 5]) p.ink([[x + dx, y + 8], [x + dx, y + 12]], { w: 1.6, color: '#5a3a78', passes: 1 }); p.ink(spiral(x, y - 9, 3.5, 1.3, 1), { w: 1.1, color: '#b8b0c8', passes: 1 }); } },
+};
+
 const goldTrim = (p, x, y) => { p.ink([[x - 11, y - 47], [x - 17, y - 30]], { w: 1.8, color: C.gold, passes: 1 }); p.ink([[x + 11, y - 47], [x + 17, y - 30]], { w: 1.8, color: C.gold, passes: 1 }); };
 const goldAura = (p, x, y) => { p.wash(ellipsePts(x, y - 60, 26, 26, 18, 0.02), '#f6e7a0', 0.5); p.ink(ellipsePts(x, y - 62, 24, 24, 20, 0.02), { w: 1.4, color: C.gold, passes: 1, closed: true }); };
 
@@ -444,6 +467,7 @@ export const PARTS = {
   'aura-gold': { layer: 'aura', o: { behind: goldAura } },
   ...Object.fromEntries(Object.keys(HATS).map((k) => [`hat-${k}`, { layer: 'hat', o: { hat: HATS[k] } }])),
   ...Object.fromEntries(Object.keys(WEAPONS).map((k) => [`weapon-${k}`, { layer: 'weapon', o: { weaponR: WEAPONS[k] } }])),
+  ...Object.fromEntries(Object.entries(WEAPON_SKINS).map(([k, w]) => [`weapon-s-${k}`, { layer: 'weapon', o: { weaponR: w.draw } }])),
   ...Object.fromEntries(Object.entries(COSTUMES).map(([id, c]) => [`robe-c-${id}`, { layer: 'outfit', o: { robe: c.robe, inner: c.inner, sash: c.sash, front: c.front } }])),
   ...Object.fromEntries([...new Set(Object.values(COSTUMES).map((c) => c.cape).filter(Boolean))].map((col) => [`cape-${col.slice(1)}`, { layer: 'cape', o: { cape: col } }])),
   ...Object.fromEntries(Object.entries(SECT).flatMap(([sect, d]) => [0, 1].map((t) => [

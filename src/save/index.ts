@@ -36,7 +36,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       omen: null,
       towerWeek: 0,
       daily: { day: 0, best: 0 },
-      stones: { balance: 0, claimed: [], dailyDay: 0, towerWeek: 0, cardUntil: 0, cardDay: 0, costumes: [], equipped: null, ledger: [] },
+      stones: { balance: 0, claimed: [], dailyDay: 0, towerWeek: 0, cardUntil: 0, cardDay: 0, costumes: [], equipped: null, weapons: [], weaponOn: {}, papers: [], paper: null, ledger: [] },
       challenges: [],
       challengesDone: [],
       karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0, unlocks: [], dao: false, bestHeaven: 0 },
@@ -74,6 +74,14 @@ function normalizeStones(raw: unknown): StoneState {
   const known = new Set(SHOP.costumes.map((c) => c.id));
   const costumes = strings(o['costumes']).filter((id) => known.has(id));
   const equipped = typeof o['equipped'] === 'string' && costumes.includes(o['equipped']) ? o['equipped'] : null;
+  const weaponOf = new Map(SHOP.weapons.map((w) => [w.id, w.weapon]));
+  const weapons = [...new Set(strings(o['weapons']).filter((id) => weaponOf.has(id)))];
+  const rawOn = (typeof o['weaponOn'] === 'object' && o['weaponOn'] !== null ? o['weaponOn'] : {}) as Record<string, unknown>;
+  // 只留「有買、而且真的是那一種武器」的：存檔被改過也穿不上別種武器的外觀
+  const weaponOn = Object.fromEntries(Object.entries(rawOn).filter((e): e is [string, string] => typeof e[1] === 'string' && weapons.includes(e[1]) && weaponOf.get(e[1]) === e[0]));
+  const paperIds = new Set(SHOP.papers.map((p) => p.id));
+  const papers = [...new Set(strings(o['papers']).filter((id) => paperIds.has(id)))];
+  const paper = typeof o['paper'] === 'string' && papers.includes(o['paper']) ? o['paper'] : null;
   const ledger = Array.isArray(o['ledger'])
     ? (o['ledger'] as unknown[])
         .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null && typeof (e as Record<string, unknown>)['item'] === 'string')
@@ -89,6 +97,10 @@ function normalizeStones(raw: unknown): StoneState {
     cardDay: int(o['cardDay']),
     costumes: [...new Set(costumes)],
     equipped,
+    weapons,
+    weaponOn,
+    papers,
+    paper,
     ledger,
   };
 }

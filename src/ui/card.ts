@@ -6,7 +6,7 @@
  * 牌面資訊只留三樣：符種圖騰、階數、階數點。多一個字都會讓 84px 寬的牌變得看不懂。
  */
 import Phaser from 'phaser';
-import { ART, glyphTexture } from '../art';
+import { ART, cardPaperKey, glyphTexture } from '../art';
 import { CARDS } from '../data';
 import type { Card } from '../systems/deck';
 import { EDGE, INK, LACQUER, LINE, hexToNumber, shade, textStyle } from './theme';
@@ -56,7 +56,7 @@ export function createCardView(scene: Phaser.Scene, x: number, y: number): CardV
     roughRect(frame, -hw, -hh, CARD_WIDTH, CARD_HEIGHT, { stroke: EDGE, width: 2.4, seed: 3 });
   };
   const paper: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle = scene.textures.exists(ART.cardPaper)
-    ? scene.add.image(0, 0, ART.cardPaper).setDisplaySize(CARD_WIDTH - 12, CARD_HEIGHT - 12).setVisible(false)
+    ? scene.add.image(0, 0, cardPaperKey(scene)).setDisplaySize(CARD_WIDTH - 12, CARD_HEIGHT - 12).setVisible(false)
     : scene.add.rectangle(0, 0, CARD_WIDTH - 12, CARD_HEIGHT - 12, 0xecd09a, 1).setVisible(false);
   // 為了讓 refresh 的開關寫法不變，body／inner 沿用舊名字。
   const body = frame;

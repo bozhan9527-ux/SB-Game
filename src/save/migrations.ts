@@ -397,6 +397,13 @@ const addCheckpoint: Migration = (data) => {
   return { ...data, world: { ...world, realmRun: { ...run, checkpoint: null }, failStreak: 0 } };
 };
 
+/** v28 → v29：藏寶閣多了武器外觀與符紙紋樣。 */
+const addSkins: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const stones = (player['stones'] ?? {}) as Record<string, unknown>;
+  return { ...data, player: { ...player, stones: { ...stones, weapons: [], weaponOn: {}, papers: [], paper: null } } };
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -425,6 +432,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addStones,
   addVibrate,
   addCheckpoint,
+  addSkins,
 ];
 
 /**
