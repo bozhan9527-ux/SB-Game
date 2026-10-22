@@ -44,6 +44,19 @@ export function pastel(hex, k = 0.28) {
   return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
 }
 
+function luma(hex) {
+  const n = parseInt((/^#([0-9a-f]{6})$/i.exec(hex) ?? [0, '888888'])[1], 16);
+  return (n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11;
+}
+/** 往深色走一階（麥克筆疊第二層）。 */
+export function shade(hex, k = 0.8) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * k));
+  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+
 export const INK = '#2a2622';
 export const GRAPH = '#5d5a55';
 export const ZHU = '#c8372d'; // 朱砂
@@ -214,25 +227,36 @@ export class Pic {
     const id = 'c' + uid++;
     this.defs.push(`<clipPath id="${id}"><path d="${d}"/></clipPath>`);
     // 深色（頭髮、墨）不能淡掉，不然變成灰灰的半透明
-    const n = parseInt((/^#([0-9a-f]{6})$/i.exec(color) ?? [0, '888888'])[1], 16);
-    const dark = ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) < 70;
-    const col = dark ? pastel(color, 0.12) : pastel(color, this.vivid ? 0.3 : 0.4);
+    const dark = luma(color) < 70;
+    const col = dark ? pastel(color, 0.1) : pastel(color, this.vivid ? 0.18 : 0.38);
     const size = Math.min(x1 - x0, y1 - y0);
-    const off = Math.min(4, size * 0.09) * this.ls;
-    const a = Math.max(base, 0.2);
-    const fillOp = dark ? 0.92 : Math.min(0.95, (this.vivid ? 0.62 : 0.45) + a * 0.4);
+    const fillOp = dark ? 0.95 : this.vivid ? 0.95 : Math.min(0.85, 0.4 + Math.max(base, 0.2) * 0.5);
+    // 塗出界：角色只偏一點點（太多會像套色失準），場景可以多一點
+    const off = Math.min(this.vivid ? 1.2 : 3, size * 0.05) * this.ls;
     this.add(`<path d="${d}" fill="${col}" opacity="${fillOp.toFixed(2)}" transform="translate(${f1(J(off))},${f1(J(off))})"/>`);
+    if (size < 3) return;
+    // 麥克筆疊色的陰影：右下一彎深一階，左上一彎亮面——不畫漸層，邊緣是硬的，像疊第二支筆
+    const k = Math.min(this.vivid ? 5 : 9, size * 0.16) * this.ls;
+    const crescent = (dx, dy, fill, opc) => {
+      const m = 'm' + uid++;
+      this.defs.push(`<mask id="${m}" maskUnits="userSpaceOnUse" x="${f1(x0 - 10)}" y="${f1(y0 - 10)}" width="${f1(x1 - x0 + 20)}" height="${f1(y1 - y0 + 20)}"><path d="${d}" fill="#fff"/><path d="${d}" fill="#000" transform="translate(${f1(dx)},${f1(dy)})"/></mask>`);
+      this.add(`<path d="${d}" fill="${fill}" opacity="${opc}" mask="url(#${m})"/>`);
+    };
+    if (!dark) crescent(-k * 0.7, -k, shade(color, this.vivid ? 0.82 : 0.88), this.vivid ? 0.7 : 0.45);
+    if (this.vivid && !dark && size > 8) crescent(k * 0.5, k * 0.6, '#ffffff', 0.4);
+    // 來回塗的筆觸：少幾道、淡一點，只是讓平塗不要死板
     const L = Math.hypot(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     const ang = angle * 0.25 + J(0.12), ca = Math.cos(ang), sa = Math.sin(ang);
     const bw = Math.max(4, Math.min(14, size * 0.28)) * this.ls;
     let g = `<g clip-path="url(#${id})">`;
-    for (let s = -L / 2; s < L / 2; s += bw * (0.9 + R() * 0.5)) {
-      if (R() < 0.35) continue;
-      const ox = cx - sa * s, oy = cy + ca * s;
-      g += `<path d="M${f1(ox - (ca * L) / 2)},${f1(oy - (sa * L) / 2)}L${f1(ox + (ca * L) / 2 + J(4))},${f1(oy + (sa * L) / 2 + J(4))}" stroke="${color}" stroke-width="${f1(bw)}" opacity="${(0.14 + R() * 0.12).toFixed(2)}" stroke-linecap="round" fill="none"/>`;
+    for (let t = -L / 2; t < L / 2; t += bw * (1.1 + R() * 0.6)) {
+      if (R() < 0.5) continue;
+      const ox = cx - sa * t, oy = cy + ca * t;
+      g += `<path d="M${f1(ox - (ca * L) / 2)},${f1(oy - (sa * L) / 2)}L${f1(ox + (ca * L) / 2 + J(4))},${f1(oy + (sa * L) / 2 + J(4))}" stroke="${shade(color, 0.9)}" stroke-width="${f1(bw)}" opacity="${(0.06 + R() * 0.07).toFixed(2)}" stroke-linecap="round" fill="none"/>`;
     }
     this.add(g + '</g>');
   }
+
   /** 填色 + 外框。sharp：直邊（先細分再抖）而不是圓滑曲線。 */
   shape(pts, fill, opt = {}) {
     if (opt.sharp) pts = jitter(pts.concat([pts[0]]), opt.sharpAmp ?? 0.6, 8).slice(0, -1);
