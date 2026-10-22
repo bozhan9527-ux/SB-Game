@@ -5,7 +5,7 @@
  * 0、1 是 A 步、2、3 是 B 步；奇數幀整隻往上彈一點。每幀換一個亂數種子，
  * 線條會輕微「沸騰」——手繪動畫的那種抖動，比每幀一模一樣更活。
  */
-import { C, FU, HAIR, INK, J, R, SKIN, STYLE, WOOD, aside, ZHU, crane as craneBird, ellipsePts, flame, ribbon, spiral, bolt } from './lib.mjs';
+import { C, FU, HAIR, INK, J, R, SKIN, STYLE, WOOD, aside, ZHU, crane as craneBird, ellipsePts, smooth, flame, ribbon, spiral, bolt } from './lib.mjs';
 
 export const step = (f) => (f >= 2 ? 1 : 0);
 export const bob = (f) => (f % 2 ? -2 : 0);
@@ -89,9 +89,13 @@ export function human(p, x, y, f, s = 1, o = {}) {
   if (o.weaponL) o.weaponL(p, x - 22 * s, y - 20 * s, s);
   // 頭
   const headY = y - 62 * s;
-  p.solid(x, headY, 13 * s, 13.5 * s, o.skin ?? SKIN, { ow: 2.2 });
+  // 臉：乾淨的圓（不加抖動），描線也幾乎不抖——五官在這裡面，臉型一歪就整張怪
+  const face = ellipsePts(x, headY, 13 * s, 13.2 * s, 28, 0, 0);
+  p.add(`<path d="${smooth(face, true)}" fill="${o.skin ?? SKIN}"/>`);
+  p.ink(face, { closed: true, w: 2.2, amp: 0.12, passes: 2 });
   if (o.hairStyle !== 'none') {
-    p.shape(S([[-13, -63], [-12, -73], [-4, -77], [6, -77], [13, -72], [13, -63], [8, -70], [0, -68], [-6, -71]]), o.hair ?? HAIR, { base: 0.9, gap: 2, ow: 1.8 });
+    // 瀏海：圓弧往兩側垂下，不做中間的尖角
+    p.shape(S([[-13.2, -61], [-13, -70], [-8, -76], [0, -77.5], [8, -76], [13, -70], [13.2, -61], [10.5, -67], [5, -70], [0, -70.6], [-5, -70], [-10.5, -67]]), o.hair ?? HAIR, { base: 0.9, gap: 2, ow: 1.8, amp: 0.3 });
     if (STYLE === 'marker') aside(() => {
       // 塗鴉捲髮：沿髮際畫幾個小圈圈
       for (let i = 0; i < 5; i++) {
@@ -106,7 +110,7 @@ export function human(p, x, y, f, s = 1, o = {}) {
   else {
     eyes(p, x, headY + 1 * s, 5 * s, s, o.face ?? 'dot', o.eyeColor);
     if (o.face !== 'angry' && o.face !== 'glow' && o.blush !== false) blush(p, x, headY + 6 * s, 8 * s, s);
-    if (o.mouth !== false) p.ink([[x - 2 * s, headY + 7 * s], [x, headY + 8.5 * s], [x + 2 * s, headY + 7 * s]], { w: 1.4, passes: 1 });
+    if (o.mouth !== false) p.ink([[x - 2.2 * s, headY + 7 * s], [x, headY + 8.6 * s], [x + 2.2 * s, headY + 7 * s]], { w: 1.4, passes: 1, amp: 0.05 });
   }
   if (o.front) o.front(p, x, y, s);
   p.ls = ls0;

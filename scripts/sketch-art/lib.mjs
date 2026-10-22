@@ -180,7 +180,7 @@ export class Pic {
     }
     for (let p = 0; p < passes; p++) {
       let q = pts.map(([x, y]) => [x + J(amp * 0.8), y + J(amp * 0.8)]);
-      if (closed && q.length > 2) q = q.concat([[q[0][0] + J(1.5 * this.ls), q[0][1] + J(1.5 * this.ls)], [q[1][0] + J(1.5 * this.ls), q[1][1] + J(1.5 * this.ls)]]);
+      if (closed && q.length > 2) { const e = Math.min(1.5 * this.ls, amp * 1.5); q = q.concat([[q[0][0] + J(e), q[0][1] + J(e)], [q[1][0] + J(e), q[1][1] + J(e)]]); }
       if (p >= only) continue;
       this.add(`<path d="${smooth(q, false)}" fill="none" stroke="${color}" stroke-width="${f1(p ? w * 0.62 : w)}" stroke-linecap="round" stroke-linejoin="round" opacity="${(op * (p ? 0.75 : 1)).toFixed(2)}"/>`);
     }
