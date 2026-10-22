@@ -120,7 +120,7 @@
   "sect": {
     "clearsPerMastery": 5,
     "maxMasteryTier": 4,
-    "masteryDamagePerTier": 0.04,
+    "masteryDamagePerTier": 0,
     "switchCostPerClear": 400
   },
   "power": {

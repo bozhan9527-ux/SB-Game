@@ -8,8 +8,6 @@ import { buildLoadout, sectById } from '../systems/loadout';
 import { cardDef, maxTierForStage } from '../systems/deck';
 import { upgradeAmount, upgradeCost } from '../systems/upgrades';
 import {
-  buySectUpgrade,
-  sectTrackFor,
   sectUpgradeAmount,
   sectUpgradeCost,
   sectUpgradeLevel,
@@ -77,9 +75,8 @@ export class UpgradeScene extends Phaser.Scene {
       this.buildRow(track, cx, top + index * (rowHeight + rowGap) + rowHeight / 2, rowHeight);
     });
 
-    // 門派秘傳排在五條線**下面**，而且只有一列：它是另一個層級的東西——
-    // 上面五條有終點，這一條沒有；上面五條人人一樣，這一條看你拜在哪一派。
-    this.buildSectRow(cx, top + UPGRADES.length * (rowHeight + rowGap) + 46, 92);
+    // 門派秘傳（v24 移除）原本排在這裡：一條沒有上限的乘區，和「數值不再膨脹」的方向相反。
+    // 金幣已在存檔轉換時退回。
 
     this.summaryText = this.add
       .text(cx, 816, '', textStyle({ size: 16, color: INK_DIM }))
@@ -134,70 +131,7 @@ export class UpgradeScene extends Phaser.Scene {
     this.rows.push({ track, flash, buttonX: cx + width / 2 - 76, level, effect, button });
   }
 
-  /**
-   * 門派秘傳那一列。
-   *
-   * 用門派色描邊，不用和上面五條一樣的灰線：它要一眼看出是不同的東西。
-   * 沒拜門派、或還沒推到飛升境時仍然畫出來——看得到但買不動，
-   * 才知道後面還有東西等著；整列藏起來的話玩家根本不知道它存在。
-   */
-  private buildSectRow(cx: number, cy: number, height: number): void {
-    const save = state();
-    const sect = sectById(save.player.sectId);
-    const track = sectTrackFor(save.player.sectId);
-    const width = GAME_WIDTH - 40;
-    const left = cx - width / 2 + 20;
-    const top = cy - height / 2;
-    const accent = sect === null ? INK_DIM : sect.color;
 
-    this.add
-      .rectangle(cx, cy, width, height, BG_PANEL, 0.9)
-      .setStrokeStyle(3, hexToNumber(accent));
-    const flash = this.add.rectangle(cx, cy, width - 6, height - 6, hexToNumber(accent), 1).setAlpha(0);
-
-    if (sect === null || track === null) {
-      this.add
-        .text(cx, cy, '門派秘傳　拜入門派之後開啟', textStyle({ size: 20, color: INK_DIM }))
-        .setOrigin(0.5);
-      return;
-    }
-
-    this.add.text(left, top + 6, track.name, textStyle({ size: 25, color: accent, bold: true }));
-    this.add
-      .text(left + 140, top + 12, `${sect.name} 秘傳`, textStyle({ size: 15, color: INK_DIM }));
-    const level = this.add.text(left + 260, top + 12, '', textStyle({ size: 17, color: JADE }));
-    const desc = this.add.text(left, top + 40, track.desc, textStyle({ size: 15, color: INK_DIM }));
-    fitText(desc, width - 176);
-    const effect = this.add.text(left, top + 64, '', textStyle({ size: 17, color: INK }));
-
-    const button = createButton(this, cx + width / 2 - 76, cy, {
-      width: 128,
-      height: 58,
-      label: '',
-      fontSize: 20,
-      strokeColor: hexToNumber(accent),
-      textColor: accent,
-      onClick: () => this.purchaseSect(),
-    });
-
-    this.sectRow = { track, flash, buttonX: cx + width / 2 - 76, level, effect, button };
-  }
-
-  private purchaseSect(): void {
-    const save = state();
-    if (!buySectUpgrade(save).ok) {
-      this.goldText.setColor(DANGER);
-      this.time.delayedCall(260, () => this.goldText.setColor(GOLD));
-      return;
-    }
-    persist();
-    this.refresh();
-    if (this.sectRow !== null) {
-      const level = sectUpgradeLevel(save);
-      const gain = sectUpgradeAmount(this.sectRow.track, level) - sectUpgradeAmount(this.sectRow.track, level - 1);
-      this.celebrate(this.sectRow, `+${Math.round(gain * 100) / 100}${this.sectRow.track.unit}`);
-    }
-  }
 
   private purchase(track: UpgradeTrack): void {
     const save = state();

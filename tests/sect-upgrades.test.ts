@@ -77,20 +77,15 @@ describe('門派秘傳', () => {
     expect(sectUpgradeLevel(save)).toBe(2);
   });
 
-  it('四派各自加在自己的那一格上', () => {
+  it('v24 起不再生效：秘傳是一條沒有上限的乘區，已移除並退回金幣', () => {
     const at = (sectId: string, level: number) => {
       const save = saveAt(sectId, 90);
       save.player.sectDepth[sectId] = level;
       return buildLoadout(save, 90);
     };
-    expect(at('body', 10).disciples).toBeGreaterThan(at('body', 0).disciples);
-    expect(at('sword', 10).bossDamageMultiplier).toBeGreaterThan(
-      at('sword', 0).bossDamageMultiplier,
-    );
-    expect(at('talisman', 10).favoredDamageBonus).toBeGreaterThan(0);
-    expect(at('alchemy', 10).goldMultiplier).toBeGreaterThan(at('alchemy', 0).goldMultiplier);
-    // 加的是自己那一格，不是全部：劍修買再多也不會多出耐久。
-    expect(at('sword', 10).disciples).toBe(at('sword', 0).disciples);
+    for (const id of ['body', 'sword', 'talisman', 'alchemy']) {
+      expect(at(id, 10)).toEqual(at(id, 0));
+    }
   });
 
   it('會跟著上報，否則伺服器重播出來的是另一場仗', () => {

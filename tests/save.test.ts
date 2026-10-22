@@ -369,7 +369,8 @@ describe('近幾版的遷移', () => {
     // v23 起舊制四條仙緣線會被退點（見 karma.test 的遷移測試），這裡只留新制的那一條。
     save.player.karma.spent = {};
     save.player.sectClears = { sword: 88, body: 12 };
-    save.player.dungeons = { library: 11, pagoda: 3 };
+    // 鎮妖塔 v24 改成每週天劫塔，舊的層數在轉換時作廢，所以指紋裡不放它。
+    save.player.dungeons = { library: 11 };
     save.player.talismans = ['sword', 'frost', 'pyre', 'soul'];
     for (const key of Object.keys(save.player.upgrades)) save.player.upgrades[key] = 42;
     return JSON.parse(JSON.stringify(save)) as Record<string, unknown>;

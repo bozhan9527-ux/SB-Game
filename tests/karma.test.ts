@@ -67,7 +67,8 @@ describe('強制飛升', () => {
     expect(save.world.highestStage).toBe(highest);
     expect(save.player.wallet.gold).toBe(0);
     for (const track of UPGRADES) expect(save.player.upgrades[track.id]).toBe(0);
-    expect(save.player.dungeons).toEqual({});
+    // 副本進度 v24 起跨世保留。
+    expect(save.player.dungeons).toEqual({ library: 6 });
     expect(save.world.realmRun.blessings).toEqual({});
   });
 

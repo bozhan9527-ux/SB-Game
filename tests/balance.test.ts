@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BALANCE, DUNGEONS, KARMA, SECTS, UPGRADES } from '../src/data';
+import { BALANCE, DUNGEONS, SECTS, UPGRADES } from '../src/data';
 import { cardDps, fieldDps, maxTierForStage } from '../src/systems/deck';
 import type { Card } from '../src/systems/deck';
 import type { CardSlot, DefenseState } from '../src/systems/defense';
@@ -18,9 +18,7 @@ import {
   applyTribulations,
   buildLoadoutFromSpec,
   buildLoadoutFor,
-  dungeonThreatFactor,
 } from '../src/systems/loadout';
-import { karmaCost, karmaTrackById } from '../src/systems/karma';
 import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
 import { tribulationsFor } from '../src/systems/tribulations';
@@ -264,20 +262,6 @@ function spendGold(levels: Record<string, number>, gold: number): number {
   }
 }
 
-/** 有點就買最便宜的那一條仙緣，和 spendGold 同一種「不做長期規劃」的花法。 */
-function spendKarma(spent: Record<string, number>, points: number): number {
-  for (;;) {
-    let cheapest: { id: string; cost: number } | null = null;
-    for (const track of KARMA) {
-      const cost = karmaCost(karmaTrackById(track.id), spent[track.id] ?? 0);
-      if (cost === null || cost > points) continue;
-      if (cheapest === null || cost < cheapest.cost) cheapest = { id: track.id, cost };
-    }
-    if (cheapest === null) return points;
-    points -= cheapest.cost;
-    spent[cheapest.id] = (spent[cheapest.id] ?? 0) + 1;
-  }
-}
 
 interface Progress {
   totalRuns: number;
@@ -551,6 +535,7 @@ describe('副本難度', () => {
     stage: number,
     karma: Record<string, number> = {},
     rebirths = 0,
+    week = 2860,
   ): number {
     const loadout = buildLoadoutFromSpec({
       sectId: 'sword',
@@ -562,7 +547,8 @@ describe('副本難度', () => {
       karma,
       sectClears: 0,
       sectDepth: 0,
-      rules: [...dungeon.rules],
+      // 每週天劫塔：照指定的那一週組出天劫（實際開打時由 dungeonSpecOf 換成當週）。
+      rules: dungeon.rules.map((rule) => (rule === 'weekly' ? `week:${week}` : rule)),
       goldMultiplier: dungeon.goldMultiplier,
       
       bankedStage: 0,
@@ -596,7 +582,10 @@ describe('副本難度', () => {
         const gate = floor.minStage ?? dungeon.minStage;
         const stage = floor.stage ?? Math.round(gate * (floor.stageRatio ?? 1));
         const upgrades = snaps.get(Math.min(81, Math.max(1, gate))) ?? {};
-        const rate = clearRate(dungeon, index, upgrades, stage);
+        // 每週天劫塔：連看六週，取最難的那一週——每一週都要爬得上去。
+        const rate = dungeon.rules.includes('weekly')
+          ? Math.min(...[2860, 2861, 2862, 2863, 2864, 2865].map((w) => clearRate(dungeon, index, upgrades, stage, {}, 0, w)))
+          : clearRate(dungeon, index, upgrades, stage);
         // 藏經閣拿不到就等於少一張符，它的門檻要高得多。
         const floorLabel = `${dungeon.name} 第 ${index + 1} 層（門檻 ${gate}、第 ${stage} 關）`;
         expect(rate, floorLabel).toBeGreaterThanOrEqual(dungeon.id === 'library' ? 0.7 : 0.4);
@@ -616,38 +605,7 @@ describe('副本難度', () => {
     }
   });
 
-  /**
-   * 轉世之後重走的那一趟。
-   *
-   * 轉世把副本進度清光，所以整條路要重走一次；而重走若是原價，那就只是勞動。
-   * 這裡驗的是加了轉世係數之後**還是走得完**——尤其藏經閣：十六張非基礎符
-   * 只有它產出，某一世打不過就等於那一世永遠少四張符。
-   */
-  it('轉世之後副本會變深，但每一層仍然過得了', () => {
-    const snaps = progressionSnapshots();
-    // v23 起打完第 81 關就強制飛升，所以前幾世的深度都是 82；
-    // 證道之後才會往飛升境推得更深（最後一項）。每一世 8 點，深的那段每 6 關多 1 點。
-    const chain = [82, 82, 82, 130];
-    const spent: Record<string, number> = {};
-    let points = 0;
-    chain.forEach((banked, life) => {
-      points = spendKarma(spent, points + 8 + Math.floor(Math.max(0, banked - 82) / 6));
-      const factor = dungeonThreatFactor(banked);
-      expect(factor, `第 ${life + 2} 世的係數`).toBeGreaterThanOrEqual(banked > 82 ? 1.0001 : 1);
-      for (const dungeon of DUNGEONS) {
-        dungeon.floors.forEach((floor, index) => {
-          if (floor.stage === undefined) return;
-          const gate = floor.minStage ?? dungeon.minStage;
-          // 深度照 floorDepth 的算法：乘上係數，再夾在門檻之內。
-          const stage = Math.max(1, Math.min(Math.round(floor.stage * factor), gate));
-          const upgrades = snaps.get(Math.min(81, Math.max(1, gate))) ?? {};
-          const rate = clearRate(dungeon, index, upgrades, stage, spent, life + 1);
-          const label = `第 ${life + 2} 世 ${dungeon.name} 第 ${index + 1} 層（門檻 ${gate}、第 ${stage} 關）`;
-          expect(rate, label).toBeGreaterThanOrEqual(dungeon.id === 'library' ? 0.7 : 0.4);
-        });
-      }
-    });
-  }, 120000);
+  // 「轉世之後副本變深」那一條在 v24 移除：副本進度跨世保留，不再重爬（見 dungeons.test）。
 });
 
 /**

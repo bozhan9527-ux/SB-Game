@@ -18,6 +18,8 @@ import type { OfferContext } from './blessings';
 import { offerPool, offerSize, rollOffer, takeBlessing } from './blessings';
 import { realmForStage } from './realms';
 import { createRng } from './rng';
+import { BLESSINGS } from '../data';
+import { legacySeeds, legacyWeight, masteryTier } from './sects';
 import { talismanDefs } from './talismans';
 
 /** 過關回復的耐久（上限的比例）。 */
@@ -31,6 +33,20 @@ export const RUN_LENGTH = 9;
 
 export function freshRealmRun(startStage: number): RealmRunState {
   return { startStage: Math.max(1, Math.floor(startStage)), gate: null, blessings: {}, offer: null, rerolls: 0 };
+}
+
+/**
+ * 開一局新的：門派傳承滿階的話，開局就帶著本門專屬機緣（一星）。
+ * 破境、失守重來、飛升都走這裡；讀檔修補與存檔轉換不走（那不是「新的一局」）。
+ */
+export function startRealmRun(save: SaveData, startStage: number): RealmRunState {
+  const run = freshRealmRun(startStage);
+  const sectId = save.player.sectId;
+  if (sectId !== null && legacySeeds(masteryTier(save, sectId))) {
+    const own = BLESSINGS.find((def) => def.sect === sectId && !def.rare);
+    if (own !== undefined) run.blessings = { [own.id]: 1 };
+  }
+  return run;
 }
 
 /** 主線最後一個有盡頭的境界在哪一關結束（81）。之後是飛升境。 */
@@ -67,6 +83,7 @@ export function offerContextOf(save: SaveData, rare: boolean): OfferContext {
     sectId: save.player.sectId ?? '',
     talismans: pool.map((def) => def.id),
     rare,
+    sectWeight: save.player.sectId === null ? 1 : legacyWeight(masteryTier(save, save.player.sectId)),
   };
 }
 
@@ -102,7 +119,7 @@ export interface ClearOutcome {
  */
 export function onStageCleared(save: SaveData, clearedStage: number, survivors: number, maxDisciples: number): ClearOutcome {
   if (endsRun(clearedStage)) {
-    save.world.realmRun = freshRealmRun(save.world.stage);
+    save.world.realmRun = startRealmRun(save, save.world.stage);
     return { brokeThrough: true, gate: null };
   }
   const run = save.world.realmRun;
@@ -124,7 +141,7 @@ export function onStageFailed(save: SaveData): number {
   }
   const start = Math.min(save.world.realmRun.startStage, save.world.stage);
   save.world.stage = start;
-  save.world.realmRun = freshRealmRun(start);
+  save.world.realmRun = startRealmRun(save, start);
   return start;
 }
 

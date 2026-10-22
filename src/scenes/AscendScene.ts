@@ -90,7 +90,7 @@ export class AscendScene extends Phaser.Scene {
 
     const note = dao
       ? '九重天渡劫——證道！第 82 關以後的飛升境從此開放。'
-      : '歸零：關卡、金幣、洞府、副本。留下：門派修為、符籙、成就、仙緣與解鎖。';
+      : '歸零：關卡、金幣、洞府。留下：門派修為、副本與符籙、成就、仙緣與解鎖。';
     this.add
       .text(cx, 820, wrapText(note, GAME_WIDTH - 70, 16), textStyle({ size: 16, color: dao ? JADE : INK_DIM }))
       .setOrigin(0.5)

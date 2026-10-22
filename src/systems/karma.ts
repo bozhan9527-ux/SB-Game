@@ -27,7 +27,7 @@
  * 本檔不 import Phaser，全部是純函式。
  */
 import { BLESSINGS, KARMA, TRIBULATIONS, UPGRADES } from '../data';
-import { freshRealmRun, lastFiniteStage } from './realmrun';
+import { lastFiniteStage, startRealmRun } from './realmrun';
 import type { KarmaTrack } from '../data/types';
 import type { SaveData } from '../save/types';
 
@@ -134,7 +134,7 @@ export function ascensionGain(save: SaveData): number {
 }
 
 /**
- * 飛升。歸零的是這一世的東西：關卡、金幣、洞府、副本、門派秘傳、一境一局。
+ * 飛升。歸零的是這一世的東西：關卡、金幣、洞府、一境一局（副本進度 v24 起保留）。
  * 留下的是跨世的東西：門派與修為、符籙解鎖、成就、紀錄、仙緣與解鎖。
  * 天劫留著當下一世的預設，飛升台上再改。回傳拿到幾點。
  */
@@ -150,10 +150,10 @@ export function ascend(save: SaveData): number {
   if (heaven >= 9) karma.dao = true;
 
   save.world.stage = 1;
-  save.world.realmRun = freshRealmRun(1);
+  save.world.realmRun = startRealmRun(save, 1);
   save.player.wallet.gold = 0;
   for (const track of UPGRADES) save.player.upgrades[track.id] = 0;
-  save.player.dungeons = {};
+  // 副本進度不再隨飛升清空（v24）：藏經閣的十六張符每一世重打一次是勞動，不是挑戰。
   save.player.sectDepth = {};
   save.player.omen = null;
   return gained;

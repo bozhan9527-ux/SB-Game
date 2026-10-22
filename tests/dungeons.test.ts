@@ -27,7 +27,9 @@ import {
   grantFloor,
   nextFloor,
   nextOpenFloor,
+  syncTower,
 } from '../src/systems/dungeons';
+import { weekOf, weeklyTribulationLevels } from '../src/systems/tribulations';
 import type { LoadoutSpec } from '../src/systems/loadout';
 import { buildLoadoutFromSpec, loadoutSpecOf } from '../src/systems/loadout';
 import { createRng } from '../src/systems/rng';
@@ -168,22 +170,35 @@ describe('副本的結構', () => {
     expect(dungeonAvailable(veteran, dungeon('pagoda'))).toBe(true);
   });
 
-  it('轉世之後副本整條重來：進度清空、門檻回到這一世的進度', () => {
-    // highestStage 不會因為轉世歸零，所以門檻若看它，轉世之後所有副本會在
-    // 第一秒全部開放——進度被清光、關卡卻一層都不用再爬。
+  it('飛升之後副本進度留著（v24）：藏經閣的符不必每一世重打', () => {
     const save = saveAt(200);
-    save.player.dungeons = { library: 16, pagoda: 5 };
+    save.player.dungeons = { library: 16, cliff: 2 };
     save.player.karma.claimedStage = 0;
     expect(ascend(save)).toBeGreaterThan(0);
-
-    expect(clearedFloors(save, 'library')).toBe(0);
-    expect(save.world.highestStage).toBeGreaterThan(100);
+    expect(clearedFloors(save, 'library')).toBe(16);
+    expect(clearedFloors(save, 'cliff')).toBe(2);
     expect(save.world.stage).toBe(1);
-    // 深的副本關起來了，藏經閣第一層照樣開著——新的一世從第一張符重新爬。
-    expect(dungeonAvailable(save, dungeon('pagoda'))).toBe(false);
+    // 還沒通過的層照樣看這一世的進度開：深的副本要重新推到門檻才進得去。
     expect(dungeonAvailable(save, dungeon('trove'))).toBe(false);
-    expect(floorOpen(save, dungeon('library'), 1)).toBe(true);
-    expect(floorOpen(save, dungeon('library'), 10)).toBe(false);
+  });
+
+  it('鎮妖塔是每週天劫塔：換週歸零，天劫由週數決定', () => {
+    const save = saveAt(80);
+    const week = weekOf(Date.UTC(2026, 9, 21));
+    save.player.towerWeek = week;
+    save.player.dungeons = { pagoda: 3 };
+    expect(syncTower(save, Date.UTC(2026, 9, 21))).toBe(false);
+    expect(clearedFloors(save, 'pagoda')).toBe(3);
+    expect(syncTower(save, Date.UTC(2026, 9, 29))).toBe(true);
+    expect(clearedFloors(save, 'pagoda')).toBe(0);
+    const levels = weeklyTribulationLevels(week);
+    expect(Object.keys(levels)).toHaveLength(3);
+    expect(Object.values(levels).sort()).toEqual([1, 1, 2]);
+    expect(weeklyTribulationLevels(week)).toEqual(levels);
+    // 開打時規則裡帶著週數，組裝出來就有那三種天劫
+    const spec = dungeonSpecOf(save, dungeon('pagoda'), 1, Date.UTC(2026, 9, 21));
+    expect(spec.rules).toEqual([`week:${week}`]);
+    expect(buildLoadoutFromSpec(spec).tribulations.map((t) => t.id).sort()).toEqual(Object.keys(levels).sort());
   });
 
   it('轉世之後同一層會變深，但永遠不會深過它自己的門檻', () => {

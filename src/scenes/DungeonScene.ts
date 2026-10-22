@@ -15,7 +15,8 @@ import type { IconName } from "../art";
 import { GAME_HEIGHT, GAME_WIDTH } from "../config";
 import { DUNGEONS } from "../data";
 import type { DungeonDef } from "../data/types";
-import { state } from "../state";
+import { persist, state } from "../state";
+import { dungeonBlurb, syncTower } from "../systems/dungeons";
 import {
   clearedFloors,
   dungeonAvailable,
@@ -54,6 +55,8 @@ export class DungeonScene extends Phaser.Scene {
   create(): void {
     fadeIn(this);
     const save = state();
+    // 換週了：每週天劫塔的進度歸零。
+    if (syncTower(save)) persist();
     const realm = realmForStage(save.world.stage);
     drawBackdrop(this, realm);
 
@@ -133,7 +136,7 @@ export class DungeonScene extends Phaser.Scene {
       .text(
         left + 76,
         top + 64,
-        dungeon.desc,
+        dungeonBlurb(dungeon),
         textStyle({ size: 16, color: INK_DIM }),
       )
       .setOrigin(0, 0.5);

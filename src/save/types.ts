@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 23;
+export const SAVE_VERSION = 24;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -214,6 +214,11 @@ export interface PlayerState {
    * 中間先去打了副本或重挑（挑戰次數會往前走），它就作廢。
    */
   omen: PendingOmen | null;
+  /**
+   * 鎮妖塔（每週天劫塔）目前記的是哪一週。和現在這一週對不上，塔的進度就歸零重爬。
+   * 0 為還沒進去過。
+   */
+  towerWeek: number;
 }
 
 export interface PendingOmen {

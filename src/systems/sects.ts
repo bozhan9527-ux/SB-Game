@@ -66,12 +66,34 @@ export function switchCost(save: SaveData, targetSectId: string): number {
   return sectClears(save, current) * BALANCE.sect.switchCostPerClear;
 }
 
+/**
+ * 門派傳承：修為換來的東西（v24 起）。
+ *
+ * 修為原本加法寶傷害（每階 +4%），和仙緣、洞府一樣是一條只會往上疊的乘區——
+ * 輪迴一次就把前段輾平的那批數值裡也有它。改成和機緣綁在一起：
+ * 修為越高，本門專屬機緣在三選一裡越常出現；滿階之後每一局開局就自帶它。
+ * 修為因此回答的是「我是哪一派的人」，而不是「我又強了 4%」。
+ */
+export function legacyWeight(tier: number): number {
+  return 1 + 0.5 * Math.max(0, tier);
+}
+
+/** 滿階：每一局開局自帶本門專屬機緣（一星）。 */
+export function legacySeeds(tier: number): boolean {
+  return tier >= BALANCE.sect.maxMasteryTier;
+}
+
+export function legacyText(tier: number): string {
+  if (tier <= 0) return '尚無傳承';
+  if (legacySeeds(tier)) return '每局開局自帶本門機緣';
+  return `本門機緣出現率 ×${legacyWeight(tier).toFixed(1)}`;
+}
+
 /** 修為的一行說明，選門派與符籙譜兩個畫面共用。 */
 export function masteryLine(save: SaveData, sectId: string): string {
   const tier = masteryTier(save, sectId);
-  const bonus = Math.round(masteryBonus(tier) * 100);
   const remain = clearsToNextMastery(save, sectId);
-  const head = `修為 ${tier} / ${BALANCE.sect.maxMasteryTier} 階（法寶傷害 +${bonus}%）`;
+  const head = `修為 ${tier} / ${BALANCE.sect.maxMasteryTier} 階（${legacyText(tier)}）`;
   if (remain === null) return `${head}・已至頂`;
   return `${head}・再通關 ${remain} 次升階`;
 }

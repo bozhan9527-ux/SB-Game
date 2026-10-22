@@ -84,3 +84,45 @@ export function sanitizeTribulationLevels(raw: unknown): Record<string, number> 
   }
   return out;
 }
+
+// ---------------------------------------------------------------- 每週天劫塔（v24）
+
+/** 週一 00:00（台北時間）為一週的開始。2024-01-01 是星期一。 */
+const WEEK_EPOCH = Date.UTC(2023, 11, 31, 16);
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 現在是第幾週。 */
+export function weekOf(now: number): number {
+  return Math.max(0, Math.floor((now - WEEK_EPOCH) / WEEK_MS));
+}
+
+/**
+ * 這一週鎮妖塔的天劫：三種，第一種是第二重。只看週數，所以全服同一組，
+ * 伺服器重播也算得出同一組。
+ */
+export function weeklyTribulationLevels(week: number): Record<string, number> {
+  const rng = createRng(((week * 7919) ^ 0x7e3c5) >>> 0);
+  const pool = TRIBULATIONS.map((def) => def.id);
+  const out: Record<string, number> = {};
+  for (let i = 0; i < 3 && pool.length > 0; i += 1) {
+    const [id] = pool.splice(rng.int(0, pool.length - 1), 1);
+    if (id !== undefined) out[id] = i === 0 ? 2 : 1;
+  }
+  return out;
+}
+
+/** 副本規則裡的週數（`week:123`）；沒有就是 null。 */
+export function weekRule(rules: readonly string[]): number | null {
+  for (const rule of rules) {
+    const match = /^week:(\d+)$/.exec(rule);
+    if (match !== null) return Number(match[1]);
+  }
+  return null;
+}
+
+/** 「雷劫二重・心魔劫・罡風劫」。 */
+export function tribulationLevelNames(levels: Readonly<Record<string, number>>): string {
+  return chosenTribulations(levels)
+    .map((item) => `${item.name}${(levels[item.id] ?? 1) > 1 ? `${['', '', '二', '三'][levels[item.id] ?? 1] ?? ''}重` : ''}`)
+    .join('・');
+}

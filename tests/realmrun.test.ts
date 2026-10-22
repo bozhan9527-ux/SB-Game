@@ -124,3 +124,34 @@ describe('功能開放節奏', () => {
     expect(featureOpen(at(1, 1), 'dungeon')).toBe(true);
   });
 });
+
+import { migrate } from '../src/save/migrations';
+import { SECT_UPGRADES } from '../src/data';
+import { startRealmRun } from '../src/systems/realmrun';
+import { offerContextOf } from '../src/systems/realmrun';
+
+describe('門派傳承與 v24 轉換', () => {
+  it('修為滿階：每一局開局自帶本門專屬機緣；未滿階只提高出現權重', () => {
+    const save = at(10);
+    save.player.sectClears['sword'] = 20;
+    expect(startRealmRun(save, 10).blessings).toEqual({ swordIntent: 1 });
+    save.player.sectClears['sword'] = 10;
+    expect(startRealmRun(save, 10).blessings).toEqual({});
+    expect(offerContextOf(save, false).sectWeight).toBe(2);
+  });
+
+  it('門派秘傳照原價退回金幣；奇遇與鎮妖塔舊層數清掉', () => {
+    const track = SECT_UPGRADES.find((t) => t.sectId === 'body')!;
+    const old = {
+      version: 23,
+      player: { wallet: { gold: 100 }, sectDepth: { body: 2 }, omen: { id: 'spring', stage: 3, runs: 1 }, dungeons: { library: 4, pagoda: 3 } },
+      world: { stage: 3 },
+    };
+    const next = migrate(old as unknown as Record<string, unknown>, 24) as Record<string, any>;
+    const refund = Math.round(track.baseCost) + Math.round(track.baseCost * track.costGrowth);
+    expect(next['player']['wallet']['gold']).toBe(100 + refund);
+    expect(next['player']['sectDepth']).toEqual({});
+    expect(next['player']['omen']).toBeNull();
+    expect(next['player']['dungeons']).toEqual({ library: 4 });
+  });
+});

@@ -6,6 +6,7 @@
  */
 import { CARDS } from '../data';
 import { legacyKarmaRefund } from '../systems/karma';
+import { SECT_UPGRADES } from '../data';
 
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
@@ -305,6 +306,40 @@ const toAscension: Migration = (data) => {
   };
 };
 
+/**
+ * v23 → v24：舊系統整併（見 ROGUELITE_DESIGN.md 第十節）。
+ *
+ * - 門派秘傳移除：買過的等級照原價退回金幣。它本來就是一條沒有上限的乘區，
+ *   和「數值不再膨脹」的方向相反；退金幣而不是直接收走，玩家不會覺得被沒收。
+ * - 關間奇遇停用：還沒用掉的那一個清掉。
+ * - 鎮妖塔改成每週天劫塔：舊的層數作廢（第一次進去就是本週第一層）。
+ */
+const dropSectDepth: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const depth = (player['sectDepth'] ?? {}) as Record<string, unknown>;
+  const wallet = (player['wallet'] ?? {}) as Record<string, unknown>;
+  let refund = 0;
+  for (const track of SECT_UPGRADES) {
+    const raw = depth[track.sectId];
+    const level = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, Math.min(400, Math.floor(raw))) : 0;
+    for (let l = 0; l < level; l += 1) refund += Math.round(track.baseCost * Math.pow(track.costGrowth, l));
+  }
+  const gold = typeof wallet['gold'] === 'number' && Number.isFinite(wallet['gold']) ? (wallet['gold'] as number) : 0;
+  const dungeons = { ...((player['dungeons'] ?? {}) as Record<string, unknown>) };
+  delete dungeons['pagoda'];
+  return {
+    ...data,
+    player: {
+      ...player,
+      wallet: { ...wallet, gold: gold + refund },
+      sectDepth: {},
+      omen: null,
+      towerWeek: 0,
+      dungeons,
+    },
+  };
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -328,6 +363,7 @@ export const MIGRATIONS: readonly Migration[] = [
   addSectDepth,
   addAccount,
   toAscension,
+  dropSectDepth,
 ];
 
 /**

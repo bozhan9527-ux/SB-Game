@@ -556,7 +556,7 @@ describe('上榜開通', () => {
 describe('上報的是開打那一刻的配置', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('第 5 次通關：結算之後現算的那一份，傷害比實際打的高一階', () => {
+  it('第 5 次通關：結算之後現算的那一份和實際打的不是同一份', () => {
     const save = createDefaultSave(1);
     save.player.sectId = 'sword';
     save.world.stage = 6;
@@ -569,10 +569,10 @@ describe('上報的是開打那一刻的配置', () => {
 
     expect(played.sectClears).toBe(4);
     expect(stale.sectClears).toBe(5);
-    // 這 4% 就是重播走散的起點。確定性重播沒有「差一點點」這種事。
-    expect(buildLoadoutFromSpec(stale).damageMultiplier).toBeGreaterThan(
-      buildLoadoutFromSpec(played).damageMultiplier,
-    );
+    // 修為 v24 起不加傷害（改成門派傳承），但兩份配置仍然不同——
+    // 上報一定要用開打那一刻的那一份。
+    expect(stale).not.toEqual(played);
+    expect(buildLoadoutFromSpec(played).stage).toBe(6);
   });
 
   it('submitRun 送的是 submission 裡那一份，不是從存檔現算的', async () => {

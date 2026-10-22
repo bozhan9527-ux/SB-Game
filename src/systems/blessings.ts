@@ -91,6 +91,8 @@ export interface OfferContext {
   talismans: readonly string[];
   /** 境底首領給的稀有三選一。 */
   rare: boolean;
+  /** 本門專屬機緣的出現權重（門派傳承）。缺席為 1。 */
+  sectWeight?: number;
 }
 
 /** 這張機緣在這一局有沒有資格出現。 */
@@ -121,7 +123,8 @@ export function offerPool(ctx: OfferContext): BlessingDef[] {
 export function rollOffer(ctx: OfferContext, rng: Rng, count = 3): string[] {
   const pool = offerPool(ctx);
   const picked: BlessingDef[] = [];
-  const weightOf = (def: BlessingDef): number => ((ctx.owned[def.id] ?? 0) > 0 ? 1.6 : 1);
+  const weightOf = (def: BlessingDef): number =>
+    ((ctx.owned[def.id] ?? 0) > 0 ? 1.6 : 1) * (def.sect !== null ? ctx.sectWeight ?? 1 : 1);
   while (picked.length < count && pool.length > 0) {
     const needSupport = picked.length === count - 1 && picked.every((def) => def.category === 'attack');
     const candidates = needSupport ? pool.filter((def) => def.category !== 'attack') : pool;

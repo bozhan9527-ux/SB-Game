@@ -8,7 +8,7 @@
  * 六條線一律是**百分比乘算**。早期版本用固定加值，實測邊界關卡完全不動——
  * 難度是指數曲線，固定加值在後期會被稀釋到看不見（見 PROGRESS 的 L-05）。
  */
-import { sectTrackFor, sectUpgradeAmount, sectUpgradeLevel } from './sect-upgrades';
+import { sectUpgradeLevel } from './sect-upgrades';
 import { BALANCE, SECTS } from '../data';
 import type { CardDef, Sect, TribulationDef } from '../data/types';
 import type { SaveData } from '../save/types';
@@ -17,7 +17,8 @@ import { masteryBonus, masteryTierFor } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
 import { OMEN_RULE_PREFIX, omenOfRules } from './omens';
-import { tribulationsFor, tribulationsForRun } from './tribulations';
+import { chosenTribulations, tribulationsFor, tribulationsForRun, weekRule, weeklyTribulationLevels } from './tribulations';
+import { jieCount } from './karma';
 import { amountOf } from './upgrades';
 import type { BlessingMap } from './blessings';
 import { NO_BLESSINGS, blessingValue, sanitizeBlessings } from './blessings';
@@ -351,16 +352,22 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   // 再疊天劫會變成兩套條件打架。奇遇不算副本規則，帶著奇遇照樣吃天劫。
   const mainline = !spec.endless && spec.rules.every((rule) => rule.startsWith(OMEN_RULE_PREFIX));
   if (mainline && !loadout.arena) applyTribulationList(loadout, tribulationsForRun(spec.stage, spec.tribulations ?? {}));
+  // 每週天劫塔：天劫由週數決定（全服同一組），不看玩家自己背的。
+  const week = weekRule(spec.rules);
+  if (week !== null && !loadout.arena) applyTribulationList(loadout, chosenTribulations(weeklyTribulationLevels(week)));
 
-  applySectDepth(loadout, spec.sectDepth);
+  // 門派秘傳（spec.sectDepth）v24 起不再生效：那是一條沒有上限的乘區。欄位留著，舊的上報照樣讀得進來。
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
   // 習性的機率也是養成的一部分，所以競技場一樣要關掉——**而且它是反過來的**：
   // 轉世愈多次機率愈高，也就是說老玩家在競技場會遇到更硬的妖魔，
   // 手上卻沒有任何多出來的力量。那不只是不公平，是把榜單的方向倒過來。
-  const { traitChancePerLife, traitChanceMax } = BALANCE.rebirth;
-  loadout.traitChance = loadout.arena
+  // v24 起習性的機率看「這一世背了多少劫」，不看飛升了幾次：
+  // 強制飛升之後世數長得很快，照世數算的話第四世起九成的妖魔都帶習性，
+  // 而那不是玩家選的難度。每一劫 +5%。
+  const { traitChanceMax } = BALANCE.rebirth;
+  loadout.traitChance = loadout.arena || !mainline
     ? 0
-    : Math.min(traitChanceMax, Math.max(0, Math.floor(spec.rebirths)) * traitChancePerLife);
+    : Math.min(traitChanceMax, jieCount(spec.tribulations ?? {}) * 0.05);
   loadout.endless = spec.endless === true;
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
   // 機緣只屬於主線的一境一局：副本有自己的規則、試劍台要所有人起點一樣、
@@ -387,31 +394,6 @@ export function applyBlessings(loadout: Loadout, blessings: BlessingMap): void {
   if (eye > 0) loadout.formationMultiplier *= 1 + eye;
 }
 
-/**
- * 門派秘傳：一派一種效果，沒有上限。
- *
- * 放在組裝的最後、乘在既有倍率上，而不是塞進 buildLoadoutFor 的參數表——
- * 它加的東西四派各不相同，攤成四個參數只會讓那個已經很長的簽章更難讀，
- * 而這裡一眼就看得出「哪一派加在哪一格」。
- */
-function applySectDepth(loadout: Loadout, level: number): void {
-  // 競技場把所有養成關掉了，秘傳也是養成。
-  if (loadout.arena) return;
-  const track = sectTrackFor(loadout.sect.id);
-  if (track === null) return;
-  const amount = sectUpgradeAmount(track, Math.max(0, Math.floor(level)));
-  if (amount <= 0) return;
-  const ratio = amount / 100;
-  if (track.effect === 'disciples') {
-    loadout.disciples = Math.max(1, Math.round(loadout.disciples * (1 + ratio)));
-  } else if (track.effect === 'bossDamage') {
-    loadout.bossDamageMultiplier *= 1 + ratio;
-  } else if (track.effect === 'favoredDamage') {
-    loadout.favoredDamageBonus += ratio;
-  } else {
-    loadout.goldMultiplier *= 1 + ratio;
-  }
-}
 
 export function buildLoadout(save: SaveData, stage: number): Loadout {
   return buildLoadoutFromSpec(loadoutSpecOf(save, stage));

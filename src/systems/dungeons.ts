@@ -21,6 +21,30 @@ import type { DungeonDef, DungeonFloor } from '../data/types';
 import type { SaveData } from '../save/types';
 import type { LoadoutSpec } from './loadout';
 import { dungeonThreatFactor, loadoutSpecOf } from './loadout';
+import { tribulationLevelNames, weekOf, weeklyTribulationLevels } from './tribulations';
+
+/** 每週天劫塔的規則字串（資料裡寫的）。開打時換成 `week:週數`。 */
+export const WEEKLY_RULE = 'weekly';
+/** 每週天劫塔。 */
+export const TOWER_ID = 'pagoda';
+
+/**
+ * 換週了就把塔的進度歸零（v24）。開副本列表與結算前都呼叫一次。
+ * 回傳 true 代表存檔有變。
+ */
+export function syncTower(save: SaveData, now: number = Date.now()): boolean {
+  const week = weekOf(now);
+  if (save.player.towerWeek === week) return false;
+  save.player.towerWeek = week;
+  delete save.player.dungeons[TOWER_ID];
+  return true;
+}
+
+/** 副本卡片上的說明：每週天劫塔寫出本週是哪一組。 */
+export function dungeonBlurb(dungeon: DungeonDef, now: number = Date.now()): string {
+  if (!dungeon.rules.includes(WEEKLY_RULE)) return dungeon.desc;
+  return `本週天劫：${tribulationLevelNames(weeklyTribulationLevels(weekOf(now)))}`;
+}
 
 /** 產出符籙的那一個。符籙的解鎖完全由它決定。 */
 export const LIBRARY_ID = 'library';
@@ -174,10 +198,11 @@ export function grantFloor(save: SaveData, dungeon: DungeonDef, index: number): 
  * 和一般關卡走同一個 buildLoadoutFromSpec——副本只是把規則、倍率與深度
  * 填進同一個 spec 裡。兩條路徑若各自組裝，排行榜的重播驗證立刻會對不上。
  */
-export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number): LoadoutSpec {
+export function dungeonSpecOf(save: SaveData, dungeon: DungeonDef, index: number, now: number = Date.now()): LoadoutSpec {
   return {
     ...loadoutSpecOf(save, floorDepth(save, dungeon, index)),
-    rules: [...dungeon.rules],
+    // 每週天劫塔：把「這一週」寫進規則，伺服器重播才算得出同一組天劫。
+    rules: dungeon.rules.map((rule) => (rule === WEEKLY_RULE ? `week:${weekOf(now)}` : rule)),
     goldMultiplier: dungeon.goldMultiplier,
     endless: dungeon.endless,
     // 轉世的加成已經算進 floorDepth 了，這裡要把主線那條關掉，否則同一件事
