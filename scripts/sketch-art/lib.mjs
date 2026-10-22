@@ -12,6 +12,25 @@ export function seedRng(n) {
 export const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 export const J = (a) => (R() * 2 - 1) * a;
 
+/**
+ * 畫風：pencil 彩鉛排線（原本）／marker 麥克筆＋蠟筆（白紙、單筆粗墨線、平塗淡彩略塗出界、沒有鉛筆顆粒）。
+ * 用環境變數 SKETCH_STYLE 切換，或在腳本裡 setStyle()。
+ */
+export let STYLE = process.env.SKETCH_STYLE ?? 'pencil';
+export function setStyle(s) {
+  STYLE = s;
+}
+const marker = () => STYLE === 'marker';
+
+/** 往白色混：麥克筆的淡彩。 */
+export function pastel(hex, k = 0.28) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * k));
+  return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+
 export const INK = '#2a2622';
 export const GRAPH = '#5d5a55';
 export const ZHU = '#c8372d'; // 朱砂
@@ -95,6 +114,7 @@ export class Pic {
   }
   /** 鉛筆顆粒濾鏡，範圍限定在 (x0,y0)–(x1,y1)。同一個範圍共用一個濾鏡。 */
   grain(x0, y0, x1, y1) {
+    if (marker()) return null;
     const r = (v) => Math.round(v);
     x0 = Math.max(0, r(x0) - 2); y0 = Math.max(0, r(y0) - 2);
     x1 = Math.min(this.w, r(x1) + 2); y1 = Math.min(this.h, r(y1) + 2);
@@ -126,6 +146,13 @@ export class Pic {
   ink(pts, { w = 3.2, color = INK, closed = false, amp = 1.2, passes = 2, op = 1 } = {}) {
     w *= this.ls;
     amp *= this.ls;
+    if (marker()) {
+      // 麥克筆：一筆到底、粗一點、筆頭圓；不描第二次。
+      w *= passes > 1 ? 0.95 : 0.9;
+      passes = 1;
+      amp *= 1.8;
+      if (color === INK) color = '#2b2420';
+    }
     for (let p = 0; p < passes; p++) {
       let q = pts.map(([x, y]) => [x + J(amp * 0.8), y + J(amp * 0.8)]);
       if (closed && q.length > 2) q = q.concat([[q[0][0] + J(1.5 * this.ls), q[0][1] + J(1.5 * this.ls)], [q[1][0] + J(1.5 * this.ls), q[1][1] + J(1.5 * this.ls)]]);
@@ -141,6 +168,7 @@ export class Pic {
     const x0 = Math.min(...xs) - 6, x1 = Math.max(...xs) + 6, y0 = Math.min(...ys) - 6, y1 = Math.max(...ys) + 6;
     const L = Math.hypot(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     gap *= this.ls;
+    if (marker()) return this.markerFill(pts, d, id, color, { base, op, angle, x0, x1, y0, y1 });
     if (this.vivid && base > 0) base = Math.min(0.9, base * 1.3 + 0.06);
     // 角色的底色是平塗（不過顆粒濾鏡），排線才帶顆粒：底色過濾鏡會被打成一片雜點，看起來髒。
     if (this.vivid && base > 0) this.add(`<path d="${d}" fill="${color}" opacity="${base}"/>`);
@@ -157,6 +185,32 @@ export class Pic {
     };
     if (op > 0) lines(angle, op);
     if (cross) lines(angle + 1.25, op * 0.55);
+    this.add(g + '</g>');
+  }
+  /**
+   * 麥克筆平塗：整塊淡彩稍微錯位（塗出線外一點），再用剪裁畫幾道寬筆觸，
+   * 筆觸重疊處顏色較深——麥克筆來回塗的痕跡。
+   */
+  markerFill(pts, d, id, color, { base, op, angle, x0, x1, y0, y1 }) {
+    if (base <= 0 && op < 0.3) return;
+    // 深色（頭髮、墨）不能淡掉，不然變成灰灰的半透明
+    const n = parseInt((/^#([0-9a-f]{6})$/i.exec(color) ?? [0, '888888'])[1], 16);
+    const dark = ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) < 70;
+    const col = dark ? pastel(color, 0.12) : pastel(color, this.vivid ? 0.3 : 0.4);
+    const size = Math.min(x1 - x0, y1 - y0);
+    const off = Math.min(4, size * 0.09) * this.ls;
+    const a = Math.max(base, 0.2);
+    const fillOp = dark ? 0.92 : Math.min(0.95, (this.vivid ? 0.62 : 0.45) + a * 0.4);
+    this.add(`<path d="${d}" fill="${col}" opacity="${fillOp.toFixed(2)}" transform="translate(${f1(J(off))},${f1(J(off))})"/>`);
+    const L = Math.hypot(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    const ang = angle * 0.25 + J(0.12), ca = Math.cos(ang), sa = Math.sin(ang);
+    const bw = Math.max(4, Math.min(14, size * 0.28)) * this.ls;
+    let g = `<g clip-path="url(#${id})">`;
+    for (let s = -L / 2; s < L / 2; s += bw * (0.9 + R() * 0.5)) {
+      if (R() < 0.35) continue;
+      const ox = cx - sa * s, oy = cy + ca * s;
+      g += `<path d="M${f1(ox - (ca * L) / 2)},${f1(oy - (sa * L) / 2)}L${f1(ox + (ca * L) / 2 + J(4))},${f1(oy + (sa * L) / 2 + J(4))}" stroke="${color}" stroke-width="${f1(bw)}" opacity="${(0.14 + R() * 0.12).toFixed(2)}" stroke-linecap="round" fill="none"/>`;
+    }
     this.add(g + '</g>');
   }
   /** 填色 + 外框。sharp：直邊（先細分再抖）而不是圓滑曲線。 */
@@ -197,7 +251,7 @@ export class Pic {
     this.defs.push(`<clipPath id="${id}"><text x="${x}" y="${y}" font-family="${font}" font-size="${size}" text-anchor="middle" ${tr}>${s}</text></clipPath>`);
     this.add(`<text x="${x}" y="${y}" font-family="${font}" font-size="${size}" text-anchor="middle" ${tr} fill="none" stroke="${INK}" stroke-width="${stroke}" stroke-linejoin="round" filter="url(#wob)">${s}</text>`);
     let g = `<g clip-path="url(#${id})" ${this.grainOf([[x - size, y - size * 1.1], [x + size, y + size * 0.4]])}><rect x="${x - size}" y="${y - size}" width="${size * 2}" height="${size * 1.4}" fill="${color}" opacity="${fillOp}"/>`;
-    for (let s2 = -size * 2; s2 < size * 2; s2 += 2.6) g += `<line x1="${f1(x - size + s2)}" y1="${f1(y + size * 0.5)}" x2="${f1(x + s2)}" y2="${f1(y - size * 1.1)}" stroke="${color}" stroke-width="${f1(1.4 + R())}" opacity="${(0.6 + R() * 0.4).toFixed(2)}"/>`;
+    if (!marker()) for (let s2 = -size * 2; s2 < size * 2; s2 += 2.6) g += `<line x1="${f1(x - size + s2)}" y1="${f1(y + size * 0.5)}" x2="${f1(x + s2)}" y2="${f1(y - size * 1.1)}" stroke="${color}" stroke-width="${f1(1.4 + R())}" opacity="${(0.6 + R() * 0.4).toFixed(2)}"/>`;
     this.add(g + '</g>');
   }
   /** 粗糙紙片（符紙、便條、按鈕底）。 */
@@ -209,7 +263,7 @@ export class Pic {
     this.open(`rotate(${rot} ${cx} ${cy})`);
     if (shadow) this.add(`<path d="${smooth(sharp.map((p) => [p[0] + 2.5, p[1] + 3]), true)}" fill="#2a2622" opacity=".16"/>`);
     this.add(`<path d="${smooth(sharp, true)}" fill="${fill}"/>`);
-    if (grainTint) this.hatch(sharp, grainTint, { angle: 0.3, gap: 6, w: 0.8, op: 0.25, base: 0 });
+    if (grainTint && !marker()) this.hatch(sharp, grainTint, { angle: 0.3, gap: 6, w: 0.8, op: 0.25, base: 0 });
     if (ow) this.ink(sharp.concat([sharp[0]]), { w: ow, amp: 0.6 });
     this.close();
     return sharp;
@@ -223,7 +277,7 @@ export class Pic {
 ${this.defs.join('\n')}
 </defs>
 ${this.out.join('\n')}
-${paper ? '<rect width="100%" height="100%" filter="url(#paperN)" opacity=".55"/>' : ''}
+${paper ? `<rect width="100%" height="100%" filter="url(#paperN)" opacity="${marker() ? '.25' : '.55'}"/>` : ''}
 </svg>`;
   }
 }
