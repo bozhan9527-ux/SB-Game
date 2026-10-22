@@ -94,6 +94,12 @@ export interface FormationBalance {
 
 /** 一波妖魔的組成與推進速度。 */
 export interface WaveBalance {
+  /**
+   * 前段的血量加成曲線（[關卡, 倍率] 折線，之後恆為最後一點）。v23 加：
+   * 機緣讓前四十關的玩家強了一截，而這段本來就太鬆（血量加倍照樣過），
+   * 只收緊前段、不動後段的指數曲線。
+   */
+  earlyHp: [number, number][];
   wavesPerStage: number;
   /** 下一波開始的間隔。 */
   /**
@@ -931,4 +937,47 @@ export interface TribulationDef {
   drawSpeed: number;
   waveCount: number;
   gold: number;
+  /**
+   * 飛升台上可以選的三重（v23 起）。每一重是一份完整的天劫——
+   * 第 82 關以後依關卡編號自動降下的那一套用的是頂層的數值（等於第一重）。
+   */
+  levels: TribulationLevel[];
+}
+
+/** 天劫的某一重：只寫和頂層不同的欄位，解析時補齊。 */
+export type TribulationLevel = Omit<TribulationDef, 'id' | 'name' | 'levels'>;
+
+/** 機緣的三類：攻（朱）、守（青）、運（金）。三選一至少要有一張不是攻。 */
+export type BlessingCategory = 'attack' | 'guard' | 'fortune';
+
+/**
+ * 機緣：每過一關三選一，本境內有效（見 src/systems/blessings.ts）。
+ *
+ * 效果寫在程式裡、以 id 對應；這裡只放數值與文字。values 依星級排列，
+ * 稀有機緣只有一個值、不升星。
+ */
+export interface BlessingDef {
+  id: string;
+  name: string;
+  category: BlessingCategory;
+  /** 圖示用的符紋（public/art/glyph-*.webp）。 */
+  glyph: string;
+  glyph2: string | null;
+  /** start：一開始就在卡池；karma：要用仙緣解鎖。 */
+  unlock: 'start' | 'karma';
+  /** 解鎖要花的仙緣點。start 的是 0。 */
+  cost: number;
+  /**
+   * 綁定的符：每一組是「任一張」，組與組之間是「都要」。
+   * 例如冰火相激是 [[寒冰, 鎮魔], [烈焰, 焚天, 鎮魔]]：要有會減速的，也要有火系的。
+   */
+  requires: string[][];
+  /** 門派專屬；不限門派為 null。 */
+  sect: string | null;
+  rare: boolean;
+  values: number[];
+  /** 說明文字，{v} 會換成該星級的數值。 */
+  desc: string;
+  /** 數值的寫法：百分比、倍數、秒數，或原樣。 */
+  format: 'percent' | 'times' | 'seconds' | 'plain';
 }

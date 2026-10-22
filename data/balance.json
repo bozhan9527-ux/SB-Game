@@ -49,7 +49,45 @@
     "leakCostBase": 1,
     "leakCostGrowth": 1.02,
     "arenaTierLag": 0,
-    "arenaHpGrowth": 1.12
+    "arenaHpGrowth": 1.12,
+    "earlyHp": [
+      [
+        1,
+        1
+      ],
+      [
+        4,
+        1.15
+      ],
+      [
+        10,
+        1.25
+      ],
+      [
+        20,
+        1.7
+      ],
+      [
+        30,
+        1.45
+      ],
+      [
+        40,
+        1.4
+      ],
+      [
+        50,
+        1.25
+      ],
+      [
+        60,
+        1.05
+      ],
+      [
+        70,
+        1
+      ]
+    ]
   },
   "rebirth": {
     "minStage": 82,

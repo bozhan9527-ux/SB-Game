@@ -94,7 +94,7 @@ describe('上報的配置足以重建同一場戰鬥', () => {
     save.world.highestStage = 139;
     save.player.sectClears['sword'] = 17;
     save.player.karma.spent['karmaPower'] = 3;
-    save.player.karma.spent['karmaGate'] = 2;
+    save.world.tribulations = { heartDemon: 2 };
     save.player.dungeons['library'] = 16;
 
     // 伺服器收到的就是 loadoutFor 的輸出，補上它自己驗出來的關卡。
@@ -103,6 +103,6 @@ describe('上報的配置足以重建同一場戰鬥', () => {
     // 而且這些欄位真的有作用——全等於預設值的話，上面那條比較不算數。
     const bare = buildLoadoutFor(sect('sword'), {}, 26);
     expect(rebuilt.damageMultiplier).toBeGreaterThan(bare.damageMultiplier);
-    expect(rebuilt.disciples).toBeGreaterThan(bare.disciples);
+    expect(rebuilt.mobHpMultiplier).toBeGreaterThan(bare.mobHpMultiplier);
   });
 });

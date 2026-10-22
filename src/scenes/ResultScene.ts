@@ -44,10 +44,15 @@ import {
 } from "../ui/theme";
 import type { RunResultData } from "./types";
 import { fadeIn, fadeToScene } from "../ui/transition";
+import { enterMainline } from "./flow";
+import { consumeRevive, onStageCleared, onStageFailed } from "../systems/realmrun";
+import { mustAscend } from "../systems/karma";
 
 /** 結算畫面：發金幣、推進關卡、顯示是否突破境界。 */
 export class ResultScene extends Phaser.Scene {
   private result!: RunResultData;
+  /** 一境一局的一句話（帶進下一關的耐久、破境、退回重來）。 */
+  private runNote: string | null = null;
   private report: Phaser.GameObjects.Container | null = null;
   private cloudLine: Phaser.GameObjects.Text | undefined;
   /** 這一層發了什麼。空陣列代表不是副本、或是沒過。 */
@@ -90,15 +95,36 @@ export class ResultScene extends Phaser.Scene {
       result.dungeon === null ? null : dungeonById(result.dungeon.id);
     // 奇遇看的是「這一場」的挑戰次數，記帳之後它就往前走了，所以先記下來。
     const runsBefore = save.world.runs;
-    const omens =
-      result.victory && !result.replay && result.dungeon === null
-        ? omenOffer(result.stage, runsBefore)
-        : [];
+    // 關間奇遇讓位給機緣三選一（v23）：兩個三選一疊在同一個結算頁，
+    // 玩家每過一關要連選兩次，第二次只會隨便點。
+    const omens: ReturnType<typeof omenOffer> = [];
     // 副本的一場走另一條記帳：給錢、算次數，但不動主線進度。
     if (result.replay) recordReplay(save);
     else if (result.dungeon !== null) recordDungeonRun(save, gold);
     else if (result.victory) recordClear(save, gold);
     else recordDefeat(save, gold);
+
+    // 一境一局（主線才有）：過關帶耐久、抽下一次三選一；沒過就退回本局第一關。
+    const mainline = !result.replay && result.dungeon === null;
+    this.runNote = null;
+    if (mainline) {
+      if (result.reviveUsed) consumeRevive(save);
+      const blessCount = Object.keys(save.world.realmRun.blessings).length;
+      const startStage = save.world.realmRun.startStage;
+      if (result.victory) {
+        const outcome = onStageCleared(save, result.stage, result.survivors, result.maxDisciples);
+        if (outcome.brokeThrough) {
+          track("realm_run_end", { stage: result.stage, start_stage: startStage, broke_through: true, blessings: blessCount });
+        }
+        this.runNote = outcome.brokeThrough
+          ? '破境！本局結束，下一境重新開局'
+          : `山門 ${outcome.gate ?? result.maxDisciples} / ${result.maxDisciples} 帶進下一關`;
+      } else {
+        track("realm_run_end", { stage: result.stage, start_stage: startStage, broke_through: false, blessings: blessCount });
+        const back = onStageFailed(save);
+        this.runNote = `本局結束：機緣散去，退回第 ${back} 關重新開局`;
+      }
+    }
 
     // 副本的回報在通關時才發，而且發放與顯示走同一份資料——
     // 兩邊各算一次的話，遲早會出現「畫面說給了、存檔裡沒有」。
@@ -189,6 +215,8 @@ export class ResultScene extends Phaser.Scene {
           wrapText(result.diagnosis, GAME_WIDTH - 52, 19),
           textStyle({ size: 19, color: GOLD }),
         )
+        // 這一行落在祥雲帶上，沒有紙色描邊的話字會和雲紋糊在一起。
+        .setStroke("#f5eddb", 6)
         .setOrigin(0.5)
         .setAlign("center")
         .setLineSpacing(6);
@@ -238,6 +266,7 @@ export class ResultScene extends Phaser.Scene {
       ...this.dungeonRewards,
       ...beaten.map((item) => `${item.label} ${item.text}`),
     ];
+    let highlightBottom = panelBottom;
     if (highlights.length > 0) {
       // 項目之間可以換行、項目內部不拆（內部的空白換成不換行空白），最多兩行。
       // 原本硬塞一行再縮，四項一起出現時字會縮到讀不出來；面板與「下一關」之間放得下兩行。
@@ -256,6 +285,7 @@ export class ResultScene extends Phaser.Scene {
       const room = 724 - 14 - (panelBottom + 10);
       if (line.height > room) line.setScale(room / line.height);
       fitText(line, GAME_WIDTH - 40);
+      highlightBottom = line.y + line.displayHeight;
     }
 
     // 副本的一場不推進主線，所以這裡要講的是「這個副本接下來是第幾層」，
@@ -277,15 +307,19 @@ export class ResultScene extends Phaser.Scene {
         result.replay
           ? `重挑第 ${result.stage} 關 · 只計速通榜，不動進度與金幣`
           : dungeon === null
-          ? `下一關：第 ${save.world.stage} 關 · ${realmTitle(save.world.stage)}`
+          ? mustAscend(save)
+            ? '渡劫圓滿 · 即將飛升'
+            : `${this.runNote === null ? '' : `${this.runNote}\n`}下一關：第 ${save.world.stage} 關 · ${realmTitle(save.world.stage)}`
           : dungeon.endless
             ? `${dungeon.name} · 無限波次`
             : upcoming === null
               ? `${dungeon.name} 已全部通過`
               : `${dungeon.name} 第 ${upcoming} 層`,
-        textStyle({ size: 20, color: INK }),
+        textStyle({ size: this.runNote === null ? 20 : 17, color: INK }),
       )
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setAlign("center")
+      .setLineSpacing(4);
 
     createButton(this, cx, 784, {
       width: 340,
@@ -293,9 +327,13 @@ export class ResultScene extends Phaser.Scene {
       label: result.replay
         ? `再挑一次第 ${result.stage} 關`
         : dungeon === null
-          ? result.victory
-            ? "繼續挑戰"
-            : "再戰一次"
+          ? mustAscend(save)
+            ? "渡劫飛升"
+            : result.victory
+              ? save.world.realmRun.offer !== null
+                ? "擇一機緣"
+                : "繼續挑戰"
+              : "重新開局"
           : dungeon.endless
             ? `再入${dungeon.name}`
             : upcoming === null
@@ -309,7 +347,7 @@ export class ResultScene extends Phaser.Scene {
           return;
         }
         if (dungeon === null) {
-          fadeToScene(this, "Run");
+          enterMainline(this);
           return;
         }
         if (upcoming === null) {
@@ -349,7 +387,8 @@ export class ResultScene extends Phaser.Scene {
     // 上榜與百分位都在背景做：玩家剛通關，正在看結算表，
     // 此時跳一個「連不上伺服器」只是掃興。成功才寫一行上去。
     this.cloudLine = this.add
-      .text(cx, panelBottom + 42, "", textStyle({ size: 16, color: INK_DIM }))
+      // 排在紀錄那一行的下面（它可能有兩行），但不能壓到「下一關」那一塊。
+      .text(cx, Math.min(Math.max(panelBottom + 42, highlightBottom + 14), this.runNote === null ? 706 : 694), "", textStyle({ size: 16, color: INK_DIM }))
       .setOrigin(0.5);
     void this.syncLeaderboard(result);
 

@@ -55,9 +55,10 @@ function totalFloors(save: SaveData): number {
   return Object.values(save.player.dungeons).reduce((sum, value) => sum + Math.max(0, value), 0);
 }
 
-/** 仙緣總共買了幾級。轉世之後唯一會一直長的數字。 */
+/** 仙緣總共換了幾項：解鎖的機緣與天劫重數，加上道基永固的等級（v23）。 */
 function karmaLevels(save: SaveData): number {
-  return Object.values(save.player.karma.spent).reduce((sum, value) => sum + Math.max(0, value), 0);
+  const levels = Object.values(save.player.karma.spent).reduce((sum, value) => sum + Math.max(0, value), 0);
+  return levels + save.player.karma.unlocks.length;
 }
 
 export function isUnlocked(save: SaveData, id: string): boolean {
@@ -132,7 +133,7 @@ export function progressOf(save: SaveData, item: Achievement): string {
       return `最低 ${worst} / ${item.value} 階`;
     }
     case 'karmaLevels':
-      return `${karmaLevels(save)} / ${item.value} 級`;
+      return `${karmaLevels(save)} / ${item.value} 項`;
     case 'omens':
       return `${stats.omensTaken} / ${item.value} 次`;
     case 'bossSkills':

@@ -21,6 +21,7 @@ import { drawBackdrop } from '../ui/backdrop';
 import { BG_PANEL, DANGER, GOLD, INK, INK_DIM, JADE, LINE, fitText, formatNumber, hexToNumber, textStyle } from '../ui/theme';
 import { realmForStage } from '../systems/realms';
 import { fadeIn, fadeToScene } from '../ui/transition';
+import { enterMainline } from './flow';
 import { burstPixels, floatLabel } from '../ui/effects';
 import { audio } from '../audio';
 
@@ -99,7 +100,7 @@ export class UpgradeScene extends Phaser.Scene {
       label: '開始挑戰',
       fontSize: 24,
       strokeColor: 0x6f8b7a,
-      onClick: () => fadeToScene(this, save.player.sectId === null ? 'Sect' : 'Run'),
+      onClick: () => enterMainline(this),
     });
 
     this.refresh();

@@ -27,6 +27,8 @@ import type {
 } from '../../src/net/protocol';
 import { CARDS, DUNGEONS, KARMA, SECTS, UPGRADES } from '../../src/data';
 import { ARENA_RULE, buildLoadoutFromSpec } from '../../src/systems/loadout';
+import { sanitizeBlessings } from '../../src/systems/blessings';
+import { sanitizeTribulationLevels } from '../../src/systems/tribulations';
 import { accountOf } from './accounts';
 
 /** 藏經閣總層數，也就是符籙解鎖的上限。 */
@@ -120,6 +122,10 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
   const banked = Number(record['bankedStage'] ?? 0);
   const lives = Number(record['rebirths'] ?? 0);
   // endless 刻意不收：它由榜別決定（見 submitScore），不是客戶端能報的欄位。
+  // 機緣與帶入的山門耐久：一境一局之內前幾關留下來的東西。和升級等級同一類——
+  // 伺服器只能清洗（不認得的 id 丟掉、星級夾到上限），沒辦法確認他真的選過。
+  const gateRaw = record['gate'];
+  const gate = typeof gateRaw === 'number' && Number.isFinite(gateRaw) ? Math.max(1, Math.floor(gateRaw)) : null;
 
   return {
     sectId,
@@ -137,6 +143,9 @@ function sanitizeLoadout(raw: unknown): ScoreLoadout | null {
     goldMultiplier: Number.isFinite(gold) ? Math.max(1, Math.min(MAX_GOLD_MULTIPLIER, gold)) : 1,
     bankedStage: Number.isFinite(banked) ? Math.max(0, Math.min(MAX_BANKED_STAGE, Math.floor(banked))) : 0,
     rebirths: Number.isFinite(lives) ? Math.max(0, Math.min(MAX_REBIRTHS, Math.floor(lives))) : 0,
+    blessings: sanitizeBlessings(record['blessings']),
+    gate,
+    tribulations: sanitizeTribulationLevels(record['tribulations']),
   };
 }
 

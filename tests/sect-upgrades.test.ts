@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE, SECTS, SECT_UPGRADES } from '../src/data';
 import { createDefaultSave } from '../src/save';
 import type { SaveData } from '../src/save/types';
-import { rebirth } from '../src/systems/karma';
+import { ascend } from '../src/systems/karma';
 import { buildLoadout } from '../src/systems/loadout';
 import { loadoutFor } from '../src/systems/leaderboard';
 import {
@@ -103,7 +103,7 @@ describe('門派秘傳', () => {
     const save = saveAt('body', 200, 0);
     save.player.sectDepth['body'] = 12;
     save.player.karma.claimedStage = 0;
-    expect(rebirth(save)).toBe(true);
+    expect(ascend(save)).toBeGreaterThan(0);
     expect(sectUpgradeLevel(save)).toBe(0);
     // 修為是打出來的，不跟著歸零。
     save.player.sectClears['body'] = 5;

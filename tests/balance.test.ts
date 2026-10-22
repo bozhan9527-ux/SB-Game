@@ -25,6 +25,9 @@ import { talismanDefs } from '../src/systems/talismans';
 import { createRng } from '../src/systems/rng';
 import { tribulationsFor } from '../src/systems/tribulations';
 import { trackById, upgradeCost } from '../src/systems/upgrades';
+import { applyBlessings } from '../src/systems/loadout';
+import { rollOffer, takeBlessing } from '../src/systems/blessings';
+import { GATE_RESTORE, RARE_LAYER, endsRun, layerInRun } from '../src/systems/realmrun';
 
 /**
  * 數值平衡的自動驗算。
@@ -622,14 +625,15 @@ describe('副本難度', () => {
    */
   it('轉世之後副本會變深，但每一層仍然過得了', () => {
     const snaps = progressionSnapshots();
-    // 上一世的深度取實測的收斂鏈（見 threatStage 的註解），仙緣照它換點平均分配。
-    const chain = [107, 151, 157];
+    // v23 起打完第 81 關就強制飛升，所以前幾世的深度都是 82；
+    // 證道之後才會往飛升境推得更深（最後一項）。每一世 8 點，深的那段每 6 關多 1 點。
+    const chain = [82, 82, 82, 130];
     const spent: Record<string, number> = {};
     let points = 0;
     chain.forEach((banked, life) => {
-      points = spendKarma(spent, points + 3 + Math.floor(Math.max(0, banked - 82) / 6));
+      points = spendKarma(spent, points + 8 + Math.floor(Math.max(0, banked - 82) / 6));
       const factor = dungeonThreatFactor(banked);
-      expect(factor, `第 ${life + 2} 世的係數`).toBeGreaterThan(1);
+      expect(factor, `第 ${life + 2} 世的係數`).toBeGreaterThanOrEqual(banked > 82 ? 1.0001 : 1);
       for (const dungeon of DUNGEONS) {
         dungeon.floors.forEach((floor, index) => {
           if (floor.stage === undefined) return;
@@ -644,4 +648,96 @@ describe('副本難度', () => {
       }
     });
   }, 120000);
+});
+
+/**
+ * 一境一局（v23）：山門耐久跨關延續、每過一關三選一、被破就退回本局第一關。
+ *
+ * 機器人每秒做一個決定（介於上面兩種之間），機緣照固定的偏好挑。
+ * 兩件事要守住：主線打得完（硬派不能變成卡死），以及前四十關不能再鬆回去——
+ * 改版前那一段血量加倍照樣過，那正是「玩半小時就膩」的原因之一。
+ */
+describe('一境一局與機緣', () => {
+  const PREFER = ['guardian', 'goldenBell', 'concord', 'insight', 'formationEye', 'zhuxie', 'swordFlow', 'quickDraw', 'revive', 'trinity', 'coldPool', 'outpost', 'fanReturn', 'thunderCharge', 'swordIntent'];
+  const choose = (ids: string[]): string => [...ids].sort((a, b) => PREFER.indexOf(a) - PREFER.indexOf(b))[0] ?? ids[0] ?? '';
+
+  function stageRun(stage: number, upgrades: Record<string, number>, seed: number, bless: Record<string, number>, gate: number | null, hpMul = 1) {
+    const sect = SECTS.find((s) => s.id === 'sword');
+    if (sect === undefined) throw new Error('sword');
+    const rng = createRng(seed);
+    const loadout = buildLoadoutFor(sect, upgrades, stage);
+    applyBlessings(loadout, bless);
+    loadout.startDisciples = gate;
+    loadout.mobHpMultiplier *= hpMul;
+    const state = createDefenseState(loadout, rng);
+    let since = 0;
+    const hardLimit = BALANCE.wave.wavesPerStage * BALANCE.wave.waveIntervalMs + BALANCE.boss.timeLimitMs + 40000;
+    while (state.outcome === 'running' && state.elapsedMs < hardLimit) {
+      tickCombat(state, TICK_MS, rng);
+      since += TICK_MS;
+      while (since >= 1000) {
+        since -= 1000;
+        playOneAction(state, rng);
+      }
+    }
+    const victory = state.outcome === 'cleared';
+    return {
+      victory,
+      survivors: state.disciples,
+      max: state.maxDisciples,
+      revived: state.blessState.reviveUsed,
+      gold: Math.round(state.gold) + (victory ? clearReward(state) : defeatReward(state)),
+    };
+  }
+
+  it('主線 81 關打得完；前四十關的餘裕收在兩倍以內', () => {
+    const levels: Record<string, number> = {};
+    let gold = 0;
+    let runs = 0;
+    let stage = 1;
+    let start = 1;
+    let gate: number | null = null;
+    let bless: Record<string, number> = {};
+    const headroom = new Map<number, number>();
+    while (stage <= 81 && runs < 400) {
+      const o = stageRun(stage, levels, stage * 7919 + runs * 104729, bless, gate);
+      runs += 1;
+      gold = spendGold(levels, gold + o.gold);
+      if (o.revived) delete bless['revive'];
+      if (!o.victory) {
+        stage = start;
+        gate = null;
+        bless = {};
+        continue;
+      }
+      if ([10, 20, 30, 40].includes(stage)) {
+        let k = 1;
+        for (const m of [1.2, 1.4, 1.7, 2, 2.5]) {
+          const wins = [0, 1, 2].filter((i) => stageRun(stage, levels, 31 + i, bless, gate, m).victory).length;
+          if (wins < 2) break;
+          k = m;
+        }
+        headroom.set(stage, k);
+      }
+      if (endsRun(stage)) {
+        stage += 1;
+        start = stage;
+        gate = null;
+        bless = {};
+        continue;
+      }
+      const restored = Math.min(o.max, Math.max(1, o.survivors) + Math.ceil(o.max * GATE_RESTORE));
+      gate = restored >= o.max ? null : restored;
+      const rare = layerInRun(stage) === RARE_LAYER;
+      const ctx = { owned: bless, unlocked: [], sectId: 'sword', talismans: ['sword', 'bolt', 'fan', 'flame'], rare };
+      let ids = rollOffer(ctx, createRng(stage * 31 + runs));
+      if (ids.length === 0) ids = rollOffer({ ...ctx, rare: false }, createRng(stage * 31 + runs));
+      if (ids.length > 0) bless = takeBlessing(bless, choose(ids));
+      stage += 1;
+    }
+    expect(stage, `卡在第 ${stage} 關（${runs} 場）`).toBe(82);
+    for (const [at, k] of headroom) {
+      expect(k, `第 ${at} 關血量放大 ${k} 倍仍過`).toBeLessThanOrEqual(2);
+    }
+  }, 600000);
 });

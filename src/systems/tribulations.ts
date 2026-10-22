@@ -36,7 +36,51 @@ export function tribulationsFor(stage: number): TribulationDef[] {
   return picked;
 }
 
+/**
+ * 飛升台上選的天劫（v23）：天劫 id → 第幾重，換算成實際生效的那一份。
+ *
+ * 金幣倍率一律拿掉：自己背的天劫，獎勵是飛升時的仙緣倍率，不是這一關多賺。
+ * 少了這一條，背滿七劫的人每一關金幣會乘上 1.3 的七次方。
+ */
+export function chosenTribulations(levels: Readonly<Record<string, number>>): TribulationDef[] {
+  const out: TribulationDef[] = [];
+  for (const def of TRIBULATIONS) {
+    const level = Math.max(0, Math.min(3, Math.floor(levels[def.id] ?? 0)));
+    if (level <= 0) continue;
+    const at = def.levels[level - 1];
+    if (at === undefined) continue;
+    out.push({ ...def, ...at, gold: 1 });
+  }
+  return out;
+}
+
+/**
+ * 一關實際生效的天劫：自己背的，加上第 82 關以後依關卡降下的。
+ * 同一種天劫兩邊都有時取自己背的那一份（通常比較重）。
+ */
+export function tribulationsForRun(stage: number, levels: Readonly<Record<string, number>>): TribulationDef[] {
+  const chosen = chosenTribulations(levels);
+  const extra = tribulationsFor(stage).filter((item) => !chosen.some((c) => c.id === item.id));
+  return [...chosen, ...extra];
+}
+
 /** 「雷劫・心魔劫」。 */
 export function tribulationNames(list: readonly TribulationDef[]): string {
   return list.map((item) => item.name).join('・');
+}
+
+/**
+ * 上報或存檔讀進來的天劫表：不認得的 id 丟掉、重數夾在 1–3。
+ * 天劫只會讓一場更難，所以伺服器不必擔心有人多報——要擋的是格式錯誤。
+ */
+export function sanitizeTribulationLevels(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
+  for (const def of TRIBULATIONS) {
+    const value = (raw as Record<string, unknown>)[def.id];
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    const level = Math.max(0, Math.min(3, Math.floor(value)));
+    if (level > 0) out[def.id] = level;
+  }
+  return out;
 }

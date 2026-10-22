@@ -58,7 +58,7 @@
   {
     "id": "ascend",
     "name": "破碎虛空",
-    "desc": "抵達飛升境",
+    "desc": "渡劫飛升",
     "kind": "stage",
     "value": 82,
     "reward": 40000000
@@ -138,7 +138,7 @@
   {
     "id": "rebirth_1",
     "name": "一世輪迴",
-    "desc": "轉世重修一次",
+    "desc": "飛升一次",
     "kind": "rebirths",
     "value": 1,
     "reward": 100000
@@ -146,7 +146,7 @@
   {
     "id": "rebirth_3",
     "name": "三世輪迴",
-    "desc": "轉世重修三次",
+    "desc": "飛升三次",
     "kind": "rebirths",
     "value": 3,
     "reward": 2000000
@@ -194,7 +194,7 @@
   {
     "id": "karma_20",
     "name": "夙願已償",
-    "desc": "仙緣累計買到二十級",
+    "desc": "仙緣累計解鎖二十項",
     "kind": "karmaLevels",
     "value": 20,
     "reward": 800000
@@ -202,15 +202,15 @@
   {
     "id": "karma_50",
     "name": "宿慧盡通",
-    "desc": "仙緣累計買到五十級",
+    "desc": "仙緣累計解鎖四十項",
     "kind": "karmaLevels",
-    "value": 50,
+    "value": 40,
     "reward": 12000000
   },
   {
     "id": "rebirth_5",
     "name": "五世輪迴",
-    "desc": "轉世五次",
+    "desc": "飛升五次",
     "kind": "rebirths",
     "value": 5,
     "reward": 20000000
@@ -234,7 +234,7 @@
   {
     "id": "omen_1",
     "name": "福緣初現",
-    "desc": "選擇一次關間奇遇",
+    "desc": "選擇一次機緣",
     "kind": "omens",
     "value": 1,
     "reward": 300
@@ -242,7 +242,7 @@
   {
     "id": "omen_10",
     "name": "機緣不斷",
-    "desc": "選擇十次關間奇遇",
+    "desc": "選擇十次機緣",
     "kind": "omens",
     "value": 10,
     "reward": 60000

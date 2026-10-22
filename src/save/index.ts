@@ -8,7 +8,11 @@ import { trackById, upgradeCost } from '../systems/upgrades';
 import type { Storage } from './storage';
 import { defaultStorage } from './storage';
 import { migrate } from './migrations';
-import type { CloudIdentity, DistributionCache, KarmaState, PendingOmen, RecordsState, SaveData } from './types';
+import type { CloudIdentity, DistributionCache, KarmaState, PendingOmen, RealmRunState, RecordsState, SaveData } from './types';
+import { blessingDef, sanitizeBlessings } from '../systems/blessings';
+import { freshRealmRun, sanitizeRealmRun } from '../systems/realmrun';
+import { sanitizeTribulationLevels } from '../systems/tribulations';
+import { unlockCost } from '../systems/karma';
 import { SAVE_KEY, SAVE_VERSION } from './types';
 
 export function createDefaultSave(now: number = Date.now()): SaveData {
@@ -32,7 +36,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
       omen: null,
       challenges: [],
       challengesDone: [],
-      karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0 },
+      karma: { rebirths: 0, points: 0, spent: {}, claimedStage: 0, unlocks: [], dao: false, bestHeaven: 0 },
       cloud: null,
       account: null,
       name: '',
@@ -55,7 +59,7 @@ export function createDefaultSave(now: number = Date.now()): SaveData {
         maxTribulations: 0,
       },
     },
-    world: { stage: 1, highestStage: 1, runs: 0, clears: 0},
+    world: { stage: 1, highestStage: 1, runs: 0, clears: 0, realmRun: freshRealmRun(1), tribulations: {} },
     settings: { sound: true, speed: 1, telemetry: true, sfxVolume: 1, musicVolume: 1 },
   };
 }
@@ -107,7 +111,32 @@ function normalizeKarma(raw: unknown): KarmaState {
     points: Math.max(0, Math.floor(asNumber(source['points'], 0))),
     spent,
     claimedStage: Math.max(0, Math.floor(asNumber(source['claimedStage'], 0))),
+    unlocks: Array.isArray(source['unlocks'])
+      ? [...new Set((source['unlocks'] as unknown[]).filter((key): key is string => typeof key === 'string' && unlockCost(key) !== null))]
+      : [],
+    dao: source['dao'] === true,
+    bestHeaven: Math.max(0, Math.min(9, Math.floor(asNumber(source['bestHeaven'], 0)))),
   };
+}
+
+/** 一境一局：壞掉的欄位一律退回「從這一關開新的一局」。 */
+function normalizeRealmRun(raw: unknown, stage: number): RealmRunState {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const offerRaw = source['offer'] as Record<string, unknown> | null | undefined;
+  const ids = offerRaw !== null && typeof offerRaw === 'object' && Array.isArray(offerRaw['ids'])
+    ? (offerRaw['ids'] as unknown[]).filter((id): id is string => typeof id === 'string' && blessingDef(id) !== null)
+    : [];
+  const gate = asNumber(source['gate'], -1);
+  return sanitizeRealmRun(
+    {
+      startStage: Math.max(1, Math.floor(asNumber(source['startStage'], stage))),
+      gate: gate >= 1 ? Math.floor(gate) : null,
+      blessings: sanitizeBlessings(source['blessings']),
+      offer: ids.length > 0 ? { ids, rare: offerRaw?.['rare'] === true } : null,
+      rerolls: Math.max(0, Math.floor(asNumber(source['rerolls'], 0))),
+    },
+    stage,
+  );
 }
 
 /** 紀錄一律夾成非負數：負的最佳紀錄會讓「破紀錄」的判定永遠成立。 */
@@ -264,6 +293,8 @@ function normalize(raw: Record<string, unknown>, now: number): SaveData {
       highestStage,
       runs: Math.max(0, Math.floor(asNumber(world['runs'], 0))),
       clears: Math.max(0, Math.floor(asNumber(world['clears'], 0))),
+      realmRun: normalizeRealmRun(world['realmRun'], stage),
+      tribulations: sanitizeTribulationLevels(world['tribulations']),
     },
     settings: {
       sound: settings['sound'] !== false,

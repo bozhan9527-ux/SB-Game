@@ -106,6 +106,7 @@ import type { RunEntryData, RunResultData } from "./types";
 import type { ScoreLoadout } from "../net/protocol";
 import { fadeIn, fadeToScene } from "../ui/transition";
 import { platform } from "../platform";
+import { blessingDef, effectiveStars } from "../systems/blessings";
 
 /** 妖魔的行進區間。上緣是妖魔出場處，下緣就是山門。 */
 const ARENA_TOP = 116;
@@ -476,6 +477,11 @@ export class RunScene extends Phaser.Scene {
       save.player.omen = null;
       persist();
     }
+    // 一境一局：主線帶著本局的機緣與上一關剩下的山門耐久開打。
+    // 副本與重挑不吃（它們不屬於任何一局），組裝那一側也會再擋一次。
+    if (dungeon === null && this.replayStage === null) {
+      spec = { ...spec, blessings: { ...save.world.realmRun.blessings }, gate: save.world.realmRun.gate };
+    }
     const stage = spec.stage;
     const loadout = buildLoadoutFromSpec(spec);
     // **配置在這裡就記下來，和種子同一個理由。**
@@ -801,6 +807,28 @@ export class RunScene extends Phaser.Scene {
       this.endlessBanner = dungeon.endless
         ? (waves: number): string => `${dungeon.name} 第 ${waves} 波　${dungeon.desc}`
         : null;
+    }
+
+    // 一境一局：本局的機緣常駐一行，和副本那一行同一個位置（兩者不會同時出現）。
+    const blessings = Object.entries(this.run.loadout.blessings);
+    if (dungeon === null && blessings.length > 0) {
+      this.add
+        .rectangle(GAME_WIDTH / 2, 124, GAME_WIDTH, 21, BG_PANEL, 1)
+        .setStrokeStyle(3, EDGE)
+        .setDepth(52);
+      const names = blessings
+        .map(([id, stars]) => {
+          const def = blessingDef(id);
+          if (def === null) return '';
+          return def.rare ? def.name : `${def.name}${'★'.repeat(effectiveStars(this.run.loadout.blessings, id) || stars)}`;
+        })
+        .filter((name) => name.length > 0)
+        .join('・');
+      const line = this.add
+        .text(20, 125, `機緣　${names}`, textStyle({ size: 15, color: GOLD, bold: true }))
+        .setOrigin(0, 0.5)
+        .setDepth(53);
+      fitText(line, GAME_WIDTH - 40);
     }
 
     this.add
@@ -1968,6 +1996,16 @@ export class RunScene extends Phaser.Scene {
     }
     if (report.bossSkill !== null) this.announceBossSkill(report);
     if (report.tribulation !== null) this.announceTribulation(report);
+    if (report.revived) {
+      this.banner("notice", "九轉還魂！山門回滿", "#5aa77a", 1600);
+      audio.play("breakthrough");
+    }
+    if (report.volley) this.banner("notice", "誅邪！最高階的符連發迎敵", "#c8372d", 1100);
+    if (report.upgraded !== null) {
+      const view = this.fieldViews[report.upgraded];
+      if (view !== undefined) this.burst(view.container.x, view.container.y, "#e3b54a", 10, 1);
+      this.refreshCards();
+    }
     if (report.drawnSlot !== null) {
       this.refreshCards();
       this.pulseHand(report.drawnSlot);
@@ -3237,6 +3275,7 @@ export class RunScene extends Phaser.Scene {
       tribulations: this.run.loadout.tribulations.length,
       survivors: Math.max(0, this.run.disciples),
       maxDisciples: this.run.maxDisciples,
+      reviveUsed: this.run.blessState.reviveUsed,
       leaks: this.run.leaks,
       kills: this.run.kills,
       peakTier: this.run.peakTier,

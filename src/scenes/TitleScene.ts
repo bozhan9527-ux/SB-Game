@@ -1,5 +1,5 @@
 import { omenById, omenSummary } from '../systems/omens';
-import { tribulationNames, tribulationsFor } from '../systems/tribulations';
+import { tribulationNames, tribulationsForRun } from '../systems/tribulations';
 import Phaser from 'phaser';
 import { pixelPanel } from '../ui/panel';
 import { libraryFloor } from '../systems/dungeons';
@@ -12,7 +12,9 @@ import { storageUnavailable } from '../save/storage';
 import type { SaveData } from '../save/types';
 import { sectById } from '../systems/loadout';
 import { talismanDefs } from '../systems/talismans';
-import { canRebirth } from '../systems/karma';
+import { canAscend, heavenName, heavenOf, jieCount, mustAscend } from '../systems/karma';
+import { layerInRun } from '../systems/realmrun';
+import { enterMainline } from './flow';
 import { detectAchievements, pendingAchievements } from '../systems/achievements';
 import { cloudEnabled } from '../net/client';
 import { nextRealmName, realmForStage, realmIndexForStage, realmTitle } from '../systems/realms';
@@ -84,12 +86,12 @@ export class TitleScene extends Phaser.Scene {
     createButton(this, cx, y, {
       width: 356,
       height: 72,
-      label: hasSect ? '開始挑戰' : '選擇門派',
+      label: !hasSect ? '選擇門派' : mustAscend(save) ? '渡劫飛升' : '開始挑戰',
       fontSize: 30,
       fillColor: hexToNumber(GOLD),
       strokeColor: hexToNumber(GOLD),
       textColor: '#12181f',
-      onClick: () => fadeToScene(this, hasSect ? 'Run' : 'Sect'),
+      onClick: () => enterMainline(this),
     });
 
     // 洞府與符籙譜並排：兩個都是「進場前整備」，同一層級，省下一整排給主視覺。
@@ -189,12 +191,13 @@ export class TitleScene extends Phaser.Scene {
     const karma = save.player.karma;
     // 輪迴只在「推得夠深」或「已經轉過世」之後才出現在畫面上。
     // 提前露出只會讓還在第 5 關的新玩家困惑——他離那件事還有八十關。
-    const showRebirth = canRebirth(save) || karma.rebirths > 0;
+    const showRebirth = canAscend(save) || karma.rebirths > 0 || karma.points > 0;
     if (showRebirth) {
+      const heaven = heavenOf(jieCount(save.world.tribulations));
       createButton(this, 76, 36, {
         width: 124,
         height: 44,
-        label: karma.rebirths > 0 ? `輪迴 · 第 ${karma.rebirths + 1} 世` : '輪迴',
+        label: karma.rebirths > 0 ? `第 ${karma.rebirths + 1} 世 · ${heavenName(heaven)}` : '仙緣',
         fontSize: 16,
         textColor: GOLD,
         onClick: () => fadeToScene(this, 'Rebirth'),
@@ -272,7 +275,9 @@ export class TitleScene extends Phaser.Scene {
     const toBreak = realm.stageTo - save.world.stage + 1;
     // 帶著奇遇時這一行讓給它：奇遇只管下一場，這時候它比「還差幾關突破」急。
     // 飛升境的天劫也寫在這裡：進場前就知道這一關多了什麼，才有機會換符。
-    const tribulations = tribulationsFor(save.world.stage);
+    const tribulations = tribulationsForRun(save.world.stage, save.world.tribulations);
+    const run = save.world.realmRun;
+    const blessCount = Object.keys(run.blessings).length;
     const pending = save.player.omen;
     const omen =
       pending !== null && pending.stage === save.world.stage && pending.runs === save.world.runs
@@ -288,6 +293,8 @@ export class TitleScene extends Phaser.Scene {
             ? `奇遇「${omen.name}」　${omenSummary(omen)}`
             : tribulations.length > 0
               ? `本關天劫：${tribulationNames(tribulations)}`
+              : blessCount > 0 || run.gate !== null
+                ? `本局第 ${layerInRun(save.world.stage)} 關・已得機緣 ${blessCount} 張`
               : toBreak > 900
                 ? '已至無盡飛升境'
                 : `再過 ${toBreak} 關可突破至 ${nextRealmName(save.world.stage)}`,

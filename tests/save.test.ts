@@ -366,7 +366,8 @@ describe('近幾版的遷移', () => {
     save.player.karma.points = 31;
     save.player.karma.rebirths = 2;
     save.player.karma.claimedStage = 152;
-    save.player.karma.spent = { karmaPower: 9, karmaGold: 4, karmaGate: 6, karmaTier: 3 };
+    // v23 起舊制四條仙緣線會被退點（見 karma.test 的遷移測試），這裡只留新制的那一條。
+    save.player.karma.spent = {};
     save.player.sectClears = { sword: 88, body: 12 };
     save.player.dungeons = { library: 11, pagoda: 3 };
     save.player.talismans = ['sword', 'frost', 'pyre', 'soul'];

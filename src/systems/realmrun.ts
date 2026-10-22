@@ -1,0 +1,161 @@
+/**
+ * 一境一局：一個境界（九關）是一局。
+ *
+ * 規則（製作人選的是硬派版，見 ROGUELITE_DESIGN.md）：
+ * - 每過一關三選一一張機緣，本局內有效；第五關給稀有三選一。
+ * - **山門耐久跨關延續**，過關回三成上限。前面打得好不好，一路影響到境底首領。
+ * - 山門被破（或首領逾時、半途收兵）：本局結束，退回本局第一關，機緣清空。
+ * - 打完境底首領就是破境：記錄點，下一境重新開局。
+ *
+ * 為什麼要這樣：原本每關滿血開打，前四十關血量加倍照樣過、山門不掉血——
+ * 頭一個小時沒有任何懸念。耐久延續之後，每一隻漏掉的妖魔都會跟著你走。
+ *
+ * 本檔不 import Phaser，全部是純函式。
+ */
+import { REALMS } from '../data';
+import type { RealmRunState, SaveData } from '../save/types';
+import type { OfferContext } from './blessings';
+import { offerPool, offerSize, rollOffer, takeBlessing } from './blessings';
+import { realmForStage } from './realms';
+import { createRng } from './rng';
+import { talismanDefs } from './talismans';
+
+/** 過關回復的耐久（上限的比例）。 */
+export const GATE_RESTORE = 0.3;
+/** 每一局免費重抽幾次。 */
+export const FREE_REREOLLS = 1;
+/** 第幾關（境內第幾層）給稀有三選一。 */
+export const RARE_LAYER = 5;
+/** 一局幾關。飛升境沒有盡頭，照這個長度切段。 */
+export const RUN_LENGTH = 9;
+
+export function freshRealmRun(startStage: number): RealmRunState {
+  return { startStage: Math.max(1, Math.floor(startStage)), gate: null, blessings: {}, offer: null, rerolls: 0 };
+}
+
+/** 主線最後一個有盡頭的境界在哪一關結束（81）。之後是飛升境。 */
+export function lastFiniteStage(): number {
+  const finite = REALMS.slice(0, -1);
+  return finite[finite.length - 1]?.stageTo ?? 81;
+}
+
+/** 這一關在本局裡是第幾層（1 起算）。 */
+export function layerInRun(stage: number): number {
+  const realm = realmForStage(stage);
+  const offset = stage - realm.stageFrom;
+  return (offset % RUN_LENGTH) + 1;
+}
+
+/** 這一關打完是不是破境。 */
+export function endsRun(stage: number): boolean {
+  const realm = realmForStage(stage);
+  if (stage >= realm.stageTo) return true;
+  return layerInRun(stage) === RUN_LENGTH;
+}
+
+/** 本局這一關開打時的起點（給第一次進入、或舊存檔用）。 */
+export function runStartFor(stage: number): number {
+  return stage - (layerInRun(stage) - 1);
+}
+
+/** 三選一的候選條件，從存檔攤出來。 */
+export function offerContextOf(save: SaveData, rare: boolean): OfferContext {
+  const pool = talismanDefs(save.player.talismans, save.player.dungeons['library'] ?? 0);
+  return {
+    owned: save.world.realmRun.blessings,
+    unlocked: save.player.karma.unlocks,
+    sectId: save.player.sectId ?? '',
+    talismans: pool.map((def) => def.id),
+    rare,
+  };
+}
+
+/**
+ * 這一次三選一的種子：關卡、挑戰次數與重抽次數。
+ * 存檔裡存的是抽好的結果，所以離開再回來看到的是同一組——重抽要花次數。
+ */
+function offerRng(save: SaveData) {
+  const seed = (save.world.stage * 92821) ^ (save.world.runs * 6271) ^ (save.world.realmRun.rerolls * 131) ^ 0x5eed;
+  return createRng(seed >>> 0);
+}
+
+function rollFor(save: SaveData, rare: boolean): { ids: string[]; rare: boolean } | null {
+  const run = save.world.realmRun;
+  let ctx = offerContextOf(save, rare);
+  // 稀有卡池抽完了（全都拿過）就退回一般三選一，不要讓那一關什麼都沒有。
+  if (rare && offerPool(ctx).length === 0) ctx = offerContextOf(save, false);
+  const ids = rollOffer(ctx, offerRng(save), offerSize(run.blessings));
+  return ids.length === 0 ? null : { ids, rare: ctx.rare };
+}
+
+export interface ClearOutcome {
+  /** 打完的是境底首領：本局結束、下一境重新開局。 */
+  brokeThrough: boolean;
+  /** 帶進下一關的耐久（破境時為 null，滿血）。 */
+  gate: number | null;
+}
+
+/**
+ * 主線過了一關。要在 recordClear 之後呼叫（world.stage 已經是下一關）。
+ *
+ * survivors 是這一關結束時的山門耐久，maxDisciples 是上限。
+ */
+export function onStageCleared(save: SaveData, clearedStage: number, survivors: number, maxDisciples: number): ClearOutcome {
+  if (endsRun(clearedStage)) {
+    save.world.realmRun = freshRealmRun(save.world.stage);
+    return { brokeThrough: true, gate: null };
+  }
+  const run = save.world.realmRun;
+  const restored = Math.min(maxDisciples, Math.max(1, Math.round(survivors)) + Math.ceil(maxDisciples * GATE_RESTORE));
+  run.gate = restored >= maxDisciples ? null : restored;
+  run.offer = rollFor(save, layerInRun(clearedStage) === RARE_LAYER);
+  return { brokeThrough: false, gate: run.gate };
+}
+
+/**
+ * 主線這一關沒過（山門被破、首領逾時、半途收兵）：本局結束，退回本局第一關。
+ * 回傳退回的關卡。
+ */
+export function onStageFailed(save: SaveData): number {
+  const start = Math.min(save.world.realmRun.startStage, save.world.stage);
+  save.world.stage = start;
+  save.world.realmRun = freshRealmRun(start);
+  return start;
+}
+
+/** 選一張。不在這次候選裡的 id 一律不收。 */
+export function pickBlessing(save: SaveData, id: string): boolean {
+  const run = save.world.realmRun;
+  if (run.offer === null || !run.offer.ids.includes(id)) return false;
+  run.blessings = takeBlessing(run.blessings, id);
+  run.offer = null;
+  // 舊的「關間奇遇」成就沿用這個計數：機緣取代了奇遇，選機緣就是那件事。
+  save.player.stats.omensTaken += 1;
+  return true;
+}
+
+export function rerollsLeft(save: SaveData): number {
+  return Math.max(0, FREE_REREOLLS - save.world.realmRun.rerolls);
+}
+
+/** 重抽這一次的候選。免費次數用完就不行（之後可以接激勵廣告）。 */
+export function rerollOffer(save: SaveData): boolean {
+  const run = save.world.realmRun;
+  if (run.offer === null || rerollsLeft(save) <= 0) return false;
+  run.rerolls += 1;
+  run.offer = rollFor(save, run.offer.rare);
+  return true;
+}
+
+/** 九轉還魂在這一關用掉了：從本局的機緣表拿掉。 */
+export function consumeRevive(save: SaveData): void {
+  const { revive: _used, ...rest } = save.world.realmRun.blessings;
+  save.world.realmRun.blessings = rest;
+}
+
+/** 讀檔時修補：起點不能在目前關卡之後、也不能跨到別的境界。 */
+export function sanitizeRealmRun(run: RealmRunState, stage: number): RealmRunState {
+  const floor = runStartFor(stage);
+  if (run.startStage > stage || run.startStage < floor) return { ...run, startStage: stage };
+  return run;
+}

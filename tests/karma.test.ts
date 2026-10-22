@@ -1,26 +1,36 @@
 /**
- * 輪迴轉世與仙緣。
+ * 強制飛升、天劫與仙緣（v23）。
  *
- * 三條規矩守在這裡，缺一條這個系統就會壞掉：
- * 只有更深才給點、解鎖不跟著歸零、仙緣只給乘區。
+ * 守的規矩：打完第 81 關一定飛升；背的天劫越多仙緣越多；仙緣拿來解鎖、
+ * 不再把主線輾平；飛升台只能在一世開頭改。
  */
 import { describe, expect, it } from 'vitest';
-import { BALANCE, KARMA, UPGRADES } from '../src/data';
+import { KARMA, TRIBULATIONS, UPGRADES } from '../src/data';
 import { createDefaultSave } from '../src/save';
+import { migrate } from '../src/save/migrations';
 import type { SaveData } from '../src/save/types';
 import { buildLoadout } from '../src/systems/loadout';
 import {
+  ASCEND_BASE_POINTS,
+  ascend,
+  ascensionGain,
   buyKarma,
-  canRebirth,
+  canAscend,
+  heavenOf,
+  jieCount,
   karmaCost,
-  karmaPointsFor,
   karmaTrackById,
-  pendingKarma,
-  rebirth,
+  legacyKarmaRefund,
+  mustAscend,
+  setTribulation,
+  tribKey,
+  tribLevelOpen,
+  unlock,
 } from '../src/systems/karma';
+import { offerPool } from '../src/systems/blessings';
 import { unlockedTalismans } from '../src/systems/talismans';
 
-function deep(stage = 100): SaveData {
+function at(stage: number): SaveData {
   const save = createDefaultSave(1);
   save.player.sectId = 'body';
   save.world.stage = stage;
@@ -30,107 +40,134 @@ function deep(stage = 100): SaveData {
   return save;
 }
 
-describe('仙緣點', () => {
-  it('沒到門檻一點都沒有', () => {
-    const { minStage } = BALANCE.rebirth;
-    expect(karmaPointsFor(minStage - 1)).toBe(0);
-    expect(karmaPointsFor(minStage)).toBe(1);
-    expect(canRebirth(deep(minStage - 1))).toBe(false);
+describe('強制飛升', () => {
+  it('打完第 81 關之前不能飛升；打完就一定要飛升', () => {
+    expect(canAscend(at(81))).toBe(false);
+    expect(mustAscend(at(82))).toBe(true);
+    expect(ascend(at(60))).toBe(0);
   });
 
-  it('越深越多點', () => {
-    const { minStage, stagesPerPoint } = BALANCE.rebirth;
-    expect(karmaPointsFor(minStage + stagesPerPoint)).toBe(2);
-    expect(karmaPointsFor(minStage + stagesPerPoint * 5)).toBe(6);
+  it('證道之後不再強制，可以往飛升境走', () => {
+    const save = at(82);
+    save.player.karma.dao = true;
+    expect(mustAscend(save)).toBe(false);
+    expect(canAscend(save)).toBe(true);
   });
 
-  it('同一段進度不會重複換點', () => {
-    // 沒有這條，轉世就從一個決定退化成一個必須重複執行的動作。
-    const save = deep(120);
-    const first = pendingKarma(save);
-    expect(rebirth(save)).toBe(true);
-    expect(save.player.karma.points).toBe(first);
-    // 沒有推得更深就再轉一次：一點都拿不到，而且轉不成。
-    expect(pendingKarma(save)).toBe(0);
-    expect(rebirth(save)).toBe(false);
-    expect(save.player.karma.points).toBe(first);
-
-    // 推得更深之後只補「新增的那一段」。
-    save.world.highestStage = 150;
-    expect(pendingKarma(save)).toBe(karmaPointsFor(150) - karmaPointsFor(120));
-  });
-});
-
-describe('轉世', () => {
   it('歸零這一世的資源，留下跨世的東西', () => {
-    const save = deep(120);
-    save.player.sectClears = { body: 30 };
-    save.player.achievements = ['first_clear'];
-    save.player.challengesDone = ['noMerge'];
-    save.player.records.bestDps = 5000;
-    rebirth(save);
-
-    expect(save.world.stage).toBe(1);
-    expect(save.player.wallet.gold).toBe(0);
-    expect(Object.values(save.player.upgrades).every((level) => level === 0)).toBe(true);
-
-    expect(save.player.sectId).toBe('body');
-    expect(save.player.sectClears['body']).toBe(30);
-    expect(save.player.achievements).toContain('first_clear');
-    expect(save.player.challengesDone).toContain('noMerge');
-    expect(save.player.records.bestDps).toBe(5000);
+    const save = at(82);
+    save.player.dungeons = { library: 6 };
+    save.world.realmRun.blessings = { guardian: 2 };
+    const highest = save.world.highestStage;
+    const gained = ascend(save);
+    expect(gained).toBe(ASCEND_BASE_POINTS);
+    expect(save.player.karma.points).toBe(gained);
     expect(save.player.karma.rebirths).toBe(1);
+    expect(save.world.stage).toBe(1);
+    expect(save.world.highestStage).toBe(highest);
+    expect(save.player.wallet.gold).toBe(0);
+    for (const track of UPGRADES) expect(save.player.upgrades[track.id]).toBe(0);
+    expect(save.player.dungeons).toEqual({});
+    expect(save.world.realmRun.blessings).toEqual({});
   });
 
-  it('符籙解鎖不跟著歸零', () => {
-    // 收回玩家已經打出來的選擇，只會讓人不敢轉世。
-    const save = deep(120);
-    const before = unlockedTalismans(save.world.highestStage).length;
-    rebirth(save);
-    expect(unlockedTalismans(save.world.highestStage)).toHaveLength(before);
-    expect(save.world.highestStage).toBe(120);
+  it('符籙選擇不跟著歸零', () => {
+    const save = at(82);
+    const before = unlockedTalismans(9).length;
+    ascend(save);
+    expect(unlockedTalismans(9).length).toBe(before);
+    expect(save.player.talismans.length).toBeGreaterThan(0);
   });
 });
 
-describe('仙緣線', () => {
-  it('買到滿級就買不動了，點數不夠也買不動', () => {
-    const save = deep(120);
-    rebirth(save);
-    save.player.karma.points = 0;
-    expect(buyKarma(save, 'karmaPower')).toBe('poor');
-
-    // 三條乘區線改成無上限（成本指數成長自我節制），所以「買到滿級」
-    // 這件事只在有限的線上才成立——測試改成驗「點數不夠就買不動」。
-    save.player.karma.points = 20;
-    let bought = 0;
-    while (buyKarma(save, 'karmaPower') === 'ok') bought += 1;
-    expect(bought).toBeGreaterThan(0);
-    expect(buyKarma(save, 'karmaPower')).toBe('poor');
-    // 有上限的線（宿慧未泯以外都已無上限）仍然要在滿級時回 null。
-    const tier = karmaTrackById('karmaTier');
-    expect(karmaCost(tier, tier.maxLevel)).toBeNull();
+describe('天劫與重天', () => {
+  it('劫數 2 為一重天，劫數 18 為九重天', () => {
+    expect(heavenOf(0)).toBe(0);
+    expect(heavenOf(1)).toBe(0);
+    expect(heavenOf(2)).toBe(1);
+    expect(heavenOf(7)).toBe(3);
+    expect(heavenOf(18)).toBe(9);
+    expect(heavenOf(21)).toBe(9);
   });
 
-  it('買了之後真的進到 loadout：傷害、金幣、山門、階數上限', () => {
-    const before = buildLoadout(deep(120), 30);
-    const save = deep(120);
-    save.player.karma.points = 999;
-    for (const track of KARMA) buyKarma(save, track.id);
-    const after = buildLoadout(save, 30);
-
-    expect(after.damageMultiplier).toBeGreaterThan(before.damageMultiplier);
-    expect(after.goldMultiplier).toBeGreaterThan(before.goldMultiplier);
-    expect(after.disciples).toBeGreaterThan(before.disciples);
-    expect(after.tierBonus).toBe(karmaTrackById('karmaTier').perLevel);
+  it('背得越多，飛升時仙緣越多', () => {
+    const plain = at(82);
+    const heavy = at(82);
+    heavy.world.tribulations = { thunder: 1, heartDemon: 1, gale: 1, cloud: 1 };
+    expect(jieCount(heavy.world.tribulations)).toBe(4);
+    expect(ascensionGain(heavy)).toBe(Math.round(ASCEND_BASE_POINTS * 2));
+    expect(ascensionGain(heavy)).toBeGreaterThan(ascensionGain(plain));
   });
 
-  it('仙緣只給乘區，不解鎖任何內容', () => {
-    // 一旦仙緣能換到別處拿不到的東西，不轉世的人會落後在「內容」而不只是「速度」上。
-    for (const track of KARMA) {
-      expect(Object.keys(track).sort()).toEqual(
-        ['cost', 'costGrowth', 'desc', 'id', 'maxLevel', 'name', 'perLevel', 'unit'],
-      );
-      expect(track.perLevel).toBeGreaterThan(0);
-    }
+  it('九重天渡劫就證道', () => {
+    const save = at(82);
+    const levels: Record<string, number> = {};
+    for (const def of TRIBULATIONS) levels[def.id] = 3;
+    save.world.tribulations = levels;
+    ascend(save);
+    expect(save.player.karma.dao).toBe(true);
+    expect(save.player.karma.bestHeaven).toBe(9);
+  });
+
+  it('第二三重要解鎖，第三重要先開第二重', () => {
+    const save = at(1);
+    save.player.karma.points = 10;
+    expect(tribLevelOpen(save, 'thunder', 1)).toBe(true);
+    expect(setTribulation(save, 'thunder', 2)).toBe(false);
+    expect(unlock(save, tribKey('thunder', 3))).toBe('locked');
+    expect(unlock(save, tribKey('thunder', 2))).toBe('ok');
+    expect(setTribulation(save, 'thunder', 2)).toBe(true);
+    expect(save.world.tribulations['thunder']).toBe(2);
+    expect(setTribulation(save, 'thunder', 0)).toBe(true);
+    expect(save.world.tribulations['thunder']).toBeUndefined();
+  });
+
+  it('背的天劫真的進到主線的配置，副本不吃', () => {
+    const save = at(10);
+    save.world.tribulations = { heartDemon: 1 };
+    const loadout = buildLoadout(save, 10);
+    expect(loadout.tribulations.map((t) => t.id)).toContain('heartDemon');
+    expect(loadout.mobHpMultiplier).toBeCloseTo(TRIBULATIONS.find((t) => t.id === 'heartDemon')!.levels[0]!.mobHp);
+    // 自己背的天劫不加金幣：獎勵是飛升時的仙緣倍率。
+    expect(loadout.goldMultiplier).toBeCloseTo(buildLoadout(at(10), 10).goldMultiplier);
+  });
+});
+
+describe('仙緣解鎖', () => {
+  it('解鎖機緣之後才進三選一的卡池', () => {
+    const save = at(1);
+    const ctx = { owned: {}, unlocked: save.player.karma.unlocks, sectId: 'body', talismans: ['frost', 'flame', 'sword', 'bolt'], rare: false };
+    expect(offerPool(ctx).map((d) => d.id)).not.toContain('fireIce');
+    save.player.karma.points = 5;
+    expect(unlock(save, 'fireIce')).toBe('ok');
+    expect(offerPool({ ...ctx, unlocked: save.player.karma.unlocks }).map((d) => d.id)).toContain('fireIce');
+    expect(unlock(save, 'fireIce')).toBe('done');
+    expect(unlock(save, 'guardian')).toBe('invalid');
+  });
+
+  it('道基永固上限很低：滿級也只有三成傷害', () => {
+    const track = karmaTrackById('karmaPower');
+    expect(track.perLevel * track.maxLevel).toBeLessThanOrEqual(30);
+    expect(KARMA).toHaveLength(1);
+    const save = at(1);
+    save.player.karma.points = 9999;
+    while (buyKarma(save, 'karmaPower') === 'ok');
+    expect(karmaCost(track, save.player.karma.spent['karmaPower'] ?? 0)).toBeNull();
+  });
+});
+
+describe('舊存檔（v22 → v23）', () => {
+  it('舊制花掉的仙緣全數退回成點數，一境一局從目前這一關開始', () => {
+    const old = {
+      version: 22,
+      player: { karma: { rebirths: 2, points: 3, spent: { karmaPower: 3, karmaTier: 1 }, claimedStage: 120 } },
+      world: { stage: 37, highestStage: 120, runs: 5, clears: 4 },
+    };
+    const next = migrate(old as unknown as Record<string, unknown>, 23) as Record<string, any>;
+    const refund = legacyKarmaRefund({ karmaPower: 3, karmaTier: 1 });
+    expect(refund).toBe(1 + 1 + 1 + 6);
+    expect(next['player']['karma']['points']).toBe(3 + refund);
+    expect(next['player']['karma']['spent']).toEqual({});
+    expect(next['world']['realmRun']['startStage']).toBe(37);
   });
 });

@@ -30,6 +30,7 @@ import { NO_SLOT_BONUS, boardBonuses, fieldPassives } from "./board";
 import { activeFormations } from "./formation";
 import type { Loadout } from "./loadout";
 import { realmForStage, realmIndexForStage } from "./realms";
+import { blessingValue } from "./blessings";
 import type { Rng } from "./rng";
 
 export interface ActiveEnemy {
@@ -89,6 +90,8 @@ interface SpawnEntry {
   hp: number;
   speed: number;
   trait: MobTrait;
+  /** 第幾波（1 起算）；首領是 0。前哨、護山大陣看「這一波開始了沒」。 */
+  wave: number;
 }
 
 export type Outcome = "running" | "cleared" | "defeated" | "timeout";
@@ -184,6 +187,32 @@ export interface DefenseState {
    * 全部是純累加，不影響任何判定。
    */
   telemetry: RunTelemetry;
+  /**
+   * 本場機緣換算好的數值（id → 數值）。開場算一次，戰鬥中只查表——
+   * 每一發都去翻資料表的話，一場要翻上萬次。
+   */
+  bless: Readonly<Record<string, number>>;
+  /** 機緣的單場狀態。全部從 0 開始，換關就重來。 */
+  blessState: BlessState;
+}
+
+/** 機緣在一關之內累積的東西。 */
+export interface BlessState {
+  /** 萬劍朝宗：本關合成過幾次劍陣。 */
+  swordMerges: number;
+  /** 天雷蓄勢：每格的出手數（換符歸零）。 */
+  shots: number[];
+  /** 追魂索命：每格下一發的加成。 */
+  soulBonus: number[];
+  /** 驚蟄：每格「下一發必暴」與冷卻到期時間。 */
+  forcedCrit: boolean[];
+  critReadyAt: number[];
+  /** 已經開始的最後一波（護山大陣、前哨）。 */
+  waveSeen: number;
+  /** 九轉還魂這一關用掉了沒（用掉之後由一境一局把它從機緣表移除）。 */
+  reviveUsed: boolean;
+  /** 輪轉的倒數。 */
+  wheelTimer: number;
 }
 
 /** 一場的戰績。只累加原始事實，衍生值（佔比、平均）交給呈現端算。 */
@@ -246,6 +275,12 @@ export interface TickReport {
   shattered: number | null;
   /** 這一拍發作的天劫 id。 */
   tribulation: string | null;
+  /** 這一拍九轉還魂救回了山門。 */
+  revived: boolean;
+  /** 這一拍被輪轉升階的格位。 */
+  upgraded: number | null;
+  /** 這一拍誅邪觸發了（首領登場時的齊射）。 */
+  volley: boolean;
 }
 
 const EMPTY_REPORT = (): TickReport => ({
@@ -263,6 +298,9 @@ const EMPTY_REPORT = (): TickReport => ({
   swapped: null,
   shattered: null,
   tribulation: null,
+  revived: false,
+  upgraded: null,
+  volley: false,
 });
 
 // ---------------------------------------------------------------- 關卡編成
@@ -278,6 +316,20 @@ export function waveCount(stage: number, wave: number): number {
         cfg.countPerRealm * realmIndexForStage(stage),
     ),
   );
+}
+
+/** 前段血量加成（BALANCE.wave.earlyHp 的折線）。 */
+export function earlyHpScale(stage: number): number {
+  const curve = BALANCE.wave.earlyHp;
+  if (curve.length === 0) return 1;
+  const first = curve[0]!;
+  if (stage <= first[0]) return first[1];
+  for (let i = 1; i < curve.length; i += 1) {
+    const a = curve[i - 1]!;
+    const b = curve[i]!;
+    if (stage <= b[0]) return a[1] + ((b[1] - a[1]) * (stage - a[0])) / (b[0] - a[0]);
+  }
+  return curve[curve.length - 1]![1];
 }
 
 /** 第 w 波每隻妖魔的血量。 */
@@ -392,6 +444,7 @@ export function buildSpawnQueue(
         speed:
           trait === "swift" ? speed * BALANCE.trait.swiftMultiplier : speed,
         trait,
+        wave,
       });
     }
   }
@@ -408,6 +461,7 @@ export function buildSpawnQueue(
     speed: BALANCE.boss.speed,
     // 首領不帶習性：牠已經有厚血、砸門與時限三件事，再加一層只會變得看不懂。
     trait: "none",
+    wave: 0,
   });
 
   queue.sort((a, b) => a.atMs - b.atMs);
@@ -467,7 +521,8 @@ export const LANES = 5;
  * 剩下那一點差距加上越跨越大的級距，才是「打到守不住為止」——決定深度的是排陣與合成。
  */
 export function hpScaleFor(loadout: Loadout, threat: number): number {
-  if (!loadout.arena) return loadout.mobHpMultiplier;
+  // 前段血量加成只給主線：機緣只在主線拿得到，副本與試劍台沒有那份力量可以抵。
+  if (!loadout.arena) return loadout.mobHpMultiplier * (loadout.earlyHp ? earlyHpScale(threat) : 1);
   const { wave } = BALANCE;
   return loadout.mobHpMultiplier * Math.pow(wave.arenaHpGrowth / wave.hpGrowth, Math.max(0, threat - 1));
 }
@@ -475,7 +530,7 @@ export function hpScaleFor(loadout: Loadout, threat: number): number {
 export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
   const { field } = BALANCE;
   // 妖魔、階數上限與金幣全部看威脅度：飛升境每轉一世世界就更硬。
-  const { queue, boss } = buildSpawnQueue(
+  const built = buildSpawnQueue(
     loadout.threat,
     rng,
     loadout.traitChance,
@@ -483,6 +538,9 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     loadout.mobSpeedMultiplier,
     loadout.waveCountMultiplier,
   );
+  const boss = built.boss;
+  const bless = blessValuesOf(loadout);
+  const queue = delayBoss(built.queue, bless["foresight"] ?? 0);
 
   const hand: (Card | null)[] = new Array<Card | null>(field.handSlots).fill(
     null,
@@ -504,7 +562,7 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
     threat: loadout.threat,
     clearedStages: 0,
     stageStartMs: 0,
-    disciples: loadout.disciples,
+    disciples: Math.max(1, Math.min(loadout.disciples, loadout.startDisciples ?? loadout.disciples)),
     maxDisciples: loadout.disciples,
     gold: 0,
     hand,
@@ -542,9 +600,38 @@ export function createDefenseState(loadout: Loadout, rng: Rng): DefenseState {
       formationActiveMs: 0,
       peakFormationLines: 0,
     },
+    bless,
+    blessState: {
+      swordMerges: 0,
+      shots: new Array<number>(loadout.fieldSlots).fill(0),
+      soulBonus: new Array<number>(loadout.fieldSlots).fill(0),
+      forcedCrit: new Array<boolean>(loadout.fieldSlots).fill(false),
+      critReadyAt: new Array<number>(loadout.fieldSlots).fill(0),
+      waveSeen: 0,
+      reviveUsed: false,
+      wheelTimer: (bless["wheel"] ?? 0) * 1000,
+    },
   };
   state.peakTier = highestTier(state);
   return state;
+}
+
+/** 把本場機緣換算成數值表。 */
+function blessValuesOf(loadout: Loadout): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of Object.keys(loadout.blessings)) {
+    const value = blessingValue(loadout.blessings, id);
+    if (value !== 0) out[id] = value;
+  }
+  return out;
+}
+
+/** 天機：關底首領晚一點出場。 */
+function delayBoss(queue: SpawnEntry[], seconds: number): SpawnEntry[] {
+  if (seconds <= 0) return queue;
+  return queue
+    .map((entry) => (entry.boss ? { ...entry, atMs: entry.atMs + seconds * 1000 } : entry))
+    .sort((a, b) => a.atMs - b.atMs);
 }
 
 export function highestTier(state: DefenseState): number {
@@ -579,7 +666,10 @@ function place(state: DefenseState, slot: CardSlot, card: Card | null): void {
   // 不屬於格子本身，否則把太乙符搬進一個熱格會直接繼承別人的成果。
   if (slot.where === "field") {
     state.cooldowns[slot.index] = 0;
-    state.ramps[slot.index] = 0;
+    // 太乙不息：太乙符搬動時連擊不歸零（累積跟著符走）。
+    if (!(card?.type === "taiyi" && (state.bless["taiyiFlow"] ?? 0) > 0)) state.ramps[slot.index] = 0;
+    state.blessState.shots[slot.index] = 0;
+    state.blessState.soulBonus[slot.index] = 0;
   }
   if (card !== null) state.peakTier = Math.max(state.peakTier, card.tier);
 }
@@ -658,6 +748,11 @@ export function swapCards(
 export function discardHand(state: DefenseState, handIndex: number): boolean {
   if (state.hand[handIndex] == null) return false;
   state.hand[handIndex] = null;
+  // 斷捨離：棄一張，下一張符立刻往前推一截。
+  const letGo = state.bless["letGo"] ?? 0;
+  if (letGo > 0) {
+    state.drawTimer -= (BALANCE.field.drawIntervalMs / state.loadout.drawSpeedMultiplier) * letGo;
+  }
   return true;
 }
 
@@ -716,15 +811,31 @@ export function mergeInto(
   if (card.type !== onto.type || card.tier !== onto.tier) return false;
   if (onto.tier >= maxTier(state)) return false;
 
-  into[target.index] = { type: onto.type, tier: onto.tier + 1 };
-  const refunded = rng.next() < state.loadout.sect.mergeRefundChance;
-  if (!refunded) from[source.index] = null;
+  let tier = onto.tier + 1;
+  // 同心：有機率多升一階（不超過上限）。只有拿了這張才擲骰——
+  // 沒有機緣的一場，亂數序列必須和以前一模一樣，舊的重播才對得上。
+  const concord = state.bless["concord"] ?? 0;
+  if (concord > 0 && tier < maxTier(state) && rng.next() < concord) tier += 1;
+  into[target.index] = { type: onto.type, tier };
+  const refundChance = state.loadout.sect.mergeRefundChance + (state.bless["alchemyRefund"] ?? 0);
+  const refunded = rng.next() < refundChance;
+  if (!refunded) {
+    // 一氣化三清：原處留下一張低兩階的同種符。
+    const leftover = tier - 2;
+    from[source.index] =
+      (state.bless["trinity"] ?? 0) > 0 && leftover >= 1 ? { type: onto.type, tier: leftover } : null;
+  }
   if (target.where === "field") {
     state.cooldowns[target.index] = 0;
-    state.ramps[target.index] = 0;
+    if (!(onto.type === "taiyi" && (state.bless["taiyiFlow"] ?? 0) > 0)) state.ramps[target.index] = 0;
+    state.blessState.shots[target.index] = 0;
   }
+  if (onto.type === "sword" || onto.type === "myriad") state.blessState.swordMerges += 1;
+  // 點金：合成就進帳，新階數越高越多。
+  const goldTouch = state.bless["goldTouch"] ?? 0;
+  if (goldTouch > 0) state.gold += killGold(state, false) * tier * goldTouch;
   state.merges += 1;
-  state.peakTier = Math.max(state.peakTier, onto.tier + 1);
+  state.peakTier = Math.max(state.peakTier, tier);
   return true;
 }
 
@@ -782,15 +893,37 @@ function fireOnce(
 ): void {
   const def = cardDef(card.type);
   const { effect } = def;
-  // 蝕靈咒：被蝕的格位照常出手，只是每一發都打折。
+  const bless = state.bless;
+  const blessState = state.blessState;
+  // 蝕靈咒：被蝕的格位照常出手，只是每一發都打折。蝕不入骨把折扣減掉一截。
   const cursed = (state.cursedUntil[slot] ?? 0) > state.elapsedMs;
-  const base = cardDamage(card, state.loadout) * damageBonus * (cursed ? 1 - state.curseAmount : 1);
+  const curse = state.curseAmount * (1 - Math.min(1, bless["uncurse"] ?? 0));
+  let base = cardDamage(card, state.loadout) * damageBonus * (cursed ? 1 - curse : 1);
+
+  // ---- 機緣：整發的倍率 ----
+  // 背水一戰：山門快破了，全部符一起拚命。
+  if ((bless["lastStand"] ?? 0) > 0 && state.disciples < state.maxDisciples * 0.3) {
+    base *= 1 + (bless["lastStand"] ?? 0);
+  }
+  // 劍心通明：九格全是同一種符。
+  if ((bless["trueSword"] ?? 0) > 0 && uniformField(state)) base *= bless["trueSword"] ?? 1;
+  // 天雷蓄勢：每第三發是蓄滿的一雷。
+  if (card.type === "bolt" && (bless["thunderCharge"] ?? 0) > 0) {
+    blessState.shots[slot] = (blessState.shots[slot] ?? 0) + 1;
+    if ((blessState.shots[slot] ?? 0) % 3 === 0) base *= bless["thunderCharge"] ?? 1;
+  }
+  // 追魂索命：上一發收了人頭，這一發加重（用掉就沒了）。
+  if (card.type === "soul" && (blessState.soulBonus[slot] ?? 0) > 0) {
+    base *= 1 + (blessState.soulBonus[slot] ?? 0);
+    blessState.soulBonus[slot] = 0;
+  }
 
   // 太乙符：這一次出手用的是「出手前」累積到的倍率，累積本身在出手後才 +1。
   let ramp = 1;
   if (effect.rampPerShot > 0) {
+    const cap = card.type === "taiyi" && (bless["taiyiFlow"] ?? 0) > 0 ? Math.max(effect.rampMax, bless["taiyiFlow"] ?? 0) : effect.rampMax;
     ramp = Math.min(
-      effect.rampMax,
+      cap,
       1 + (state.ramps[slot] ?? 0) * effect.rampPerShot,
     );
     state.ramps[slot] = (state.ramps[slot] ?? 0) + 1;
@@ -803,6 +936,11 @@ function fireOnce(
   const reach = effect.carryOverkill ? state.enemies.length : def.targets;
 
   const queue = frontMost(state, reach);
+  // 風刃回旋：湊不滿道數時，少的那幾道回頭打第一個。
+  const missing = Math.max(0, def.targets - queue.length);
+  const firstBoost = card.type === "fan" && missing > 0 ? 1 + (bless["fanReturn"] ?? 0) * missing : 1;
+  const executeBelow = card.type === "abyss" ? Math.max(effect.executeBelow, bless["abyssReap"] ?? 0) : effect.executeBelow;
+  const freshAt = card.type === "breaker" && (bless["breakerVanguard"] ?? 0) > 0 ? bless["breakerVanguard"] ?? 0.8 : 0.8;
   for (let index = 0; index < queue.length; index += 1) {
     const target = queue[index];
     if (target === undefined || target.hp <= 0) continue;
@@ -822,12 +960,37 @@ function fireOnce(
 
     let damage = beyondTargets ? 0 : base * ramp;
     if (!beyondTargets) {
-      if (target.boss)
+      if (index === 0) damage *= firstBoost;
+      if (target.boss) {
         damage *= state.loadout.bossDamageMultiplier * effect.bossMultiplier;
+        if (card.type === "sword" || card.type === "myriad") damage *= 1 + (bless["swordIntent"] ?? 0);
+        // 首級懸賞：首領每少一成血，誅仙再重一截。
+        if (card.type === "slayer") damage *= 1 + (bless["bounty"] ?? 0) * Math.floor((1 - ratio) * 10);
+      }
       if (ratio <= 0.5) damage *= effect.woundedMultiplier;
-      if (ratio >= 0.8) damage *= effect.freshMultiplier;
-      if (effect.critChance > 0 && rng.next() < effect.critChance)
-        damage *= effect.critMultiplier;
+      if (ratio >= freshAt) damage *= effect.freshMultiplier;
+      // 冰火相激：被減速的妖魔，火系打起來更痛。
+      if (
+        (bless["fireIce"] ?? 0) > 0 &&
+        (card.type === "flame" || card.type === "pyre" || card.type === "seal") &&
+        target.slowUntilMs > state.elapsedMs
+      ) {
+        damage *= 1 + (bless["fireIce"] ?? 0);
+      }
+      if (effect.critChance > 0) {
+        // 驚蟄：暴擊之後，下一發必定暴擊（每格有自己的冷卻）。
+        const forced = blessState.forcedCrit[slot] === true;
+        const crit = forced || rng.next() < effect.critChance;
+        if (forced) blessState.forcedCrit[slot] = false;
+        if (crit) {
+          damage *= effect.critMultiplier;
+          const clap = bless["thunderClap"] ?? 0;
+          if (!forced && clap > 0 && state.elapsedMs >= (blessState.critReadyAt[slot] ?? 0)) {
+            blessState.forcedCrit[slot] = true;
+            blessState.critReadyAt[slot] = state.elapsedMs + clap * 1000;
+          }
+        }
+      }
       // 金剛不壞：直擊打折。灼燒是另一條路徑（見 tickCombat 第 3 步），不受影響——那正是對策。
       if (target.skill !== null && target.skill.hardenUntilMs > state.elapsedMs)
         damage *= 1 - target.skill.def.amount;
@@ -863,8 +1026,8 @@ function fireOnce(
     if (
       target.hp > 0 &&
       !target.boss &&
-      effect.executeBelow > 0 &&
-      target.hp < effect.executeBelow * target.maxHp
+      executeBelow > 0 &&
+      target.hp < executeBelow * target.maxHp
     ) {
       damage += target.hp;
       target.hp = 0;
@@ -889,6 +1052,9 @@ function fireOnce(
       }
     }
 
+    if (card.type === "soul" && target.hp <= 0 && (bless["soulChase"] ?? 0) > 0) {
+      blessState.soulBonus[slot] = bless["soulChase"] ?? 0;
+    }
     creditDamage(state, card.type, damage);
     report.shots.push({
       slot,
@@ -897,6 +1063,13 @@ function fireOnce(
       killed: target.hp <= 0,
     });
   }
+}
+
+/** 劍心通明：每一格都有符，而且全是同一種。 */
+function uniformField(state: DefenseState): boolean {
+  const first = state.field[0];
+  if (first == null) return false;
+  return state.field.every((card) => card != null && card.type === first.type);
 }
 
 /** 減速不疊加，取「還沒過期的那一段」與新的一段之中較強的。 */
@@ -1012,7 +1185,7 @@ export function tickCombat(
       report.drawLost = true;
       continue;
     }
-    state.hand[slot] = drawCard(state.loadout, state.threat, rng);
+    state.hand[slot] = drawWithInsight(state, rng);
     report.drawnSlot = slot;
   }
 
@@ -1045,11 +1218,16 @@ export function tickCombat(
     state.nextId += 1;
     state.enemies.push(enemy);
     report.spawned.push(enemy);
+    if (!next.boss) onMobEnters(state, enemy, next.wave);
     if (next.boss) {
       state.bossSpawnedAtMs = state.elapsedMs;
       report.bossSpawned = true;
+      volley(state, rng, report);
     }
   }
+
+  // 2a. 輪轉：定時把場上最低階的符升一階。
+  tickWheel(state, deltaMs, report);
 
   // 3. 灼燒。放在開火之前，好讓這一拍燒死的妖魔和被打死的走同一條收屍路徑。
   for (const enemy of state.enemies) {
@@ -1081,7 +1259,11 @@ export function tickCombat(
     // 被封的格位不出手，冷卻也停住——解封後接著原本的節奏，不會一口氣補射。
     if ((state.sealedUntil[slot] ?? 0) > state.elapsedMs) continue;
     const bonus = bonuses[slot] ?? NO_SLOT_BONUS;
-    const interval = cardInterval(card, state.loadout) / bonus.fireRate;
+    let interval = cardInterval(card, state.loadout) / bonus.fireRate;
+    // 萬劍朝宗：本關每合成一次劍陣，所有劍陣出手更快（最多快六成）。
+    if ((card.type === "sword" || card.type === "myriad") && (state.bless["swordFlow"] ?? 0) > 0) {
+      interval /= 1 + Math.min(0.6, state.blessState.swordMerges * (state.bless["swordFlow"] ?? 0));
+    }
     const cooling = state.cooldowns[slot] ?? 0;
     let remaining = cooling - deltaMs;
     // 出手間隔可能比一拍還短，用 while 補齊，掉幀時輸出不會憑空消失。
@@ -1115,7 +1297,9 @@ export function tickCombat(
     state.kills += 1;
     if (enemy.boss) state.bossKilled = true;
     // 山河符：斬殺有機率補回一名弟子，但補不過起始上限——它是續命，不是無敵。
-    if (passives.repairChance > 0 && rng.next() < passives.repairChance) {
+    const repair =
+      passives.repairChance > 0 ? Math.max(passives.repairChance, state.bless["bastionHold"] ?? 0) : 0;
+    if (repair > 0 && rng.next() < repair) {
       state.disciples = Math.min(state.maxDisciples, state.disciples + 1);
     }
     report.kills.push({ enemyId: enemy.id, boss: enemy.boss, gold });
@@ -1198,7 +1382,9 @@ export function tickCombat(
       continue;
     }
     // 體修：每關前幾次漏怪由門人硬擋，山門不掉耐久。
-    if (state.leakImmunityUsed < state.loadout.sect.leakImmunityCount) {
+    const immunity =
+      state.loadout.sect.leakImmunityCount + (state.bless["goldenBell"] ?? 0) + (state.bless["bodyIron"] ?? 0);
+    if (state.leakImmunityUsed < immunity) {
       state.leakImmunityUsed += 1;
       report.leaks.push({
         enemyId: enemy.id,
@@ -1236,6 +1422,12 @@ export function tickCombat(
   }
 
   // 7. 勝負
+  // 九轉還魂：山門被破的那一刻回滿，一境只有一次。
+  if (state.disciples <= 0 && (state.bless["revive"] ?? 0) > 0 && !state.blessState.reviveUsed) {
+    state.blessState.reviveUsed = true;
+    state.disciples = state.maxDisciples;
+    report.revived = true;
+  }
   if (state.disciples <= 0) {
     state.outcome = "defeated";
   } else if (
@@ -1256,6 +1448,78 @@ export function tickCombat(
   }
 
   return report;
+}
+
+/**
+ * 抽一張符；靈犀有機率直接給一張「抽得到、又湊得成一對」的。
+ *
+ * 給的是手上或場上已經有的那一張的複製，但**階數不超過這一次正常抽到的階數**——
+ * 它幫的是「湊對」，不是憑空送高階符。
+ */
+function drawWithInsight(state: DefenseState, rng: Rng): Card {
+  const drawn = drawCard(state.loadout, state.threat, rng);
+  const insight = state.bless["insight"] ?? 0;
+  if (insight <= 0 || rng.next() >= insight) return drawn;
+  const cap = maxTier(state);
+  let best: Card | null = null;
+  for (const card of [...state.hand, ...state.field]) {
+    if (card == null || card.tier > drawn.tier || card.tier >= cap) continue;
+    if (best === null || card.tier > best.tier) best = card;
+  }
+  return best === null ? drawn : { type: best.type, tier: best.tier };
+}
+
+/** 一隻（非首領的）妖魔進場：寒潭、前哨、護山大陣。 */
+function onMobEnters(state: DefenseState, enemy: ActiveEnemy, wave: number): void {
+  const cold = state.bless["coldPool"] ?? 0;
+  if (cold > 0) applySlow(state, enemy, cold, 2000);
+  if (wave <= state.blessState.waveSeen) return;
+  // 這一波的第一隻。
+  state.blessState.waveSeen = wave;
+  const outpost = state.bless["outpost"] ?? 0;
+  if (outpost > 0) applySlow(state, enemy, 1, outpost * 1000);
+  const guardian = state.bless["guardian"] ?? 0;
+  if (guardian > 0) state.disciples = Math.min(state.maxDisciples, state.disciples + guardian);
+}
+
+/** 誅邪：首領登場的那一刻，場上最高階的符連發。 */
+function volley(state: DefenseState, rng: Rng, report: TickReport): void {
+  const times = Math.round(state.bless["zhuxie"] ?? 0);
+  if (times <= 0) return;
+  let best = -1;
+  for (let i = 0; i < state.field.length; i += 1) {
+    const card = state.field[i];
+    if (card == null || (state.sealedUntil[i] ?? 0) > state.elapsedMs) continue;
+    const current = best < 0 ? null : state.field[best];
+    if (current == null || card.tier > current.tier) best = i;
+  }
+  const card = best < 0 ? null : state.field[best];
+  if (card == null) return;
+  const bonus = boardBonuses(state.field, state.loadout.formationMultiplier)[best] ?? NO_SLOT_BONUS;
+  for (let n = 0; n < times; n += 1) fireOnce(state, best, card, bonus.damage, rng, report);
+  report.volley = true;
+}
+
+/** 輪轉：每隔一段時間，場上最低階、還沒到上限的那張升一階。 */
+function tickWheel(state: DefenseState, deltaMs: number, report: TickReport): void {
+  const every = (state.bless["wheel"] ?? 0) * 1000;
+  if (every <= 0) return;
+  state.blessState.wheelTimer -= deltaMs;
+  if (state.blessState.wheelTimer > 0) return;
+  state.blessState.wheelTimer += every;
+  const cap = maxTier(state);
+  let low = -1;
+  for (let i = 0; i < state.field.length; i += 1) {
+    const card = state.field[i];
+    if (card == null || card.tier >= cap) continue;
+    const current = low < 0 ? null : state.field[low];
+    if (current == null || card.tier < current.tier) low = i;
+  }
+  const card = low < 0 ? null : state.field[low];
+  if (card == null) return;
+  state.field[low] = { type: card.type, tier: card.tier + 1 };
+  state.peakTier = Math.max(state.peakTier, card.tier + 1);
+  report.upgraded = low;
 }
 
 /**
@@ -1303,7 +1567,8 @@ function advanceEndless(state: DefenseState, rng: Rng): void {
     state.loadout.waveCountMultiplier,
   );
   const offset = state.elapsedMs + BALANCE.wave.waveIntervalMs * 0.5;
-  state.queue = queue.map((entry) => ({ ...entry, atMs: entry.atMs + offset }));
+  state.queue = delayBoss(queue, state.bless["foresight"] ?? 0).map((entry) => ({ ...entry, atMs: entry.atMs + offset }));
+  state.blessState.waveSeen = 0;
   state.stageStartMs = offset;
   state.bossDef = boss;
   state.bossKilled = false;
@@ -1449,10 +1714,12 @@ function sealSlots(
       loaded.push(i);
     }
   }
+  // 破封：封印時間縮短。
+  const lasting = durationMs * (1 - Math.min(0.95, state.bless["unseal"] ?? 0));
   for (let n = 0; n < count && loaded.length > 0; n += 1) {
     const pick = loaded.splice(rng.int(0, loaded.length - 1), 1)[0];
     if (pick === undefined) break;
-    state.sealedUntil[pick] = state.elapsedMs + durationMs;
+    state.sealedUntil[pick] = state.elapsedMs + lasting;
     report.sealed.push(pick);
   }
 }

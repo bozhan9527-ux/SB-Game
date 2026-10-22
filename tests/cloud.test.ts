@@ -96,6 +96,9 @@ describe('上榜', () => {
     // 與開了試煉的人，成績會被自己的伺服器判定為造假。
     expect(Object.keys(loadout).sort()).toEqual([
       'bankedStage',
+      // 一境一局與天劫（v23）：少了它們，帶著機緣與天劫打的那一場重播不出來。
+      'blessings',
+      'gate',
       'goldMultiplier',
       'karma',
       'libraryFloor',
@@ -105,6 +108,7 @@ describe('上榜', () => {
       'sectDepth',
       'sectId',
       'talismans',
+      'tribulations',
       'upgrades',
     ]);
   });

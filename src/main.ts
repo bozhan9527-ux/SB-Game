@@ -19,6 +19,9 @@ import { LeaderboardScene } from './scenes/LeaderboardScene';
 import { SplashScene } from './scenes/SplashScene';
 import { DungeonScene } from './scenes/DungeonScene';
 import { TalismanScene } from './scenes/TalismanScene';
+import { BlessingScene } from './scenes/BlessingScene';
+import { AscendScene } from './scenes/AscendScene';
+import { AltarScene } from './scenes/AltarScene';
 
 // 瀏覽器要求先有使用者手勢才能發聲。解鎖時才讀存檔裡的音效開關
 // （走 state() 而非直接碰 localStorage，見 TECH_SPEC 第 9.2 節）。
@@ -90,7 +93,7 @@ const game = new Phaser.Game({
     width: GAME_WIDTH * RENDER_SCALE,
     height: GAME_HEIGHT * RENDER_SCALE,
   },
-  scene: [BootScene, SplashScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene, TalismanScene, DungeonScene, ArchiveScene, RebirthScene, LeaderboardScene],
+  scene: [BootScene, SplashScene, TitleScene, SectScene, RunScene, ResultScene, UpgradeScene, AchievementScene, HelpScene, TalismanScene, DungeonScene, ArchiveScene, RebirthScene, LeaderboardScene, BlessingScene, AscendScene, AltarScene],
 });
 
 // 開發用：讓瀏覽器自動化腳本讀得到遊戲（幀率、目前場景）。正式版不掛。

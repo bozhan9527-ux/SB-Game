@@ -102,6 +102,22 @@
 `https://bozhan9527-ux.github.io/SB-Game/` 於 2026-08-27 部署成功（run #7）。
 `main` 已是預設分支，之後推到 `main` 就會自動重新部署。
 
+### B 路線第一、二階段：機緣、一境一局、強制飛升（2026-10-22）
+
+設計與實作紀錄見 `ROGUELITE_DESIGN.md`。要點：
+
+- `src/systems/blessings.ts`＋`data/blessings.json`：機緣（36 張），效果掛在 `defense.ts` 各處，以 `state.bless[id]` 查表。
+  **沒有機緣的一場亂數序列和以前完全一樣**（只有拿了機緣才多擲骰），測試守著。
+- `src/systems/realmrun.ts`：一境一局（存檔 `world.realmRun`）。結算頁呼叫 `onStageCleared`／`onStageFailed`。
+- `src/systems/karma.ts`：強制飛升、天劫重數、仙緣解鎖；`world.tribulations` 是這一世背的天劫。
+- 新場景：`Blessing`（三選一）、`Ascend`（飛升）、`Altar`（飛升台）；`Rebirth` 改成仙緣解鎖頁。
+  「進主線」一律走 `scenes/flow.ts` 的 `enterMainline`（會先導去飛升或三選一）。
+- 上報與重播：`LoadoutSpec` 多了 `blessings`、`gate`、`tribulations`，伺服器清洗後照收；重播契約 13 → 14。
+- 遙測新增 `blessing_pick`、`blessing_reroll`、`realm_run_end`、`ascend`：上線後先看「哪幾張機緣沒人選」與
+  「在哪一境被打回去最多次」。
+- [ ] 實機確認一境一局的挫折感（製作人選的是硬派版；太挫折可改成每關滿血、失守只重打那一關）
+- [ ] 設計稿上另外 11 張機緣、第三階段（解鎖時間表、副本分線產出、閉關）
+
 ### 128 合 1 平台：接關（2026-10-14）
 
 - `src/platform/arcade128.js` 是平台給的橋接原檔，不要改；`src/platform/index.ts` 包一層。

@@ -10,7 +10,21 @@
     "formation": 1,
     "drawSpeed": 1,
     "waveCount": 1,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "intervalMs": 10000,
+        "desc": "每 10 秒劈下一道雷，封住一格陣位 3 秒"
+      },
+      {
+        "intervalMs": 7000,
+        "desc": "每 7 秒劈下一道雷，封住一格陣位 3 秒"
+      },
+      {
+        "intervalMs": 5000,
+        "desc": "每 5 秒劈下一道雷，封住一格陣位 3 秒"
+      }
+    ]
   },
   {
     "id": "heavenfire",
@@ -23,7 +37,21 @@
     "formation": 1,
     "drawSpeed": 1,
     "waveCount": 1,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "intervalMs": 12000,
+        "desc": "每 12 秒燒掉手牌裡最低階的一張"
+      },
+      {
+        "intervalMs": 9000,
+        "desc": "每 9 秒燒掉手牌裡最低階的一張"
+      },
+      {
+        "intervalMs": 6000,
+        "desc": "每 6 秒燒掉手牌裡最低階的一張"
+      }
+    ]
   },
   {
     "id": "heartDemon",
@@ -36,7 +64,21 @@
     "formation": 1,
     "drawSpeed": 1,
     "waveCount": 1,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "mobHp": 1.08,
+        "desc": "妖魔血量 +8%"
+      },
+      {
+        "mobHp": 1.2,
+        "desc": "妖魔血量 +20%"
+      },
+      {
+        "mobHp": 1.4,
+        "desc": "妖魔血量 +40%"
+      }
+    ]
   },
   {
     "id": "gale",
@@ -49,7 +91,21 @@
     "formation": 1,
     "drawSpeed": 1,
     "waveCount": 1,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "mobSpeed": 1.2,
+        "desc": "妖魔移速 +20%"
+      },
+      {
+        "mobSpeed": 1.35,
+        "desc": "妖魔移速 +35%"
+      },
+      {
+        "mobSpeed": 1.5,
+        "desc": "妖魔移速 +50%"
+      }
+    ]
   },
   {
     "id": "collapse",
@@ -62,7 +118,21 @@
     "formation": 0.5,
     "drawSpeed": 1,
     "waveCount": 1,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "formation": 0.5,
+        "desc": "陣法加成只剩五成"
+      },
+      {
+        "formation": 0.3,
+        "desc": "陣法加成只剩三成"
+      },
+      {
+        "formation": 0.1,
+        "desc": "陣法加成只剩一成"
+      }
+    ]
   },
   {
     "id": "cloud",
@@ -75,7 +145,21 @@
     "formation": 1,
     "drawSpeed": 0.8,
     "waveCount": 1,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "drawSpeed": 0.8,
+        "desc": "抽符慢兩成"
+      },
+      {
+        "drawSpeed": 0.68,
+        "desc": "抽符慢三成多"
+      },
+      {
+        "drawSpeed": 0.55,
+        "desc": "抽符慢四成半"
+      }
+    ]
   },
   {
     "id": "horde",
@@ -88,6 +172,23 @@
     "formation": 1,
     "drawSpeed": 1,
     "waveCount": 1.25,
-    "gold": 1.3
+    "gold": 1.3,
+    "levels": [
+      {
+        "waveCount": 1.25,
+        "mobHp": 0.85,
+        "desc": "每波妖魔多兩成半，單隻弱一些"
+      },
+      {
+        "waveCount": 1.45,
+        "mobHp": 0.82,
+        "desc": "每波妖魔多四成半，單隻弱一些"
+      },
+      {
+        "waveCount": 1.7,
+        "mobHp": 0.78,
+        "desc": "每波妖魔多七成，單隻弱一些"
+      }
+    ]
   }
 ]

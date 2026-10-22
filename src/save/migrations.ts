@@ -5,6 +5,7 @@
  * 索引 i 的函式負責 v(i+1) → v(i+2)。禁止改結構而不寫遷移。
  */
 import { CARDS } from '../data';
+import { legacyKarmaRefund } from '../systems/karma';
 
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 
@@ -275,6 +276,35 @@ const addAccount: Migration = (data) => {
 };
 
 /** 索引 i 的函式負責 v(i+1) → v(i+2)。新增時往後 push，不得插隊或修改既有項目。 */
+/**
+ * v22 → v23：B 路線（見 ROGUELITE_DESIGN.md）。
+ *
+ * - 一境一局：從玩家**目前所在的那一關**開一局新的（不往回退到境的開頭——
+ *   改制不該讓任何人少掉進度）。
+ * - 仙緣改成解鎖制：舊的四條線全數退回成點數，讓玩家在新制裡重新選。
+ * - 強制飛升：已經在第 82 關以後的老玩家，下一次進主線就會先飛升（見 mustAscend）。
+ */
+const toAscension: Migration = (data) => {
+  const player = (data['player'] ?? {}) as Record<string, unknown>;
+  const world = (data['world'] ?? {}) as Record<string, unknown>;
+  const karma = (player['karma'] ?? {}) as Record<string, unknown>;
+  const spent = (karma['spent'] ?? {}) as Record<string, unknown>;
+  const points = typeof karma['points'] === 'number' && Number.isFinite(karma['points']) ? Math.max(0, Math.floor(karma['points'] as number)) : 0;
+  const stage = typeof world['stage'] === 'number' && Number.isFinite(world['stage']) ? Math.max(1, Math.floor(world['stage'] as number)) : 1;
+  return {
+    ...data,
+    player: {
+      ...player,
+      karma: { ...karma, points: points + legacyKarmaRefund(spent), spent: {}, unlocks: [], dao: false, bestHeaven: 0 },
+    },
+    world: {
+      ...world,
+      realmRun: { startStage: stage, gate: null, blessings: {}, offer: null, rerolls: 0 },
+      tribulations: {},
+    },
+  };
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   addSettings,
   addAchievements,
@@ -297,6 +327,7 @@ export const MIGRATIONS: readonly Migration[] = [
   dropFieldSlots,
   addSectDepth,
   addAccount,
+  toAscension,
 ];
 
 /**

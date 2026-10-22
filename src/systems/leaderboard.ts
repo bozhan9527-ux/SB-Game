@@ -32,6 +32,9 @@ export function scoreLoadoutOf(spec: LoadoutSpec): ScoreLoadout {
     upgrades: { ...rest.upgrades },
     karma: { ...rest.karma },
     rules: [...rest.rules],
+    blessings: { ...(rest.blessings ?? {}) },
+    gate: rest.gate ?? null,
+    tribulations: { ...(rest.tribulations ?? {}) },
   };
 }
 

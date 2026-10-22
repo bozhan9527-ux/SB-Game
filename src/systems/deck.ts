@@ -13,6 +13,7 @@ import type { CardDef } from '../data/types';
 import type { Loadout } from './loadout';
 import type { Rng } from './rng';
 import { NO_SLOT_BONUS, boardBonuses } from './board';
+import { blessingValue } from './blessings';
 
 export interface Card {
   /** 對應 cards.json 的 id。 */
@@ -91,7 +92,11 @@ export function arenaDrawTier(stage: number): number {
  * 也正好對上 3×3 陣法天花板的推導前提。
  */
 export function drawCard(loadout: Loadout, stage: number, rng: Rng): Card {
-  const def = rng.pickWeighted(loadout.talismans, (card) => card.weight);
+  // 一符通神・悟：本門專精的那一張比較常抽到。
+  const focus = blessingValue(loadout.blessings, 'talismanFocus');
+  const def = rng.pickWeighted(loadout.talismans, (card) =>
+    focus > 0 && card.id === loadout.sect.favoredCard ? card.weight * (1 + focus) : card.weight,
+  );
   // 競技場：抽到的階數跟著深度走，但不吃任何加成、也沒有「偶爾多一階」的骰子——
   // 同一個深度，每個人抽到的都一樣（見 BALANCE.wave.arenaTierLag）。
   const tier = loadout.arena ? arenaDrawTier(stage) : drawTierForStage(stage, rng, loadout.tierBonus);

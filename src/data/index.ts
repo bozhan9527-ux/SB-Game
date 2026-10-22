@@ -19,6 +19,7 @@ import dungeonsJson from '../../data/dungeons.json';
 import bossSkillsJson from '../../data/boss-skills.json';
 import omensJson from '../../data/omens.json';
 import tribulationsJson from '../../data/tribulations.json';
+import blessingsJson from '../../data/blessings.json';
 
 import { BOSS_ART_NAMES, ICON_NAMES } from './types';
 import type {
@@ -32,6 +33,7 @@ import type {
   BossSkillKind,
   OmenDef,
   TribulationDef,
+  BlessingDef,
   CardDef,
   CardEffect,
   ChallengeDef,
@@ -111,6 +113,22 @@ function parseFormationTier(raw: unknown, path: string): FormationTierBalance {
   };
 }
 
+/** [[關卡, 倍率], …] 的折線。缺席就是一條 1 的直線。 */
+function parseCurve(raw: unknown, path: string): [number, number][] {
+  if (raw === undefined) return [];
+  const points = list(raw, path, (item, p) => {
+    if (!Array.isArray(item) || item.length !== 2 || !item.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+      throw new DataError(p, '應為 [關卡, 倍率]');
+    }
+    return [item[0] as number, item[1] as number] as [number, number];
+  });
+  for (let i = 1; i < points.length; i += 1) {
+    if ((points[i]?.[0] ?? 0) <= (points[i - 1]?.[0] ?? 0)) throw new DataError(path, '關卡要遞增');
+  }
+  if (points.some(([, v]) => v <= 0)) throw new DataError(path, '倍率要大於 0');
+  return points;
+}
+
 export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
   const field_ = obj(raw, 'field', path);
   const formation = obj(raw, 'formation', path);
@@ -170,6 +188,7 @@ export function parseBalance(raw: unknown, path = 'balance.json'): Balance {
       trackPx: p(wave, 'trackPx', 'wave'),
       leakCostBase: p(wave, 'leakCostBase', 'wave'),
       leakCostGrowth: p(wave, 'leakCostGrowth', 'wave'),
+      earlyHp: parseCurve((wave as Record<string, unknown>)['earlyHp'], `${path}.wave.earlyHp`),
     },
     trait: {
       addedTraitDiscount: p(trait, 'addedTraitDiscount', 'trait'),
@@ -519,19 +538,36 @@ export function parseOmens(raw: unknown, path = 'omens.json'): OmenDef[] {
 }
 
 export function parseTribulations(raw: unknown, path = 'tribulations.json'): TribulationDef[] {
-  const items = list(raw, path, (item, p) => ({
-    id: str(item, 'id', p),
-    name: str(item, 'name', p),
-    desc: str(item, 'desc', p),
-    intervalMs: num(item, 'intervalMs', p),
-    durationMs: num(item, 'durationMs', p),
-    mobHp: num(item, 'mobHp', p),
-    mobSpeed: num(item, 'mobSpeed', p),
-    formation: num(item, 'formation', p),
-    drawSpeed: num(item, 'drawSpeed', p),
-    waveCount: num(item, 'waveCount', p),
-    gold: num(item, 'gold', p),
-  }));
+  const items = list(raw, path, (item, p) => {
+    const base = {
+      desc: str(item, 'desc', p),
+      intervalMs: num(item, 'intervalMs', p),
+      durationMs: num(item, 'durationMs', p),
+      mobHp: num(item, 'mobHp', p),
+      mobSpeed: num(item, 'mobSpeed', p),
+      formation: num(item, 'formation', p),
+      drawSpeed: num(item, 'drawSpeed', p),
+      waveCount: num(item, 'waveCount', p),
+      gold: num(item, 'gold', p),
+    };
+    const rec = item as Record<string, unknown>;
+    // 三重：每一重只寫和頂層不同的欄位。沒寫 levels 的就三重都是頂層數值。
+    const levels = rec['levels'] === undefined
+      ? [base, base, base]
+      : list(rec['levels'], `${p}.levels`, (lv, lp) => ({
+          desc: optStr(lv, 'desc', lp, base.desc),
+          intervalMs: optNum(lv, 'intervalMs', lp, base.intervalMs),
+          durationMs: optNum(lv, 'durationMs', lp, base.durationMs),
+          mobHp: optNum(lv, 'mobHp', lp, base.mobHp),
+          mobSpeed: optNum(lv, 'mobSpeed', lp, base.mobSpeed),
+          formation: optNum(lv, 'formation', lp, base.formation),
+          drawSpeed: optNum(lv, 'drawSpeed', lp, base.drawSpeed),
+          waveCount: optNum(lv, 'waveCount', lp, base.waveCount),
+          gold: optNum(lv, 'gold', lp, base.gold),
+        }));
+    if (levels.length !== 3) throw new DataError(path, `天劫 ${str(item, 'id', p)} 要有三重`);
+    return { id: str(item, 'id', p), name: str(item, 'name', p), ...base, levels };
+  });
   assertUniqueIds(items, path);
   for (const item of items) {
     for (const key of ['mobHp', 'mobSpeed', 'formation', 'drawSpeed', 'waveCount', 'gold'] as const) {
@@ -544,7 +580,54 @@ export function parseTribulations(raw: unknown, path = 'tribulations.json'): Tri
   return items;
 }
 
+export function parseBlessings(raw: unknown, path = 'blessings.json'): BlessingDef[] {
+  const items = list(raw, path, (item, p) => {
+    const rec = item as Record<string, unknown>;
+    const format: BlessingDef['format'] = rec['percent'] === true
+      ? 'percent'
+      : rec['times'] === true
+        ? 'times'
+        : rec['seconds'] === true
+          ? 'seconds'
+          : 'plain';
+    const requires = rec['requires'] === undefined
+      ? []
+      : list(rec['requires'], `${p}.requires`, (group, gp) => list(group, gp, (id, ip) => {
+          if (typeof id !== 'string') throw new DataError(ip, '應為符的 id');
+          return id;
+        }));
+    const values = list(rec['values'], `${p}.values`, (v, vp) => {
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new DataError(vp, '應為有限數字');
+      return v;
+    });
+    return {
+      id: str(item, 'id', p),
+      name: str(item, 'name', p),
+      category: oneOf(item, 'category', p, ['attack', 'guard', 'fortune'] as const),
+      glyph: str(item, 'glyph', p),
+      glyph2: optStr(item, 'glyph2', p, '') || null,
+      unlock: oneOf(item, 'unlock', p, ['start', 'karma'] as const),
+      cost: optNum(item, 'cost', p, 0),
+      requires,
+      sect: optStr(item, 'sect', p, '') || null,
+      rare: optBool(item, 'rare', p, false),
+      values,
+      desc: str(item, 'desc', p),
+      format,
+    } satisfies BlessingDef;
+  });
+  assertUniqueIds(items, path);
+  for (const item of items) {
+    const want = item.rare ? 1 : 3;
+    if (item.values.length !== want) throw new DataError(path, `機緣 ${item.id} 要有 ${want} 個數值`);
+    if (!item.rare && !item.desc.includes('{v}')) throw new DataError(path, `機緣 ${item.id} 的說明缺 {v}`);
+    if (item.unlock === 'karma' && item.cost <= 0) throw new DataError(path, `機緣 ${item.id} 要標解鎖花費`);
+  }
+  return items;
+}
+
 export const BALANCE: Balance = parseBalance(balanceJson);
+export const BLESSINGS: readonly BlessingDef[] = parseBlessings(blessingsJson);
 export const TRIBULATIONS: readonly TribulationDef[] = parseTribulations(tribulationsJson);
 export const OMENS: readonly OmenDef[] = parseOmens(omensJson);
 export const BOSS_SKILLS: readonly BossSkillDef[] = parseBossSkills(bossSkillsJson);
@@ -758,5 +841,19 @@ for (const realm of REALMS) {
 for (const sect of SECTS) {
   if (!CARDS.some((card) => card.id === sect.favoredCard)) {
     throw new DataError('sects.json', `${sect.id} 的 favoredCard「${sect.favoredCard}」不存在`);
+  }
+}
+
+/** 機緣綁定的符與門派必須真的存在，否則那張機緣永遠抽不到、也沒有人發現。 */
+for (const blessing of BLESSINGS) {
+  for (const group of blessing.requires) {
+    for (const id of group) {
+      if (!CARDS.some((card) => card.id === id)) {
+        throw new DataError('blessings.json', `${blessing.id} 綁定的符「${id}」不存在`);
+      }
+    }
+  }
+  if (blessing.sect !== null && !SECTS.some((sect) => sect.id === blessing.sect)) {
+    throw new DataError('blessings.json', `${blessing.id} 的門派「${blessing.sect}」不存在`);
   }
 }

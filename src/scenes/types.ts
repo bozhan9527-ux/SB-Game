@@ -66,6 +66,8 @@ export interface RunResultData {
   survivors: number;
   /** 起始耐久，用於顯示「守下了幾成」。 */
   maxDisciples: number;
+  /** 九轉還魂在這一關用掉了（一境一局要把它從機緣表拿掉）。 */
+  reviveUsed: boolean;
   /** 本場漏進山門的妖魔數。 */
   leaks: number;
   /** 本場斬殺的妖魔數。 */

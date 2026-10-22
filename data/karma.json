@@ -2,41 +2,11 @@
   {
     "id": "karmaPower",
     "name": "道基永固",
-    "desc": "每一世都帶著的法寶傷害加成。",
+    "desc": "每一世都帶著的法寶傷害加成。上限不高：仙緣主要拿來解鎖機緣與天劫。",
     "unit": "%",
-    "perLevel": 8,
-    "cost": 1,
-    "costGrowth": 1.06,
-    "maxLevel": 999
-  },
-  {
-    "id": "karmaGold",
-    "name": "夙世積財",
-    "desc": "每一世都帶著的金幣加成，重爬靠它。",
-    "unit": "%",
-    "perLevel": 12,
-    "cost": 1,
-    "costGrowth": 1.06,
-    "maxLevel": 999
-  },
-  {
-    "id": "karmaGate",
-    "name": "護山大陣",
-    "desc": "每一世都帶著的山門耐久加成。",
-    "unit": "%",
-    "perLevel": 10,
-    "cost": 1,
-    "costGrowth": 1.06,
-    "maxLevel": 999
-  },
-  {
-    "id": "karmaTier",
-    "name": "宿慧未泯",
-    "desc": "法寶階數上限 +1，最貴也最有感。",
-    "unit": "階",
-    "perLevel": 1,
-    "cost": 6,
-    "costGrowth": 1.6,
-    "maxLevel": 999
+    "perLevel": 2,
+    "cost": 2,
+    "costGrowth": 1.2,
+    "maxLevel": 15
   }
 ]

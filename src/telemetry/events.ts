@@ -83,6 +83,40 @@ export interface TelemetryEvents {
     sect: string | null;
     highest_stage: number;
   };
+
+  /**
+   * 機緣三選一選了哪一張（v23）。回答「哪幾張沒人要」與「哪幾張選了之後勝率特別高」。
+   * offered 是這一次的候選（逗號連接），沒被選的那兩張才看得出偏好。
+   */
+  blessing_pick: {
+    stage: number;
+    id: string;
+    stars: number;
+    rare: boolean;
+    offered: string;
+  };
+
+  /** 重抽了一次機緣。 */
+  blessing_reroll: { stage: number };
+
+  /**
+   * 一局（一境）結束：破境或山門被破。回答「硬派的一境一局會不會太挫折」——
+   * 在哪一境、第幾層、帶著幾張機緣倒下。
+   */
+  realm_run_end: {
+    stage: number;
+    start_stage: number;
+    broke_through: boolean;
+    blessings: number;
+  };
+
+  /** 飛升。回答「大家敢背多少劫」。 */
+  ascend: {
+    lives: number;
+    jie: number;
+    heaven: number;
+    gained: number;
+  };
 }
 
 export type TelemetryEventName = keyof TelemetryEvents;

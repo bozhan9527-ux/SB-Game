@@ -17,8 +17,10 @@ import { masteryBonus, masteryTierFor } from './sects';
 import { realmForStage } from './realms';
 import { starterTalismans, talismanDefs } from './talismans';
 import { OMEN_RULE_PREFIX, omenOfRules } from './omens';
-import { tribulationsFor } from './tribulations';
+import { tribulationsFor, tribulationsForRun } from './tribulations';
 import { amountOf } from './upgrades';
+import type { BlessingMap } from './blessings';
+import { NO_BLESSINGS, blessingValue, sanitizeBlessings } from './blessings';
 
 /**
  * 這一場的規則修改，來自玩家自己開的挑戰條件。
@@ -120,6 +122,15 @@ export interface Loadout {
   formationMultiplier: number;
   /** 這一場的天劫。定時的那幾條由 tickCombat 結算。 */
   tribulations: TribulationDef[];
+  /** 本境拿到的機緣（見 src/systems/blessings.ts）。只有主線一境一局才有。 */
+  blessings: BlessingMap;
+  /**
+   * 開場時山門剩多少耐久。一境一局的耐久跨關延續，所以第二關起不是滿血開打；
+   * null 就是滿血（副本、試劍台、舊的上報）。上限仍是 disciples。
+   */
+  startDisciples: number | null;
+  /** 吃不吃前段血量加成（BALANCE.wave.earlyHp）。主線吃，副本與試劍台不吃。 */
+  earlyHp: boolean;
 }
 
 /**
@@ -127,7 +138,10 @@ export interface Loadout {
  * 模擬走的是 buildLoadoutFor，不經過 buildLoadoutFromSpec。
  */
 export function applyTribulations(loadout: Loadout, stage: number): void {
-  const list = tribulationsFor(stage);
+  applyTribulationList(loadout, tribulationsFor(stage));
+}
+
+export function applyTribulationList(loadout: Loadout, list: TribulationDef[]): void {
   loadout.tribulations = list;
   for (const item of list) {
     loadout.mobHpMultiplier *= item.mobHp;
@@ -194,6 +208,16 @@ export interface LoadoutSpec {
   bankedStage: number;
   /** 轉世次數。決定妖魔長出習性的機率。 */
   rebirths: number;
+  /**
+   * 本境帶進這一關的機緣。關與關之間才會變，一關之內是固定的，
+   * 所以伺服器拿著這一份就重播得出同一場仗，不必把「選了哪張」記進操作紀錄。
+   * 和升級等級一樣是客戶端上報的結構性限制（寫在 server/README）。
+   */
+  blessings?: Readonly<Record<string, number>>;
+  /** 帶進這一關的山門耐久；缺席或 null 為滿血。 */
+  gate?: number | null;
+  /** 這一世在飛升台上背的天劫（id → 第幾重）。只對主線生效。 */
+  tribulations?: Readonly<Record<string, number>>;
   /** 無限模式。一般關卡與有終點的副本都是 false。 */
   endless?: boolean;
 }
@@ -243,6 +267,7 @@ export function loadoutSpecOf(save: SaveData, stage: number): LoadoutSpec {
     goldMultiplier: 1,
     bankedStage: save.player.karma.claimedStage,
     rebirths: save.player.karma.rebirths,
+    tribulations: { ...save.world.tribulations },
   };
 }
 
@@ -276,12 +301,9 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
       suddenDeath: has('noLeak'),
       bossTimeMultiplier: has('hasteBoss') ? 0.5 : 1,
     },
-    {
-      damage: karmaAmountOf(spec.karma, 'karmaPower') / 100,
-      gold: karmaAmountOf(spec.karma, 'karmaGold') / 100,
-      disciples: karmaAmountOf(spec.karma, 'karmaGate') / 100,
-      tierBonus: karmaAmountOf(spec.karma, 'karmaTier'),
-    },
+    // 仙緣從 v23 起只留一條很小的傷害線，其餘改成解鎖（見 ROGUELITE_DESIGN.md）。
+    // 舊的金幣、耐久、階數三條已經退點，不再生效。
+    { ...NO_KARMA, damage: karmaAmountOf(spec.karma, 'karmaPower') / 100 },
   );
   // 孤身守門：容錯幾乎歸零。放在這裡而不是 RunRules 裡，
   // 是因為它改的是一個既有的起始值，不是一條新規則。
@@ -328,7 +350,7 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
   // 飛升境的天劫：只給主線。副本有自己的規則、無限模式一場跨很多關，
   // 再疊天劫會變成兩套條件打架。奇遇不算副本規則，帶著奇遇照樣吃天劫。
   const mainline = !spec.endless && spec.rules.every((rule) => rule.startsWith(OMEN_RULE_PREFIX));
-  if (mainline && !loadout.arena) applyTribulations(loadout, spec.stage);
+  if (mainline && !loadout.arena) applyTribulationList(loadout, tribulationsForRun(spec.stage, spec.tribulations ?? {}));
 
   applySectDepth(loadout, spec.sectDepth);
   loadout.threat = threatStage(spec.stage, spec.bankedStage);
@@ -341,7 +363,28 @@ export function buildLoadoutFromSpec(spec: LoadoutSpec): Loadout {
     : Math.min(traitChanceMax, Math.max(0, Math.floor(spec.rebirths)) * traitChancePerLife);
   loadout.endless = spec.endless === true;
   loadout.goldMultiplier *= Math.max(1, spec.goldMultiplier);
+  // 機緣只屬於主線的一境一局：副本有自己的規則、試劍台要所有人起點一樣、
+  // 無限模式一場跨很多關，都不吃。
+  loadout.earlyHp = mainline && !loadout.arena;
+  if (mainline && !loadout.arena && !loadout.endless) {
+    applyBlessings(loadout, sanitizeBlessings(spec.blessings ?? {}));
+    if (typeof spec.gate === 'number' && Number.isFinite(spec.gate)) {
+      loadout.startDisciples = Math.max(1, Math.min(loadout.disciples, Math.round(spec.gate)));
+    }
+  }
   return loadout;
+}
+
+/**
+ * 開場就決定的機緣：抽符速度、陣法倍率。戰鬥中才成立的那些由 defense.ts 讀。
+ * 平衡模擬走 buildLoadoutFor，要吃機緣也是呼叫這一支。
+ */
+export function applyBlessings(loadout: Loadout, blessings: BlessingMap): void {
+  loadout.blessings = blessings;
+  const quick = blessingValue(blessings, 'quickDraw');
+  if (quick > 0) loadout.drawSpeedMultiplier /= Math.max(0.2, 1 - quick);
+  const eye = blessingValue(blessings, 'formationEye');
+  if (eye > 0) loadout.formationMultiplier *= 1 + eye;
 }
 
 /**
@@ -458,5 +501,8 @@ export function buildLoadoutFor(
     talismans: pool,
     rules,
     tierBonus,
+    blessings: NO_BLESSINGS,
+    startDisciples: null,
+    earlyHp: true,
   };
 }

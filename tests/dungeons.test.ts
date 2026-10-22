@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, CARDS, DUNGEONS, SECTS } from '../src/data';
 import { createDefaultSave } from '../src/save';
-import { rebirth } from '../src/systems/karma';
+import { ascend } from '../src/systems/karma';
 import type { SaveData } from '../src/save/types';
 import { createDefenseState, mergeInto, tickCombat } from '../src/systems/defense';
 import {
@@ -174,7 +174,7 @@ describe('副本的結構', () => {
     const save = saveAt(200);
     save.player.dungeons = { library: 16, pagoda: 5 };
     save.player.karma.claimedStage = 0;
-    expect(rebirth(save)).toBe(true);
+    expect(ascend(save)).toBeGreaterThan(0);
 
     expect(clearedFloors(save, 'library')).toBe(0);
     expect(save.world.highestStage).toBeGreaterThan(100);
@@ -213,7 +213,7 @@ describe('副本的結構', () => {
   it('聚寶洞的深度看這一世，不看歷史最高——剛轉世的人不會一進去就必死', () => {
     const save = saveAt(200);
     save.player.karma.claimedStage = 0;
-    rebirth(save);
+    ascend(save);
     save.world.stage = 40;
     // 歷史最高還是 200，但這一趟只會開在第 40 關附近。
     expect(save.world.highestStage).toBeGreaterThan(100);

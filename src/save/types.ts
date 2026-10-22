@@ -8,7 +8,7 @@
  * - 時間一律存 Unix ms 絕對時間戳。
  */
 
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 export const SAVE_KEY = 'xianxia_save_v1';
 
 export interface WalletState {
@@ -52,6 +52,34 @@ export interface KarmaState {
    * 沒有它，轉世就從一個決定退化成一個必須重複執行的動作。
    */
   claimedStage: number;
+  /**
+   * 用仙緣解鎖過的東西：機緣 id，或天劫的某一重（`trib:雷劫id:2`）。
+   * 仙緣從 v23 起改成「解鎖」而不是「加數值」——見 ROGUELITE_DESIGN.md。
+   */
+  unlocks: string[];
+  /** 曾經以九重天渡劫（證道）。證道之後才開放第 82 關以後的飛升境。 */
+  dao: boolean;
+  /** 打完過的最高重天（0 為凡世）。純紀錄。 */
+  bestHeaven: number;
+}
+
+/**
+ * 一境一局（見 src/systems/realmrun.ts）。
+ *
+ * 只存原始事實：本局從哪一關開始、帶著多少耐久與哪些機緣、還沒選的三選一。
+ * 一關之內的東西（場上的符、妖魔）不存——中途離開就從這一關重打。
+ */
+export interface RealmRunState {
+  /** 本局從第幾關開始。山門被破就退回這裡。 */
+  startStage: number;
+  /** 帶進下一關的山門耐久；null 為滿血。 */
+  gate: number | null;
+  /** 本局的機緣（id → 星級）。 */
+  blessings: Record<string, number>;
+  /** 還沒選的三選一；選完、或本局重來時清掉。存起來是為了離開再回來不能重抽。 */
+  offer: { ids: string[]; rare: boolean } | null;
+  /** 本局已用過幾次重抽。 */
+  rerolls: number;
 }
 
 /**
@@ -202,6 +230,10 @@ export interface WorldState {
   /** 挑戰次數與通關次數，純統計。 */
   runs: number;
   clears: number;
+  /** 一境一局。 */
+  realmRun: RealmRunState;
+  /** 這一世背負的天劫（天劫 id → 第幾重）。飛升台上選，整世生效。 */
+  tribulations: Record<string, number>;
 }
 
 /** 玩家偏好。不是權威數值，純本機設定。 */
