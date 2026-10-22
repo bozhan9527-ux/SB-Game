@@ -65,15 +65,16 @@ describe('免費靈石', () => {
   });
 
   it('成就：照金幣獎勵分三檔，領獎時一起入帳', () => {
-    expect(achievementStones(60)).toBe(50);
-    expect(achievementStones(30000)).toBe(100);
-    expect(achievementStones(9000000000)).toBe(200);
+    const [low, mid, high] = SHOP.grants.achievement.map(([, n]) => n);
+    expect(achievementStones(60)).toBe(low);
+    expect(achievementStones(30000)).toBe(mid);
+    expect(achievementStones(9000000000)).toBe(high);
     const save = createDefaultSave(1);
     save.player.achievements.push('first_clear');
     expect(claimReward(save, 'first_clear')).toBeGreaterThan(0);
-    expect(save.player.stones.balance).toBe(50);
+    expect(save.player.stones.balance).toBe(low);
     expect(claimReward(save, 'first_clear')).toBe(0);
-    expect(save.player.stones.balance).toBe(50);
+    expect(save.player.stones.balance).toBe(low);
   });
 });
 
@@ -105,7 +106,8 @@ describe('時裝', () => {
   it('買得起才買、買到直接穿上；沒有的穿不上', () => {
     const save = createDefaultSave(1);
     expect(buyCostume(save, 'moonwhite')).toBe('short');
-    save.player.stones.balance = 2000;
+    const price = SHOP.costumes.find((c) => c.id === 'moonwhite')!.price;
+    save.player.stones.balance = price + 200;
     expect(buyCostume(save, 'moonwhite')).toBe('ok');
     expect(save.player.stones.balance).toBe(200);
     expect(save.player.stones.equipped).toBe('moonwhite');
@@ -126,7 +128,7 @@ describe('v26 轉換', () => {
     const next = migrate(old as unknown as Record<string, unknown>, 26) as Record<string, any>;
     const stones = next['player']['stones'];
     // 30 關＝過了三境
-    const expected = SHOP.grants.firstBreak + 3 * SHOP.grants.realm + SHOP.grants.firstAscend + SHOP.grants.ascend + 50;
+    const expected = SHOP.grants.firstBreak + 3 * SHOP.grants.realm + SHOP.grants.firstAscend + SHOP.grants.ascend + SHOP.grants.achievement[0]![1];
     expect(stones.balance).toBe(expected);
     expect(stones.claimed).toContain('ascend:first');
     expect(stones.claimed).toContain('ach:first_clear');
