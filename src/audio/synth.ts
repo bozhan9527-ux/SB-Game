@@ -222,3 +222,133 @@ export function renderWoodblock(ctx: BaseAudioContext, frequency = 880, seconds 
   }
   return buffer;
 }
+
+// ---------- 配樂第二套編制（2026-10-22）：二胡、揚琴、弦樂、編鐘、堂鼓 ----------
+
+/**
+ * 二胡：弓拉的弦，泛音很多（鋸齒波的 1/n 疊加，第二三泛音再推一點，那是它鼻音的來源）。
+ * 起音從低一點滑上來（揉弦的手指落下去那一下），拉長之後加顫音，弓毛的沙沙聲很輕。
+ */
+export function renderErhu(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const attack = 0.1;
+  const release = Math.min(0.25, seconds * 0.35);
+  const harmonics = [1, 0.75, 0.62, 0.32, 0.22, 0.16, 0.1, 0.07];
+  let phase = 0;
+  let bow = 0;
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const env = Math.min(1, t / attack) * Math.min(1, (seconds - t) / release);
+    const slide = 1 - 0.018 * Math.exp(-t / 0.05);
+    const vibrato = 1 + 0.009 * Math.min(1, Math.max(0, t - 0.18) / 0.25) * Math.sin(2 * Math.PI * 5.6 * t);
+    phase += (2 * Math.PI * frequency * slide * vibrato) / rate;
+    let tone = 0;
+    for (let h = 0; h < harmonics.length; h += 1) tone += (harmonics[h] ?? 0) * Math.sin((h + 1) * phase);
+    bow = bow * 0.7 + (Math.random() * 2 - 1) * 0.3;
+    data[i] = (tone * 0.22 + bow * 0.04) * Math.max(0, env);
+  }
+  return buffer;
+}
+
+/**
+ * 揚琴：竹槌敲弦。每個音是兩根略微走音的弦（揚琴一音多弦，合起來有一點閃爍），
+ * 高泛音衰減得比基音快，起頭有一下很短的槌聲。
+ */
+export function renderDulcimer(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const partials = [[1, 1, 0.9], [2, 0.5, 0.45], [3, 0.3, 0.3], [4.02, 0.18, 0.2], [5.05, 0.1, 0.14]] as const;
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    let tone = 0;
+    for (const [mult, amp, decay] of partials) {
+      const env = Math.exp(-t / decay);
+      tone += amp * env * (Math.sin(2 * Math.PI * frequency * mult * t) + Math.sin(2 * Math.PI * frequency * mult * 1.0025 * t));
+    }
+    const hammer = t < 0.004 ? (Math.random() * 2 - 1) * (1 - t / 0.004) * 0.5 : 0;
+    const fade = Math.min(1, (seconds - t) / 0.05);
+    data[i] = (tone * 0.22 + hammer) * fade;
+  }
+  return buffer;
+}
+
+/** 弦樂合奏的持續和聲：三把略微走音的弦（少量泛音），慢起慢收，比笙更厚、更暖。 */
+export function renderStrings(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  const attack = Math.min(0.6, seconds * 0.35);
+  const release = Math.min(0.8, seconds * 0.4);
+  const detunes = [0.996, 1, 1.0045];
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const env = Math.min(1, t / attack) * Math.min(1, (seconds - t) / release);
+    let tone = 0;
+    for (const d of detunes) {
+      const f = frequency * d;
+      tone += Math.sin(2 * Math.PI * f * t) + 0.4 * Math.sin(4 * Math.PI * f * t) + 0.18 * Math.sin(6 * Math.PI * f * t) + 0.08 * Math.sin(8 * Math.PI * f * t);
+    }
+    data[i] = tone * 0.11 * Math.max(0, env);
+  }
+  return buffer;
+}
+
+/** 低音弓弦（革胡）：短促的弓，基音加一點二泛音，墊在拍子上。 */
+export function renderBassBow(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const env = Math.min(1, t / 0.04) * Math.exp(-t / (seconds * 0.55));
+    const tone = Math.sin(2 * Math.PI * frequency * t) + 0.35 * Math.sin(4 * Math.PI * frequency * t) + 0.12 * Math.sin(6 * Math.PI * frequency * t);
+    data[i] = tone * 0.4 * env * Math.min(1, (seconds - t) / 0.05);
+  }
+  return buffer;
+}
+
+/**
+ * 編鐘：FM 合成的鐘聲。調變頻率取非整數倍，聲音才有青銅的「嗡」；
+ * 調變深度隨時間衰減，敲下去很亮、尾音越來越純。
+ */
+export function renderChime(ctx: BaseAudioContext, frequency: number, seconds: number): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const index = 3.2 * Math.exp(-t / 0.35);
+    const mod = Math.sin(2 * Math.PI * frequency * 1.41 * t) * index;
+    const env = Math.exp(-t / (seconds * 0.4)) * Math.min(1, t / 0.002);
+    data[i] = Math.sin(2 * Math.PI * frequency * t + mod) * 0.5 * env * Math.min(1, (seconds - t) / 0.05);
+  }
+  return buffer;
+}
+
+/** 堂鼓：鼓皮的音高從高往下掉（敲下去那一下最緊），加一點鼓框的噪音。 */
+export function renderDrum(ctx: BaseAudioContext, seconds = 0.35): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const length = Math.max(1, Math.floor(rate * seconds));
+  const buffer = ctx.createBuffer(1, length, rate);
+  const data = buffer.getChannelData(0);
+  let phase = 0;
+  let noise = 0;
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const f = 70 + 90 * Math.exp(-t / 0.04);
+    phase += (2 * Math.PI * f) / rate;
+    noise = noise * 0.6 + (Math.random() * 2 - 1) * 0.4;
+    const body = Math.sin(phase) * Math.exp(-t / 0.12);
+    const skin = noise * Math.exp(-t / 0.02) * 0.35;
+    data[i] = (body + skin) * 0.8;
+  }
+  return buffer;
+}
