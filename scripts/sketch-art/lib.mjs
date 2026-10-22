@@ -9,6 +9,19 @@ let seed = 1;
 export function seedRng(n) {
   seed = (Math.abs(Math.floor(n)) % 2147483646) + 1;
 }
+/**
+ * 在旁支亂數裡跑 fn：主亂數序列不受影響。麥克筆畫風多出來的隨機（錯位、筆觸）都包在這裡，
+ * 所以兩種畫風的線稿一筆一筆完全對得上——只換筆，不換圖。
+ */
+export function aside(fn) {
+  const saved = seed;
+  seed = ((saved * 48271) % 2147483646) + 1;
+  try {
+    return fn();
+  } finally {
+    seed = saved;
+  }
+}
 export const R = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 export const J = (a) => (R() * 2 - 1) * a;
 
@@ -146,19 +159,16 @@ export class Pic {
   ink(pts, { w = 3.2, color = INK, closed = false, amp = 1.2, passes = 2, op = 1 } = {}) {
     w *= this.ls;
     amp *= this.ls;
+    // 麥克筆：只留第一筆（線稿位置和彩鉛版一樣，第二筆照樣算亂數但不畫）、略粗。
+    const only = marker() ? 1 : passes;
     if (marker()) {
-      // 麥克筆：一筆到底、粗一點、筆頭圓；不描第二次。
-      w *= passes > 1 ? 0.95 : 0.9;
-      passes = 1;
-      // 長線條放鬆一點；臉、眼、嘴這種小線條要穩，抖了五官就歪
-      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
-      const size = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-      amp *= size < 45 ? 0.5 : 1.4;
+      w *= 1.1;
       if (color === INK) color = '#2b2420';
     }
     for (let p = 0; p < passes; p++) {
       let q = pts.map(([x, y]) => [x + J(amp * 0.8), y + J(amp * 0.8)]);
       if (closed && q.length > 2) q = q.concat([[q[0][0] + J(1.5 * this.ls), q[0][1] + J(1.5 * this.ls)], [q[1][0] + J(1.5 * this.ls), q[1][1] + J(1.5 * this.ls)]]);
+      if (p >= only) continue;
       this.add(`<path d="${smooth(q, false)}" fill="none" stroke="${color}" stroke-width="${f1(p ? w * 0.62 : w)}" stroke-linecap="round" stroke-linejoin="round" opacity="${(op * (p ? 0.75 : 1)).toFixed(2)}"/>`);
     }
   }
@@ -171,10 +181,9 @@ export class Pic {
     const x0 = Math.min(...xs) - 6, x1 = Math.max(...xs) + 6, y0 = Math.min(...ys) - 6, y1 = Math.max(...ys) + 6;
     const L = Math.hypot(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     gap *= this.ls;
-    if (marker()) return this.markerFill(pts, d, id, color, { base, op, angle, x0, x1, y0, y1 });
     if (this.vivid && base > 0) base = Math.min(0.9, base * 1.3 + 0.06);
     // 角色的底色是平塗（不過顆粒濾鏡），排線才帶顆粒：底色過濾鏡會被打成一片雜點，看起來髒。
-    if (this.vivid && base > 0) this.add(`<path d="${d}" fill="${color}" opacity="${base}"/>`);
+    if (this.vivid && base > 0 && !marker()) this.add(`<path d="${d}" fill="${color}" opacity="${base}"/>`);
     let g = `<g clip-path="url(#${id})" ${this.grainOf(pts)}>`;
     if (base > 0 && !this.vivid) g += `<path d="${d}" fill="${color}" opacity="${base}"/>`;
     const lines = (ang, op2) => {
@@ -188,14 +197,22 @@ export class Pic {
     };
     if (op > 0) lines(angle, op);
     if (cross) lines(angle + 1.25, op * 0.55);
+    if (marker()) {
+      // 排線照算（吃掉一樣多的亂數）但不畫，改成平塗
+      this.defs.pop();
+      aside(() => this.markerFill(pts, d, color, { base, op, angle, x0, x1, y0, y1 }));
+      return;
+    }
     this.add(g + '</g>');
   }
   /**
    * 麥克筆平塗：整塊淡彩稍微錯位（塗出線外一點），再用剪裁畫幾道寬筆觸，
    * 筆觸重疊處顏色較深——麥克筆來回塗的痕跡。
    */
-  markerFill(pts, d, id, color, { base, op, angle, x0, x1, y0, y1 }) {
+  markerFill(pts, d, color, { base, op, angle, x0, x1, y0, y1 }) {
     if (base <= 0 && op < 0.3) return;
+    const id = 'c' + uid++;
+    this.defs.push(`<clipPath id="${id}"><path d="${d}"/></clipPath>`);
     // 深色（頭髮、墨）不能淡掉，不然變成灰灰的半透明
     const n = parseInt((/^#([0-9a-f]{6})$/i.exec(color) ?? [0, '888888'])[1], 16);
     const dark = ((n >> 16) * 0.3 + ((n >> 8) & 255) * 0.59 + (n & 255) * 0.11) < 70;

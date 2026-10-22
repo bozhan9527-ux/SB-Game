@@ -1,7 +1,7 @@
 /**
  * 場景素材：境界背景、戰場、山門、符紙、陣位、符紋、介面圖示、主畫面主視覺。
  */
-import { C, FU, GRAPH, HAIR, INK, J, PAPER, Pic, R, STYLE, WOOD, ZHU, bolt, crane, eaveRoof, ellipsePts, flame, flySword, hill, jitter, pagoda, peak, pine, ribbon, ruyi, seedRng, smooth, spiral } from './lib.mjs';
+import { C, FU, GRAPH, HAIR, INK, J, PAPER, Pic, R, STYLE, WOOD, aside, ZHU, bolt, crane, eaveRoof, ellipsePts, flame, flySword, hill, jitter, pagoda, peak, pine, ribbon, ruyi, seedRng, smooth, spiral } from './lib.mjs';
 import { heroXian } from './chars.mjs';
 
 const GW = 540, GH = 960;
@@ -12,11 +12,11 @@ export function xuanPaper(p, { lines = true, frame = true, tint = null } = {}) {
     // 白圖畫紙＋咖啡色雙框（粗框一圈、細框一圈，都是手畫的不直線）。
     p.add(`<rect width="${p.w}" height="${p.h}" fill="#fbfaf5"/>`);
     if (tint) p.add(`<rect width="${p.w}" height="${p.h}" fill="${tint}" opacity=".05"/>`);
-    if (frame) {
+    if (frame) aside(() => {
       const box = (m) => [[m, m], [p.w - m, m], [p.w - m, p.h - m], [m, p.h - m], [m, m]];
       p.ink(jitter(box(13), 1, 30), { w: 3.6, color: '#7a4e2e', amp: 0.6 });
       p.ink(jitter(box(21), 0.8, 30), { w: 1.3, color: '#7a4e2e', amp: 0.5 });
-    }
+    });
     return;
   }
   p.add(`<rect width="${p.w}" height="${p.h}" fill="${PAPER}"/>`);

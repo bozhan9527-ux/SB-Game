@@ -5,7 +5,7 @@
  * 0、1 是 A 步、2、3 是 B 步；奇數幀整隻往上彈一點。每幀換一個亂數種子，
  * 線條會輕微「沸騰」——手繪動畫的那種抖動，比每幀一模一樣更活。
  */
-import { C, FU, HAIR, INK, J, R, SKIN, STYLE, WOOD, ZHU, crane as craneBird, ellipsePts, flame, ribbon, spiral, bolt } from './lib.mjs';
+import { C, FU, HAIR, INK, J, R, SKIN, STYLE, WOOD, aside, ZHU, crane as craneBird, ellipsePts, flame, ribbon, spiral, bolt } from './lib.mjs';
 
 export const step = (f) => (f >= 2 ? 1 : 0);
 export const bob = (f) => (f % 2 ? -2 : 0);
@@ -35,8 +35,10 @@ export function eyes(p, x, y, gap, s = 1, style = 'dot', color = '#c43a2a') {
     } else if (STYLE === 'marker') {
       // 亮晶晶的眼睛：黑眼珠 + 兩顆白光點
       p.dot(ex, y, 2.8 * s);
-      p.dot(ex + 0.9 * s, y - 1 * s, 0.9 * s, '#ffffff');
-      p.dot(ex - 0.9 * s, y + 0.9 * s, 0.45 * s, '#ffffff');
+      aside(() => {
+        p.dot(ex + 0.9 * s, y - 1 * s, 0.9 * s, '#ffffff');
+        p.dot(ex - 0.9 * s, y + 0.9 * s, 0.45 * s, '#ffffff');
+      });
     } else p.dot(ex, y, 2.3 * s);
     if (style === 'angry' || style === 'glow') p.ink([[x + k * (gap + 5 * s), y - 6 * s], [x + k * (gap - 3 * s), y - 3.5 * s]], { w: 2, passes: 1 });
   }
@@ -90,13 +92,13 @@ export function human(p, x, y, f, s = 1, o = {}) {
   p.solid(x, headY, 13 * s, 13.5 * s, o.skin ?? SKIN, { ow: 2.2 });
   if (o.hairStyle !== 'none') {
     p.shape(S([[-13, -63], [-12, -73], [-4, -77], [6, -77], [13, -72], [13, -63], [8, -70], [0, -68], [-6, -71]]), o.hair ?? HAIR, { base: 0.9, gap: 2, ow: 1.8 });
-    if (STYLE === 'marker') {
+    if (STYLE === 'marker') aside(() => {
       // 塗鴉捲髮：沿髮際畫幾個小圈圈
       for (let i = 0; i < 5; i++) {
         const u = -10 + i * 5, v = -74 + Math.abs(u) * 0.1;
         p.ink(spiral(x + u * s, y + v * s, 2.4 * s, 1.1, i % 2 ? 1 : -1, R() * 6), { w: 1.1, passes: 1, amp: 0.2 });
       }
-    }
+    });
   }
   if (o.hat) o.hat(p, x, headY, s);
   else if (o.hairStyle !== 'none') p.solid(x, headY - 17 * s, 5.5 * s, 4.5 * s, o.hair ?? HAIR, { ow: 1.6 });
