@@ -257,15 +257,23 @@ export const BOSSES = {
     });
   } },
   hydra: { draw: (p, x, y, f) => {
+    // 九首相柳：九個頭。後排四個小一點、高一點、顏色深一階（在遠處），前排五個。
+    const head = (a, reach, lift, size, body, skin, i) => {
+      const sw = (f ? 1 : -1) * (i % 2 ? 4 : -4);
+      const hx = x + Math.cos(a) * reach + sw, hy = y - 60 - lift + Math.sin(a) * 120;
+      ribbon(p, [[x + Math.cos(a) * 30, y - 50], [x + Math.cos(a) * reach * 0.65 + sw, y - 70 - lift * 0.6 + Math.sin(a) * 60], [hx, hy + 14 * size]], 10 * size, body, { taper: 0.3 });
+      p.blob(hx, hy, 17 * size, 13 * size, skin, { gap: 2.4, base: 0.5 });
+      eyes(p, hx, hy - 2 * size, 6 * size, 1.1 * size, 'glow', '#e8b33c');
+      p.ink([[hx, hy + 11 * size], [hx, hy + 18 * size]], { w: 1.6, color: ZHU, passes: 1 });
+    };
+    for (let i = 0; i < 4; i++) {
+      const t = i / 3, a = -Math.PI * 0.82 + t * Math.PI * 0.64;
+      head(a, 70, 22, 0.8, '#3f7a62', '#4f8a70', i + 1);
+    }
     p.blob(x, y - 40, 70, 36, '#3a6a5a', { gap: 2.8, base: 0.5 });
-    const heads = 5;
-    for (let i = 0; i < heads; i++) {
-      const t = i / (heads - 1), a = -Math.PI * 0.92 + t * Math.PI * 0.84, sw = (f ? 1 : -1) * (i % 2 ? 4 : -4);
-      const hx = x + Math.cos(a) * 92 + sw, hy = y - 60 + Math.sin(a) * 120;
-      ribbon(p, [[x + Math.cos(a) * 30, y - 50], [x + Math.cos(a) * 60 + sw, y - 70 + Math.sin(a) * 60], [hx, hy + 14]], 10, '#4f8a70', { taper: 0.3 });
-      p.blob(hx, hy, 17, 13, '#5f9a80', { gap: 2.4, base: 0.5 });
-      eyes(p, hx, hy - 2, 6, 1.1, 'glow', '#e8b33c');
-      p.ink([[hx, hy + 11], [hx, hy + 18]], { w: 1.6, color: ZHU, passes: 1 });
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4, a = -Math.PI * 0.92 + t * Math.PI * 0.84;
+      head(a, 92, 0, 1, '#4f8a70', '#5f9a80', i);
     }
   } },
   demonemperor: { draw: (p, x, y, f) => {
