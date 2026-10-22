@@ -63,7 +63,7 @@ export class DungeonScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     this.add
       .text(cx, 44, "副　本", textStyle({ size: 36, color: INK, bold: true }))
-      .setOrigin(0.5);
+      .setStroke('#fdfbf6', 8).setOrigin(0.5);
     this.add
       .text(
         cx,
@@ -71,7 +71,7 @@ export class DungeonScene extends Phaser.Scene {
         "關卡由副本決定，不能挑",
         textStyle({ size: 16, color: INK_DIM }),
       )
-      .setOrigin(0.5);
+      .setStroke('#fdfbf6', 6).setOrigin(0.5);
 
     DUNGEONS.forEach((dungeon, index) => {
       this.buildCard(dungeon, LIST_TOP + index * (CARD_HEIGHT + CARD_GAP));

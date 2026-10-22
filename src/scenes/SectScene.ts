@@ -52,11 +52,11 @@ export class SectScene extends Phaser.Scene {
     this.selected = SECTS.find((sect) => sect.id === save.player.sectId) ?? null;
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 74, '拜入師門', textStyle({ size: 42, color: INK, bold: true })).setOrigin(0.5);
+    this.add.text(cx, 74, '拜入師門', textStyle({ size: 42, color: INK, bold: true })).setStroke('#fdfbf6', 8).setOrigin(0.5);
     // 門派修為與換派費用要先講清楚，玩家才會知道這個選擇是有份量的。
     this.add
       .text(cx, 118, '門派修為只長在自己身上——換派要付錢，但舊修為留著', textStyle({ size: 17, color: INK_DIM }))
-      .setOrigin(0.5);
+      .setStroke('#fdfbf6', 6).setOrigin(0.5);
     this.brought = sanitizeTalismans(save.player.talismans, libraryFloor(save));
 
     // 四張卡 + 底部兩顆按鈕要塞進 960：140 起、每張 168 高、間距 6，

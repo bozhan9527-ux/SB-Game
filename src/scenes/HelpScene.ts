@@ -282,7 +282,7 @@ export class HelpScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     this.add
       .text(cx, 46, "玩法說明", textStyle({ size: 40, color: INK, bold: true }))
-      .setOrigin(0.5);
+      .setStroke('#fdfbf6', 8).setOrigin(0.5);
     this.add
       .text(
         cx,
@@ -290,7 +290,7 @@ export class HelpScene extends Phaser.Scene {
         "完整規則，隨時查閱（教學會在用得到的那一關自己出現）",
         textStyle({ size: 16, color: INK_DIM }),
       )
-      .setOrigin(0.5);
+      .setStroke('#fdfbf6', 6).setOrigin(0.5);
 
     const viewTop = 122;
     // 底部留給「可捲動」提示與按鈕，遮罩下緣不能貼著它們。

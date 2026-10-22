@@ -685,7 +685,7 @@ export class ResultScene extends Phaser.Scene {
           "戰　報",
           textStyle({ size: 38, color: GOLD, bold: true }),
         )
-        .setOrigin(0.5),
+        .setStroke('#fdfbf6', 8).setOrigin(0.5),
     );
     parts.push(
       this.add
@@ -696,7 +696,7 @@ export class ResultScene extends Phaser.Scene {
             `平均每秒 ${formatNumber(averageDps(telemetry, result.elapsedMs))}`,
           textStyle({ size: 17, color: INK_DIM }),
         )
-        .setOrigin(0.5),
+        .setStroke('#fdfbf6', 6).setOrigin(0.5),
     );
 
     parts.push(...this.buildDamageBars(cx, 150, telemetry));

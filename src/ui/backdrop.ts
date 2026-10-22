@@ -45,6 +45,9 @@ export function drawBackdrop(scene: Phaser.Scene, realm: BackdropRealm): Phaser.
     layer.add(scene.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, PAPER).setOrigin(0, 0));
   }
   const fade = scene.add.graphics();
+  // 整張先蓋一層薄紙：麥克筆畫風的遠景顏色比彩鉛深，不蓋的話頁首的標題、說明會壓在竹子和山上讀不清
+  fade.fillStyle(PAPER, 0.66);
+  fade.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
   drawFade(fade, 0.5);
   layer.add(fade);
 

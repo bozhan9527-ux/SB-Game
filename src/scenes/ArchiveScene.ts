@@ -49,7 +49,7 @@ export class ArchiveScene extends Phaser.Scene {
     this.cloudStatus = undefined;
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 40, '存　檔', textStyle({ size: 36, color: INK, bold: true })).setOrigin(0.5);
+    this.add.text(cx, 40, '存　檔', textStyle({ size: 36, color: INK, bold: true })).setStroke('#fdfbf6', 8).setOrigin(0.5);
 
     this.buildRecords(cx, RECORDS_TOP);
     // 存檔碼、雲端存檔與匿名統計各自墊一塊面板：說明字直接寫在遠景上，

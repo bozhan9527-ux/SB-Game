@@ -63,8 +63,8 @@ export class UpgradeScene extends Phaser.Scene {
     drawBackdrop(this, realm);
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 56, '洞府', textStyle({ size: 42, color: INK, bold: true })).setOrigin(0.5);
-    this.goldText = this.add.text(cx, 104, '', textStyle({ size: 26, color: GOLD })).setOrigin(0.5);
+    this.add.text(cx, 56, '洞府', textStyle({ size: 42, color: INK, bold: true })).setStroke('#fdfbf6', 8).setOrigin(0.5);
+    this.goldText = this.add.text(cx, 104, '', textStyle({ size: 26, color: GOLD })).setStroke('#fdfbf6', 6).setOrigin(0.5);
 
     // 六條線 + 摘要 + 兩顆按鈕要塞進 960，因此列高與間距是算過的：
     // 140 起、每列 96 高、間距 8，最後一列底緣落在 756，剛好把 770 以下讓給摘要與按鈕。

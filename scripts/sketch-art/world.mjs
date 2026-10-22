@@ -14,8 +14,9 @@ export function xuanPaper(p, { lines = true, frame = true, tint = null } = {}) {
     if (tint) p.add(`<rect width="${p.w}" height="${p.h}" fill="${tint}" opacity=".05"/>`);
     if (frame) aside(() => {
       const box = (m) => [[m, m], [p.w - m, m], [p.w - m, p.h - m], [m, p.h - m], [m, m]];
-      p.ink(jitter(box(13), 1, 30), { w: 3.6, color: '#7a4e2e', amp: 0.6 });
-      p.ink(jitter(box(21), 0.8, 30), { w: 1.3, color: '#7a4e2e', amp: 0.5 });
+      // 框貼著紙邊畫（6、12 點），而且淡一點：介面元件從 14 點起排，框不能從它們底下穿過去
+      p.ink(jitter(box(6), 0.8, 30), { w: 2.6, color: '#7a4e2e', amp: 0.5, op: 0.8 });
+      p.ink(jitter(box(11), 0.6, 30), { w: 1, color: '#7a4e2e', amp: 0.4, op: 0.6 });
     });
     return;
   }
@@ -387,7 +388,6 @@ export function titleKey() {
 /** 匾額標題：木框紅底金字 + 仙俠朱印。440×140。 */
 export function titleLogo() {
   const p = new Pic(450, 150);
-  p.ink([[60, 16], [100, 2], [225, -4], [350, 2], [390, 16]], { w: 1.8, color: ZHU, passes: 1 });
   p.shape([[10, 16], [430, 16], [436, 136], [4, 136]], WOOD, { base: 0.6, gap: 3, ow: 3.4, sharp: true });
   p.shape([[26, 30], [414, 30], [418, 122], [22, 122]], '#7a2a22', { base: 0.75, gap: 3, ow: 2, sharp: true });
   ['問', '道', '飛', '升'].forEach((ch, i) => p.letter(76 + i * 96, 104, ch, '#f3c84a', { size: 74, fillOp: 0.9 }));

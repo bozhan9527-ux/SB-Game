@@ -143,7 +143,7 @@ export class TalismanScene extends Phaser.Scene {
     this.activeSlot = 0;
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 40, '符籙譜', textStyle({ size: 34, color: INK, bold: true })).setOrigin(0.5);
+    this.add.text(cx, 40, '符籙譜', textStyle({ size: 34, color: INK, bold: true })).setStroke('#fdfbf6', 8).setOrigin(0.5);
     const upcoming = nextUnlock(highest);
     this.add
       .text(
@@ -155,7 +155,7 @@ export class TalismanScene extends Phaser.Scene {
           : `每次帶 ${TALISMAN_SLOTS} 張入場　藏經閣第 ${highest + 1} 層可得「${upcoming.name}」`,
         textStyle({ size: 16, color: INK_DIM }),
       )
-      .setOrigin(0.5);
+      .setStroke('#fdfbf6', 6).setOrigin(0.5);
 
     this.buildSectLine(cx);
     this.buildChosenSlots(cx);
@@ -215,7 +215,7 @@ export class TalismanScene extends Phaser.Scene {
     const gain = Math.round((sect.favoredDamageMultiplier - 1) * 100);
     this.sectLine = this.add
       .text(cx, 92, '', textStyle({ size: 15, bold: true }))
-      .setOrigin(0.5)
+      .setStroke('#fdfbf6', 6).setOrigin(0.5)
       .setData('sect', sect.name)
       .setData('favored', favored.name)
       .setData('gain', gain);

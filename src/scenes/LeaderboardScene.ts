@@ -100,7 +100,7 @@ export class LeaderboardScene extends Phaser.Scene {
     this.rows = [];
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 44, '榜　單', textStyle({ size: 36, color: INK, bold: true })).setOrigin(0.5);
+    this.add.text(cx, 44, '榜　單', textStyle({ size: 36, color: INK, bold: true })).setStroke('#fdfbf6', 8).setOrigin(0.5);
 
     // 三個分頁。同一頁塞三種排序會讓人看不出現在在看什麼，
     // 而三個榜回答的是三個不同的問題：走得多深、多快、撐得多久。
@@ -170,7 +170,7 @@ export class LeaderboardScene extends Phaser.Scene {
       });
       this.add
         .text(cx, 122, `第 ${track} 關`, textStyle({ size: 17, color: JADE, bold: true }))
-        .setOrigin(0.5);
+        .setStroke('#fdfbf6', 6).setOrigin(0.5);
 
       // **速通榜要能成立就需要這一顆。**
       //
@@ -213,12 +213,14 @@ export class LeaderboardScene extends Phaser.Scene {
           : `你最深到第 ${save.world.highestStage} 關`,
         textStyle({ size: 22, color: GOLD, bold: true }),
       )
+      .setStroke('#fdfbf6', 6)
       .setOrigin(0.5);
 
     // 「我到底有沒有上榜」是這一頁最常被問的問題，而原本這裡完全沒有回答——
     // 玩家只看得到別人的名次，看不出自己缺了什麼、或是根本已經在榜上了。
     this.mine = this.add
       .text(cx, 174 + shift, '', textStyle({ size: 15, color: INK_DIM }))
+      .setStroke('#fdfbf6', 5)
       .setOrigin(0.5);
 
 
@@ -317,7 +319,7 @@ export class LeaderboardScene extends Phaser.Scene {
     // 一個數字就解決：和伺服器對不上時，它就是那句話的證據。
     this.add
       // 放在右下角、按鈕底緣（933）以下：置中的話會被返回鍵的立體邊壓掉半行。
-      .text(GAME_WIDTH - 16, GAME_HEIGHT - 12, `版本 ${REPLAY_CONTRACT_VERSION}`, textStyle({ size: 13, color: INK_DIM }))
+      .text(GAME_WIDTH - 22, GAME_HEIGHT - 24, `版本 ${REPLAY_CONTRACT_VERSION}`, textStyle({ size: 13, color: INK_DIM }))
       .setOrigin(1, 0.5)
       .setAlpha(0.7);
 

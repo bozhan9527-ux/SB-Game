@@ -142,7 +142,7 @@ export class TitleScene extends Phaser.Scene {
     this.add
       .text(
         cx,
-        GAME_HEIGHT - 16,
+        GAME_HEIGHT - 30,
         `最高境界 ${realmTitle(save.world.highestStage)} · 通關 ${save.world.clears} 次 · ${APP_VERSION}`,
         textStyle({ size: 17, color: INK_DIM }),
       )
@@ -221,7 +221,7 @@ export class TitleScene extends Phaser.Scene {
         `金幣 ${formatNumber(save.player.wallet.gold)}`,
         textStyle({ size: 18, color: GOLD }),
       )
-      .setOrigin(0, 0.5);
+      .setStroke('#fdfbf6', 6).setOrigin(0, 0.5);
 
     // 靈石：點了進藏寶閣。和金幣同一列，但它是個入口，所以做成按鈕。
     createButton(this, GAME_WIDTH - 150, 36, {

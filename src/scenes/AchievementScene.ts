@@ -52,8 +52,8 @@ export class AchievementScene extends Phaser.Scene {
     drawBackdrop(this, realm);
 
     const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 46, '仙途錄', textStyle({ size: 40, color: INK, bold: true })).setOrigin(0.5);
-    this.header = this.add.text(cx, 92, '', textStyle({ size: 20, color: GOLD })).setOrigin(0.5);
+    this.add.text(cx, 46, '仙途錄', textStyle({ size: 40, color: INK, bold: true })).setStroke('#fdfbf6', 8).setOrigin(0.5);
+    this.header = this.add.text(cx, 92, '', textStyle({ size: 20, color: GOLD })).setStroke('#fdfbf6', 6).setOrigin(0.5);
 
     // 條目放進一個可拖曳的容器，並用遮罩裁掉清單範圍以外的部分。
     const viewTop = 122;
